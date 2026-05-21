@@ -5,17 +5,41 @@ const { sendToCustomerTokens } = require("./notificationService");
 
 const returnTemplateMap = {
   requested: "return_requested",
+  request_received: "return_requested",
+  return_requested: "return_requested",
+  solicitud_de_devolucion_recibida: "return_requested",
   approved: "return_approved",
+  return_approved: "return_approved",
+  devolucion_aprobada: "return_approved",
   rejected: "return_rejected",
+  return_rejected: "return_rejected",
+  devolucion_rechazada: "return_rejected",
   pickup_scheduled: "return_pickup_scheduled",
+  collection_scheduled: "return_pickup_scheduled",
+  recoleccion_programada: "return_pickup_scheduled",
   picked_up: "return_picked_up",
+  product_picked_up: "return_picked_up",
+  producto_recogido: "return_picked_up",
   refund_processed: "refund_processed",
-  refund_completed: "refund_completed"
+  reembolso_procesado: "refund_processed",
+  refund_completed: "refund_completed",
+  reembolso_completado: "refund_completed"
 };
+
+function normalizeReturnStatus(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, "")
+    .replace(/[\s-]+/g, "_");
+}
 
 async function processReturnEvent({ shopDomain, payload }) {
   const status = payload.status;
-  const templateCode = returnTemplateMap[status] || null;
+  const normalizedStatus = normalizeReturnStatus(status);
+  const templateCode = returnTemplateMap[normalizedStatus] || null;
 
   const eventInsert = await pool.query(
     `
@@ -27,7 +51,7 @@ async function processReturnEvent({ shopDomain, payload }) {
       shopDomain,
       payload.return_reference || null,
       payload.shopify_customer_id || null,
-      status,
+      normalizedStatus || status,
       JSON.stringify(payload)
     ]
   );

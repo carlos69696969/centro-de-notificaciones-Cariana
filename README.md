@@ -126,6 +126,16 @@ Payload esperado:
 }
 ```
 
+Estados soportados (se normalizan automaticamente):
+
+- `requested`, `request_received`, `return_requested`
+- `approved`, `return_approved`
+- `rejected`, `return_rejected`
+- `pickup_scheduled`, `collection_scheduled`
+- `picked_up`, `product_picked_up`
+- `refund_processed`, `refund_completed`
+- variantes en espanol como `devolucion_aprobada`, `recoleccion_programada`, `reembolso_completado`.
+
 ### Estado manual de pedido
 
 - `POST /api/orders/manual-status`
@@ -138,6 +148,11 @@ Estados soportados:
 - `in_transit`
 - `delivered`
 - `cancelled`
+
+Notas de automatizacion en pedidos:
+
+- Si Shopify envia estado de entrega (`delivered`), se usa plantilla `order_delivered`.
+- Se evita reenviar notificaciones duplicadas cuando llega el mismo estado varias veces para la misma orden.
 
 ## Seguridad implementada
 

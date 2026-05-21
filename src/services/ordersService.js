@@ -3,6 +3,30 @@ const { upsertCustomerFromShopify, getCustomerByShopifyId } = require("./custome
 const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens } = require("./notificationService");
 
+function normalizeStatus(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function hasDeliveredSignal(payload) {
+  const deliveredValues = new Set(["delivered", "delivered_to_customer"]);
+  const candidates = [];
+
+  candidates.push(normalizeStatus(payload.fulfillment_status));
+  candidates.push(normalizeStatus(payload.display_fulfillment_status));
+
+  if (Array.isArray(payload.fulfillments)) {
+    for (const fulfillment of payload.fulfillments) {
+      candidates.push(normalizeStatus(fulfillment.shipment_status));
+      candidates.push(normalizeStatus(fulfillment.status));
+    }
+  }
+
+  return candidates.some((status) => deliveredValues.has(status));
+}
+
 function resolveTemplateCodeFromOrder(topic, payload) {
   if (topic === "orders/cancelled") {
     return "order_cancelled";
@@ -11,11 +35,17 @@ function resolveTemplateCodeFromOrder(topic, payload) {
     return "order_confirmed";
   }
   if (topic === "orders/fulfilled") {
+    if (hasDeliveredSignal(payload)) {
+      return "order_delivered";
+    }
     return "order_shipped";
   }
   if (topic === "orders/updated") {
     if (payload.cancelled_at) {
       return "order_cancelled";
+    }
+    if (hasDeliveredSignal(payload)) {
+      return "order_delivered";
     }
     if (payload.fulfillment_status === "fulfilled") {
       return "order_in_transit";
@@ -50,24 +80,33 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     return { skipped: true };
   }
 
+  const mappedOrder = await pool.query(
+    `
+    SELECT shopify_customer_id, order_number, last_status
+    FROM order_customer_map
+    WHERE shop_domain = $1 AND order_id = $2
+    `,
+    [shopDomain, payload.id]
+  );
+
+  const existingMap = mappedOrder.rowCount > 0 ? mappedOrder.rows[0] : null;
+  if (existingMap && existingMap.last_status === templateCode) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Duplicate status event', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Duplicate status event" };
+  }
+
   let customer = null;
+  const customerIdFromPayload = payload.customer?.id || null;
+  const customerIdFromMap = existingMap?.shopify_customer_id || null;
+  const mappedCustomerId = customerIdFromPayload || customerIdFromMap;
+
   if (payload.customer?.id) {
     customer = await upsertCustomerFromShopify(shopDomain, payload.customer);
-    await pool.query(
-      `
-      INSERT INTO order_customer_map
-        (shop_domain, order_id, shopify_customer_id, order_number, last_status, updated_at)
-      VALUES
-        ($1,$2,$3,$4,$5,NOW())
-      ON CONFLICT (shop_domain, order_id)
-      DO UPDATE SET
-        shopify_customer_id = EXCLUDED.shopify_customer_id,
-        order_number = EXCLUDED.order_number,
-        last_status = EXCLUDED.last_status,
-        updated_at = NOW()
-      `,
-      [shopDomain, payload.id, payload.customer.id, payload.order_number || null, templateCode]
-    );
+  } else if (mappedCustomerId) {
+    customer = await getCustomerByShopifyId(shopDomain, mappedCustomerId);
   }
 
   if (!customer) {
@@ -77,6 +116,28 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     );
     return { skipped: true, reason: "Order has no customer" };
   }
+
+  await pool.query(
+    `
+    INSERT INTO order_customer_map
+      (shop_domain, order_id, shopify_customer_id, order_number, last_status, updated_at)
+    VALUES
+      ($1,$2,$3,$4,$5,NOW())
+    ON CONFLICT (shop_domain, order_id)
+    DO UPDATE SET
+      shopify_customer_id = EXCLUDED.shopify_customer_id,
+      order_number = EXCLUDED.order_number,
+      last_status = EXCLUDED.last_status,
+      updated_at = NOW()
+    `,
+    [
+      shopDomain,
+      payload.id,
+      mappedCustomerId || customer.shopify_customer_id,
+      payload.order_number || existingMap?.order_number || null,
+      templateCode
+    ]
+  );
 
   const template = await getTemplate(shopDomain, templateCode);
   if (!template) {
