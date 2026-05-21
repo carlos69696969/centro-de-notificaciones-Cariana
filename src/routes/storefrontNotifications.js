@@ -273,11 +273,40 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     return a;
   }
 
+  function isVisible(node) {
+    if (!node) return false;
+    var style = window.getComputedStyle(node);
+    if (!style) return false;
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+    var rect = node.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  }
+
+  function findFirstVisible(selectorList) {
+    for (var i = 0; i < selectorList.length; i++) {
+      var list = document.querySelectorAll(selectorList[i]);
+      for (var j = 0; j < list.length; j++) {
+        if (isVisible(list[j])) return list[j];
+      }
+    }
+    return null;
+  }
+
   function findHeaderTarget() {
-    var cart = document.querySelector('a[href*="/cart"], .header__icon--cart, .icon-cart, .site-header__cart');
+    var cart = findFirstVisible([
+      'a[href*="/cart"]',
+      ".header__icon--cart",
+      ".icon-cart",
+      ".site-header__cart"
+    ]);
     if (cart && cart.parentElement) return cart.parentElement;
 
-    var account = document.querySelector('a[href*="/account"], .header__icon--account, .icon-account, .site-header__account');
+    var account = findFirstVisible([
+      'a[href*="/account"]',
+      ".header__icon--account",
+      ".icon-account",
+      ".site-header__account"
+    ]);
     if (account && account.parentElement) return account.parentElement;
 
     var selectors = [
@@ -290,8 +319,10 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       "header"
     ];
     for (var i = 0; i < selectors.length; i++) {
-      var node = document.querySelector(selectors[i]);
-      if (node) return node;
+      var list = document.querySelectorAll(selectors[i]);
+      for (var j = 0; j < list.length; j++) {
+        if (isVisible(list[j])) return list[j];
+      }
     }
     return null;
   }
@@ -301,8 +332,18 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     var target = findHeaderTarget();
     if (!target) return false;
 
-    var cart = document.querySelector('a[href*="/cart"], .header__icon--cart, .icon-cart, .site-header__cart');
-    var account = document.querySelector('a[href*="/account"], .header__icon--account, .icon-account, .site-header__account');
+    var cart = findFirstVisible([
+      'a[href*="/cart"]',
+      ".header__icon--cart",
+      ".icon-cart",
+      ".site-header__cart"
+    ]);
+    var account = findFirstVisible([
+      'a[href*="/account"]',
+      ".header__icon--account",
+      ".icon-account",
+      ".site-header__account"
+    ]);
 
     if (existing) {
       if (cart && cart.parentElement && existing.parentElement !== cart.parentElement) {
