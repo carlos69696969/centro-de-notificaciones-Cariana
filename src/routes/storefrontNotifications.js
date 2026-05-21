@@ -345,27 +345,29 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       ".site-header__account"
     ]);
 
-    if (existing) {
-      if (cart && cart.parentElement && existing.parentElement !== cart.parentElement) {
-        cart.parentElement.insertBefore(existing, cart);
-      } else if (cart && cart.parentElement && existing.parentElement === cart.parentElement && existing.nextSibling !== cart) {
-        cart.parentElement.insertBefore(existing, cart);
-      } else if (!cart && account && account.parentElement && existing.parentElement !== account.parentElement) {
-        account.parentElement.insertBefore(existing, account.nextSibling);
-      } else if (!cart && existing.parentElement !== target) {
-        target.appendChild(existing);
+    function placeOnRightSide(node) {
+      if (cart && cart.parentElement) {
+        if (cart.nextSibling !== node) {
+          cart.insertAdjacentElement("afterend", node);
+        }
+        return;
       }
+      if (account && account.parentElement) {
+        if (account.nextSibling !== node) {
+          account.insertAdjacentElement("afterend", node);
+        }
+        return;
+      }
+      target.appendChild(node);
+    }
+
+    if (existing) {
+      placeOnRightSide(existing);
       return true;
     }
 
     var bell = createBellElement();
-    if (cart && cart.parentElement) {
-      cart.parentElement.insertBefore(bell, cart);
-    } else if (account && account.parentElement) {
-      account.parentElement.insertBefore(bell, account.nextSibling);
-    } else {
-      target.appendChild(bell);
-    }
+    placeOnRightSide(bell);
     return true;
   }
 
