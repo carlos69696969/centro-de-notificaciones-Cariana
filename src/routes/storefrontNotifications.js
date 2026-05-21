@@ -199,6 +199,86 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
   return { history: history.rows, unread };
 }
 
+async function getUnreadCount(shopDomain, shopifyCustomerId) {
+  if (!shopDomain || !shopifyCustomerId) {
+    return 0;
+  }
+  const result = await pool.query(
+    `
+    SELECT COUNT(*)::int AS unread
+    FROM notifications n
+    JOIN customers c ON c.id = n.customer_id
+    WHERE c.shop_domain = $1
+      AND c.shopify_customer_id = $2
+      AND n.opened_at IS NULL
+    `,
+    [shopDomain, Number(shopifyCustomerId)]
+  );
+  return result.rows[0]?.unread || 0;
+}
+
+router.get("/badge", requireValidProxy, async (req, res, next) => {
+  try {
+    const shopDomain = req.query.shop || "";
+    const shopifyCustomerId = req.query.logged_in_customer_id || "";
+    const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
+    return res.json({
+      unread,
+      notificationsUrl: "/apps/notificaciones"
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/widget.js", requireValidProxy, async (req, res, next) => {
+  try {
+    const shopDomain = req.query.shop || "";
+    const shopifyCustomerId = req.query.logged_in_customer_id || "";
+    const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
+
+    const js = `
+(function() {
+  var unread = ${Number(unread) || 0};
+  var url = "/apps/notificaciones";
+
+  function createBell() {
+    var a = document.createElement("a");
+    a.href = url;
+    a.setAttribute("aria-label", "Notificaciones");
+    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-left:10px;text-decoration:none;color:inherit;";
+    a.innerHTML = '<span style="font-size:22px;line-height:1">🔔</span>';
+
+    var badge = document.createElement("span");
+    badge.textContent = unread > 99 ? "99+" : String(unread);
+    badge.style.cssText = "position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:11px;line-height:18px;text-align:center;font-weight:700;" + (unread > 0 ? "" : "display:none;");
+    a.appendChild(badge);
+    return a;
+  }
+
+  function mount() {
+    if (document.getElementById("cariana-noti-bell")) return;
+    var target = document.querySelector(".header__icons, .site-header__icons, .header-icons, .header__inline-menu") || document.querySelector("header");
+    if (!target) return;
+    var bell = createBell();
+    bell.id = "cariana-noti-bell";
+    target.appendChild(bell);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();`;
+
+    res.setHeader("Content-Type", "text/javascript; charset=utf-8");
+    return res.status(200).send(js);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/", requireValidProxy, async (req, res) => {
   const shopDomain = req.query.shop || "";
   const shopifyCustomerId = req.query.logged_in_customer_id || "";
