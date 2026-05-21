@@ -2,7 +2,7 @@
 
 client_id = "952fdfd7271a3a55ba1f963a504658d0"
 name = "Centro de notificaciones"
-application_url = "https://example.com"
+application_url = "https://centro-de-notificaciones-cariana.onrender.com"
 embedded = true
 
 [webhooks]
@@ -15,7 +15,12 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "http://localhost:3000/auth/callback" ]
+redirect_urls = [ "https://centro-de-notificaciones-cariana.onrender.com/auth/callback" ]
+
+[app_proxy]
+url = "https://centro-de-notificaciones-cariana.onrender.com/proxy/notifications"
+subpath = "notificaciones"
+prefix = "apps"
 
 [[webhooks.subscriptions]]
 topics = [ "orders/create", "orders/updated", "orders/fulfilled", "orders/cancelled", "refunds/create", "checkouts/update" ]

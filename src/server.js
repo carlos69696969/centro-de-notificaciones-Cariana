@@ -15,6 +15,7 @@ const templatesRoutes = require("./routes/templates");
 const dashboardRoutes = require("./routes/dashboard");
 const returnsRoutes = require("./routes/returns");
 const ordersRoutes = require("./routes/orders");
+const storefrontNotificationsRoutes = require("./routes/storefrontNotifications");
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/api/templates", requireInternalApiKey, templatesRoutes);
 app.use("/api/dashboard", requireInternalApiKey, dashboardRoutes);
 app.use("/api/returns", requireInternalApiKey, returnsRoutes);
 app.use("/api/orders", requireInternalApiKey, ordersRoutes);
+app.use("/proxy/notifications", storefrontNotificationsRoutes);
 
 app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname, "views", "admin.html"));

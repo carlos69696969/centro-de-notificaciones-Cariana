@@ -2,17 +2,22 @@
 
 client_id = "fe9abcb93f4b4191be77701f482dec83"
 name = "Centro de notificaciones"
-application_url = "https://example.com"
+application_url = "https://centro-de-notificaciones-cariana.onrender.com"
 embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_orders,read_customers"
 optional_scopes = [ ]
-use_legacy_install_flow = true
+use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "http://localhost:3000/auth/callback" ]
+redirect_urls = [ "https://centro-de-notificaciones-cariana.onrender.com/auth/callback" ]
+
+[app_proxy]
+url = "https://centro-de-notificaciones-cariana.onrender.com/proxy/notifications"
+subpath = "notificaciones"
+prefix = "apps"
 
 [webhooks]
 api_version = "2026-04"
