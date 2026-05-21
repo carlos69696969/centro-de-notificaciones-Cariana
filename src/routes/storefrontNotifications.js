@@ -239,20 +239,37 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
     const js = `
 (function() {
+  if (window.__carianaBellInit) return;
+  window.__carianaBellInit = true;
+
   var unread = ${Number(unread) || 0};
   var url = "/apps/notificaciones";
 
-  function createBell() {
+  function updateBadge(count) {
+    unread = Number(count) || 0;
+    var badge = document.getElementById("cariana-noti-badge");
+    if (!badge) return;
+    badge.textContent = unread > 99 ? "99+" : String(unread);
+    badge.style.display = unread > 0 ? "" : "none";
+  }
+
+  function createBellElement() {
     var a = document.createElement("a");
     a.href = url;
+    a.id = "cariana-noti-bell";
     a.setAttribute("aria-label", "Notificaciones");
-    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-left:10px;text-decoration:none;color:inherit;";
-    a.innerHTML = '<span style="font-size:22px;line-height:1">🔔</span>';
+    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-left:10px;text-decoration:none;color:inherit;flex:0 0 auto;";
+
+    var icon = document.createElement("span");
+    icon.textContent = "\uD83D\uDD14";
+    icon.style.cssText = "font-size:22px;line-height:1;display:inline-block;";
+    a.appendChild(icon);
 
     var badge = document.createElement("span");
-    badge.textContent = unread > 99 ? "99+" : String(unread);
-    badge.style.cssText = "position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:11px;line-height:18px;text-align:center;font-weight:700;" + (unread > 0 ? "" : "display:none;");
+    badge.id = "cariana-noti-badge";
+    badge.style.cssText = "position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:11px;line-height:18px;text-align:center;font-weight:700;box-sizing:border-box;";
     a.appendChild(badge);
+    updateBadge(unread);
     return a;
   }
 
@@ -265,57 +282,93 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       ".header__inline-menu",
       ".header-wrapper .list-menu",
       "header .list-menu",
-      "header .header"
+      "header .header",
+      "header .container",
+      "header"
     ];
-
     for (var i = 0; i < selectors.length; i++) {
-      var candidate = document.querySelector(selectors[i]);
-      if (candidate) return candidate;
+      var node = document.querySelector(selectors[i]);
+      if (node) return node;
     }
-
-    var account = document.querySelector('a[href*="/account"], .header__icon--account, .icon-account');
-    if (account && account.parentElement) return account.parentElement;
-
-    var cart = document.querySelector('a[href*="/cart"], .header__icon--cart, .icon-cart');
-    if (cart && cart.parentElement) return cart.parentElement;
-
-    return document.querySelector("header");
+    return null;
   }
 
-  function mount() {
-    if (document.getElementById("cariana-noti-bell")) return;
+  function attachBell() {
+    var existing = document.getElementById("cariana-noti-bell");
     var target = findHeaderTarget();
-    if (!target) return;
-    var bell = createBell();
-    bell.id = "cariana-noti-bell";
+    if (!target) return false;
 
     var cart = document.querySelector('a[href*="/cart"], .header__icon--cart, .icon-cart');
+
+    if (existing) {
+      if (cart && cart.parentElement && existing.parentElement !== cart.parentElement) {
+        cart.parentElement.insertBefore(existing, cart);
+      } else if (!cart && existing.parentElement !== target) {
+        target.appendChild(existing);
+      }
+      return true;
+    }
+
+    var bell = createBellElement();
     if (cart && cart.parentElement) {
       cart.parentElement.insertBefore(bell, cart);
     } else {
       target.appendChild(bell);
     }
+    return true;
   }
 
-  function mountWithRetry() {
-    var attempts = 0;
-    var maxAttempts = 30;
-    var timer = setInterval(function() {
-      attempts++;
-      mount();
-      if (document.getElementById("cariana-noti-bell") || attempts >= maxAttempts) {
-        clearInterval(timer);
+  function scheduleEnsure() {
+    attachBell();
+    setTimeout(attachBell, 250);
+    setTimeout(attachBell, 900);
+    setTimeout(attachBell, 1800);
+  }
+
+  function watchDomChanges() {
+    var observer = new MutationObserver(function() {
+      scheduleEnsure();
+    });
+    observer.observe(document.documentElement || document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  function watchNavigation() {
+    var lastHref = location.href;
+    setInterval(function() {
+      if (location.href !== lastHref) {
+        lastHref = location.href;
+        scheduleEnsure();
       }
-    }, 400);
+    }, 500);
+  }
+
+  function refreshBadge() {
+    fetch("/apps/notificaciones/badge")
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (!data) return;
+        updateBadge(data.unread || 0);
+      })
+      .catch(function() {});
+  }
+
+  function init() {
+    scheduleEnsure();
+    watchDomChanges();
+    watchNavigation();
+    refreshBadge();
+    setInterval(refreshBadge, 60000);
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", mountWithRetry);
+    document.addEventListener("DOMContentLoaded", init);
   } else {
-    mountWithRetry();
+    init();
   }
 })();`;
-
     res.setHeader("Content-Type", "text/javascript; charset=utf-8");
     return res.status(200).send(js);
   } catch (error) {
