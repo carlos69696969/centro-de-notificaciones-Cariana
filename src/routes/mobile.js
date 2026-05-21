@@ -18,24 +18,49 @@ router.post("/register-token", async (req, res, next) => {
       last_name: lastName
     });
 
-    await pool.query(
-      `
-      INSERT INTO fcm_tokens
-        (shop_domain, customer_id, token, platform, app_version, is_active, last_seen_at, updated_at)
-      VALUES
-        ($1,$2,$3,$4,$5,TRUE,NOW(),NOW())
-      ON CONFLICT (shop_domain, token)
-      DO UPDATE SET
-        customer_id = EXCLUDED.customer_id,
-        platform = EXCLUDED.platform,
-        app_version = EXCLUDED.app_version,
-        is_active = TRUE,
-        invalidated_at = NULL,
-        last_seen_at = NOW(),
-        updated_at = NOW()
-      `,
-      [shopDomain, customer.id, token, platform || "android", appVersion || null]
-    );
+    const normalizedPlatform = platform || "android";
+
+    await pool.query("BEGIN");
+    try {
+      // Keep only one active token per customer+platform to prevent duplicate sends
+      // when Android rotates tokens and old ones remain active.
+      await pool.query(
+        `
+        UPDATE fcm_tokens
+        SET is_active = FALSE, invalidated_at = NOW(), updated_at = NOW()
+        WHERE shop_domain = $1
+          AND customer_id = $2
+          AND platform = $3
+          AND token <> $4
+          AND is_active = TRUE
+        `,
+        [shopDomain, customer.id, normalizedPlatform, token]
+      );
+
+      await pool.query(
+        `
+        INSERT INTO fcm_tokens
+          (shop_domain, customer_id, token, platform, app_version, is_active, last_seen_at, updated_at)
+        VALUES
+          ($1,$2,$3,$4,$5,TRUE,NOW(),NOW())
+        ON CONFLICT (shop_domain, token)
+        DO UPDATE SET
+          customer_id = EXCLUDED.customer_id,
+          platform = EXCLUDED.platform,
+          app_version = EXCLUDED.app_version,
+          is_active = TRUE,
+          invalidated_at = NULL,
+          last_seen_at = NOW(),
+          updated_at = NOW()
+        `,
+        [shopDomain, customer.id, token, normalizedPlatform, appVersion || null]
+      );
+
+      await pool.query("COMMIT");
+    } catch (error) {
+      await pool.query("ROLLBACK");
+      throw error;
+    }
 
     return res.json({ ok: true });
   } catch (error) {
