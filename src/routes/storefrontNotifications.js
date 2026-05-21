@@ -189,6 +189,7 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
     JOIN customers c ON c.id = n.customer_id
     WHERE c.shop_domain = $1
       AND c.shopify_customer_id = $2
+      AND n.status = 'sent'
     ORDER BY n.created_at DESC
     LIMIT 100
     `,
@@ -210,6 +211,7 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
     JOIN customers c ON c.id = n.customer_id
     WHERE c.shop_domain = $1
       AND c.shopify_customer_id = $2
+      AND n.status = 'sent'
       AND n.opened_at IS NULL
     `,
     [shopDomain, Number(shopifyCustomerId)]
