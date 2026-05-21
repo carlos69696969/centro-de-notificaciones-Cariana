@@ -1,0 +1,106 @@
+const pool = require("./pool");
+const logger = require("../utils/logger");
+
+const templates = [
+  {
+    code: "order_confirmed",
+    title: "Pedido confirmado",
+    message: "Tu pedido ha sido confirmado."
+  },
+  {
+    code: "order_preparing",
+    title: "Pedido en preparacion",
+    message: "Estamos preparando tu pedido."
+  },
+  {
+    code: "order_shipped",
+    title: "Pedido enviado",
+    message: "Tu pedido ya fue enviado."
+  },
+  {
+    code: "order_in_transit",
+    title: "Pedido en camino",
+    message: "Tu pedido ya va en camino."
+  },
+  {
+    code: "order_delivered",
+    title: "Pedido entregado",
+    message: "Tu pedido ha sido entregado."
+  },
+  {
+    code: "order_cancelled",
+    title: "Pedido cancelado",
+    message: "Tu pedido ha sido cancelado."
+  },
+  {
+    code: "return_requested",
+    title: "Devolucion solicitada",
+    message: "Tu solicitud de devolucion ha sido recibida."
+  },
+  {
+    code: "return_approved",
+    title: "Devolucion aprobada",
+    message: "Tu devolucion ha sido aprobada."
+  },
+  {
+    code: "return_rejected",
+    title: "Devolucion rechazada",
+    message: "Tu devolucion ha sido rechazada."
+  },
+  {
+    code: "return_pickup_scheduled",
+    title: "Recoleccion programada",
+    message: "La recoleccion de tu devolucion ya fue programada."
+  },
+  {
+    code: "return_picked_up",
+    title: "Producto recogido",
+    message: "Hemos recogido el producto de tu devolucion."
+  },
+  {
+    code: "refund_processed",
+    title: "Reembolso procesado",
+    message: "Tu reembolso ya fue procesado."
+  },
+  {
+    code: "refund_completed",
+    title: "Reembolso completado",
+    message: "Tu reembolso ha sido completado."
+  },
+  {
+    code: "abandoned_cart_1h",
+    title: "Carrito pendiente",
+    message: "Olvidaste articulos en tu carrito. Finaliza tu compra ahora."
+  },
+  {
+    code: "abandoned_cart_24h",
+    title: "Completa tu compra",
+    message: "Completa tu pedido y aprovecha nuestras promociones."
+  },
+  {
+    code: "abandoned_cart_3d",
+    title: "Tu carrito te espera",
+    message: "Aun tienes productos en tu carrito."
+  }
+];
+
+async function seed() {
+  for (const template of templates) {
+    await pool.query(
+      `
+      INSERT INTO notification_templates (shop_domain, code, title, message, deep_link)
+      VALUES (NULL, $1, $2, $3, NULL)
+      ON CONFLICT (shop_domain, code) DO NOTHING
+      `,
+      [template.code, template.title, template.message]
+    );
+  }
+
+  logger.info("Seed complete", { templates: templates.length });
+  await pool.end();
+}
+
+seed().catch((error) => {
+  logger.error("Seed failed", { error: error.message });
+  process.exit(1);
+});

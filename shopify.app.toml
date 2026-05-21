@@ -1,0 +1,25 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "952fdfd7271a3a55ba1f963a504658d0"
+name = "Centro de notificaciones"
+application_url = "https://example.com"
+embedded = true
+
+[webhooks]
+api_version = "2026-04"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+scopes = "read_orders,read_customers"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [ "http://localhost:3000/auth/callback" ]
+
+[[webhooks.subscriptions]]
+topics = [ "orders/create", "orders/updated", "orders/fulfilled", "orders/cancelled", "refunds/create", "checkouts/update" ]
+uri = "/webhooks/shopify"
+
+[build]
+automatically_update_urls_on_dev = true

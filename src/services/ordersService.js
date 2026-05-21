@@ -1,0 +1,241 @@
+const pool = require("../db/pool");
+const { upsertCustomerFromShopify, getCustomerByShopifyId } = require("./customerService");
+const { getTemplate } = require("./templateService");
+const { sendToCustomerTokens } = require("./notificationService");
+
+function resolveTemplateCodeFromOrder(topic, payload) {
+  if (topic === "orders/cancelled") {
+    return "order_cancelled";
+  }
+  if (topic === "orders/create") {
+    return "order_confirmed";
+  }
+  if (topic === "orders/fulfilled") {
+    return "order_shipped";
+  }
+  if (topic === "orders/updated") {
+    if (payload.cancelled_at) {
+      return "order_cancelled";
+    }
+    if (payload.fulfillment_status === "fulfilled") {
+      return "order_in_transit";
+    }
+    return "order_preparing";
+  }
+  return null;
+}
+
+async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
+  const eventResult = await pool.query(
+    `
+    INSERT INTO notification_events (webhook_id, shop_domain, topic, payload, status)
+    VALUES ($1,$2,$3,$4::jsonb,'pending')
+    ON CONFLICT (webhook_id) DO NOTHING
+    RETURNING id
+    `,
+    [webhookId, shopDomain, topic, JSON.stringify(payload)]
+  );
+
+  if (eventResult.rowCount === 0) {
+    return { duplicated: true };
+  }
+
+  const eventId = eventResult.rows[0].id;
+  const templateCode = resolveTemplateCodeFromOrder(topic, payload);
+  if (!templateCode) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true };
+  }
+
+  let customer = null;
+  if (payload.customer?.id) {
+    customer = await upsertCustomerFromShopify(shopDomain, payload.customer);
+    await pool.query(
+      `
+      INSERT INTO order_customer_map
+        (shop_domain, order_id, shopify_customer_id, order_number, last_status, updated_at)
+      VALUES
+        ($1,$2,$3,$4,$5,NOW())
+      ON CONFLICT (shop_domain, order_id)
+      DO UPDATE SET
+        shopify_customer_id = EXCLUDED.shopify_customer_id,
+        order_number = EXCLUDED.order_number,
+        last_status = EXCLUDED.last_status,
+        updated_at = NOW()
+      `,
+      [shopDomain, payload.id, payload.customer.id, payload.order_number || null, templateCode]
+    );
+  }
+
+  if (!customer) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Order has no customer', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Order has no customer" };
+  }
+
+  const template = await getTemplate(shopDomain, templateCode);
+  if (!template) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Template not found', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Template not found" };
+  }
+
+  const data = {
+    orderId: payload.id,
+    orderNumber: payload.order_number,
+    status: templateCode
+  };
+
+  const sendResult = await sendToCustomerTokens({
+    shopDomain,
+    customerId: customer.id,
+    type: "order_event",
+    title: template.title,
+    message: template.message,
+    deepLink: template.deep_link || `/orders/${payload.id}`,
+    data,
+    eventId
+  });
+
+  await pool.query(
+    `
+    UPDATE notification_events
+    SET status = $2, processed_at = NOW(), error_message = $3
+    WHERE id = $1
+    `,
+    [eventId, sendResult.total > 0 ? "processed" : "skipped", sendResult.total > 0 ? null : "No active tokens"]
+  );
+
+  return sendResult;
+}
+
+async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, orderNumber, status }) {
+  const map = {
+    confirmed: "order_confirmed",
+    preparing: "order_preparing",
+    shipped: "order_shipped",
+    in_transit: "order_in_transit",
+    delivered: "order_delivered",
+    cancelled: "order_cancelled"
+  };
+  const templateCode = map[status];
+  if (!templateCode) {
+    throw new Error("Unsupported order status");
+  }
+
+  const customer = await getCustomerByShopifyId(shopDomain, shopifyCustomerId);
+  if (!customer) {
+    throw new Error("Customer not found");
+  }
+
+  const template = await getTemplate(shopDomain, templateCode);
+  if (!template) {
+    throw new Error(`Template not found for ${templateCode}`);
+  }
+
+  return sendToCustomerTokens({
+    shopDomain,
+    customerId: customer.id,
+    type: "order_manual",
+    title: template.title,
+    message: template.message,
+    deepLink: template.deep_link || `/orders/${orderId}`,
+    data: {
+      orderId,
+      orderNumber,
+      status: templateCode
+    }
+  });
+}
+
+async function processRefundWebhook({ shopDomain, payload, webhookId }) {
+  const eventResult = await pool.query(
+    `
+    INSERT INTO notification_events (webhook_id, shop_domain, topic, payload, status)
+    VALUES ($1,$2,'refunds/create',$3::jsonb,'pending')
+    ON CONFLICT (webhook_id) DO NOTHING
+    RETURNING id
+    `,
+    [webhookId, shopDomain, JSON.stringify(payload)]
+  );
+
+  if (eventResult.rowCount === 0) {
+    return { duplicated: true };
+  }
+
+  const eventId = eventResult.rows[0].id;
+  const mapResult = await pool.query(
+    `
+    SELECT shopify_customer_id, order_number
+    FROM order_customer_map
+    WHERE shop_domain = $1 AND order_id = $2
+    `,
+    [shopDomain, payload.order_id]
+  );
+
+  if (mapResult.rowCount === 0) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Order mapping not found', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true };
+  }
+
+  const mapped = mapResult.rows[0];
+  const customer = await getCustomerByShopifyId(shopDomain, mapped.shopify_customer_id);
+  if (!customer) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Customer not found', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true };
+  }
+
+  const template = await getTemplate(shopDomain, "refund_processed");
+  if (!template) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Template not found', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true };
+  }
+
+  const sendResult = await sendToCustomerTokens({
+    shopDomain,
+    customerId: customer.id,
+    type: "refund_event",
+    title: template.title,
+    message: template.message,
+    deepLink: template.deep_link || `/orders/${payload.order_id}`,
+    data: {
+      orderId: payload.order_id,
+      orderNumber: mapped.order_number || "",
+      refundId: payload.id || ""
+    },
+    eventId
+  });
+
+  await pool.query(
+    `
+    UPDATE notification_events
+    SET status = $2, processed_at = NOW(), error_message = $3
+    WHERE id = $1
+    `,
+    [eventId, sendResult.total > 0 ? "processed" : "skipped", sendResult.total > 0 ? null : "No active tokens"]
+  );
+
+  return sendResult;
+}
+
+module.exports = {
+  processOrderWebhook,
+  sendManualOrderStatus,
+  processRefundWebhook
+};

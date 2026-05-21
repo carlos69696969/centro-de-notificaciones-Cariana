@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Centro de notificaciones</title>
+    <style>
+      :root {
+        --bg: #f4f7f9;
+        --surface: #ffffff;
+        --text: #1b1d1f;
+        --muted: #6b7280;
+        --primary: #0f766e;
+        --accent: #f59e0b;
+        --border: #dfe3e8;
+      }
+      body {
+        margin: 0;
+        padding: 24px;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: radial-gradient(circle at top right, #e6fffa 0%, var(--bg) 45%, #eef2ff 100%);
+        color: var(--text);
+      }
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        gap: 16px;
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .metric {
+        font-size: 32px;
+        font-weight: 700;
+      }
+      .label {
+        color: var(--muted);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      input,
+      select,
+      textarea,
+      button {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        font-size: 14px;
+      }
+      button {
+        background: var(--primary);
+        color: white;
+        border: 0;
+        cursor: pointer;
+        transition: transform 0.15s ease;
+      }
+      button:hover {
+        transform: translateY(-1px);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        text-align: left;
+        border-bottom: 1px solid #eceff3;
+        padding: 8px;
+        font-size: 13px;
+      }
+      @media (max-width: 900px) {
+        .grid,
+        .row {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>Centro de notificaciones</h1>
+        <p class="label">Panel embebido para envios push con Shopify + FCM</p>
+        <div class="row">
+          <input id="shopDomain" placeholder="shopDomain (ej: tienda.myshopify.com)" />
+          <input id="apiKey" placeholder="x-api-key (APP_INTERNAL_API_KEY)" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Dashboard</h2>
+        <div class="grid">
+          <div><div class="metric" id="mUsers">0</div><div class="label">Usuarios con app</div></div>
+          <div><div class="metric" id="mSent">0</div><div class="label">Notificaciones enviadas</div></div>
+          <div><div class="metric" id="mOpen">0%</div><div class="label">Tasa de apertura</div></div>
+          <div><div class="metric" id="mConv">0</div><div class="label">Conversiones</div></div>
+        </div>
+        <button onclick="loadMetrics()">Actualizar dashboard</button>
+      </div>
+
+      <div class="card">
+        <h2>Centro de campanas</h2>
+        <div class="row">
+          <input id="cName" placeholder="Nombre campana" />
+          <select id="cAudience">
+            <option value="all_users">Todos los usuarios</option>
+            <option value="customers_with_previous_purchases">Clientes con compras previas</option>
+            <option value="abandoned_cart">Clientes con carrito abandonado</option>
+            <option value="inactive_customers">Clientes inactivos</option>
+          </select>
+        </div>
+        <div class="row">
+          <input id="cTitle" placeholder="Titulo" />
+          <input id="cDeepLink" placeholder="Deep link (opcional)" />
+        </div>
+        <textarea id="cMessage" rows="3" placeholder="Mensaje"></textarea>
+        <div class="row">
+          <input id="cSchedule" type="datetime-local" />
+          <button onclick="createCampaign()">Crear campana</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Plantillas</h2>
+        <div class="row">
+          <input id="tCode" placeholder="Codigo (ej: order_confirmed)" />
+          <input id="tTitle" placeholder="Titulo" />
+        </div>
+        <textarea id="tMessage" rows="2" placeholder="Mensaje"></textarea>
+        <div class="row">
+          <input id="tDeepLink" placeholder="Deep link (opcional)" />
+          <button onclick="saveTemplate()">Guardar plantilla</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Historial de notificaciones</h2>
+        <button onclick="loadHistory()">Cargar historial</button>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tipo</th>
+              <th>Titulo</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      function cfg() {
+        return {
+          shopDomain: document.getElementById("shopDomain").value.trim(),
+          apiKey: document.getElementById("apiKey").value.trim()
+        };
+      }
+
+      async function api(path, options = {}) {
+        const { shopDomain, apiKey } = cfg();
+        const headers = {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "x-shop-domain": shopDomain
+        };
+        const response = await fetch(path, { ...options, headers: { ...headers, ...(options.headers || {}) } });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Request failed");
+        }
+        return response.json();
+      }
+
+      async function loadMetrics() {
+        const data = await api("/api/dashboard/metrics");
+        document.getElementById("mUsers").textContent = data.installedUsers;
+        document.getElementById("mSent").textContent = data.notificationsSent;
+        document.getElementById("mOpen").textContent = data.openRate + "%";
+        document.getElementById("mConv").textContent = data.conversions;
+      }
+
+      async function createCampaign() {
+        const payload = {
+          shopDomain: cfg().shopDomain,
+          name: document.getElementById("cName").value,
+          title: document.getElementById("cTitle").value,
+          message: document.getElementById("cMessage").value,
+          deepLink: document.getElementById("cDeepLink").value || null,
+          audienceType: document.getElementById("cAudience").value,
+          scheduledAt: document.getElementById("cSchedule").value ? new Date(document.getElementById("cSchedule").value).toISOString() : null
+        };
+        await api("/api/campaigns", { method: "POST", body: JSON.stringify(payload) });
+        alert("Campana creada");
+      }
+
+      async function saveTemplate() {
+        const payload = {
+          shopDomain: cfg().shopDomain,
+          code: document.getElementById("tCode").value,
+          title: document.getElementById("tTitle").value,
+          message: document.getElementById("tMessage").value,
+          deepLink: document.getElementById("tDeepLink").value || null
+        };
+        await api("/api/templates", { method: "POST", body: JSON.stringify(payload) });
+        alert("Plantilla guardada");
+      }
+
+      async function loadHistory() {
+        const data = await api("/api/dashboard/history");
+        const tbody = document.getElementById("historyBody");
+        tbody.innerHTML = "";
+        data.history.forEach((item) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td>${item.id}</td><td>${item.type}</td><td>${item.title}</td><td>${item.status}</td><td>${new Date(item.created_at).toLocaleString()}</td>`;
+          tbody.appendChild(tr);
+        });
+      }
+    </script>
+  </body>
+</html>
