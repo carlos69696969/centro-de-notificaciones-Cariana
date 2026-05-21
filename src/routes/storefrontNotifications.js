@@ -256,19 +256,63 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     return a;
   }
 
+  function findHeaderTarget() {
+    var selectors = [
+      ".header__icons",
+      ".site-header__icons",
+      ".header-icons",
+      ".header__actions",
+      ".header__inline-menu",
+      ".header-wrapper .list-menu",
+      "header .list-menu",
+      "header .header"
+    ];
+
+    for (var i = 0; i < selectors.length; i++) {
+      var candidate = document.querySelector(selectors[i]);
+      if (candidate) return candidate;
+    }
+
+    var account = document.querySelector('a[href*="/account"], .header__icon--account, .icon-account');
+    if (account && account.parentElement) return account.parentElement;
+
+    var cart = document.querySelector('a[href*="/cart"], .header__icon--cart, .icon-cart');
+    if (cart && cart.parentElement) return cart.parentElement;
+
+    return document.querySelector("header");
+  }
+
   function mount() {
     if (document.getElementById("cariana-noti-bell")) return;
-    var target = document.querySelector(".header__icons, .site-header__icons, .header-icons, .header__inline-menu") || document.querySelector("header");
+    var target = findHeaderTarget();
     if (!target) return;
     var bell = createBell();
     bell.id = "cariana-noti-bell";
-    target.appendChild(bell);
+
+    var cart = document.querySelector('a[href*="/cart"], .header__icon--cart, .icon-cart');
+    if (cart && cart.parentElement) {
+      cart.parentElement.insertBefore(bell, cart);
+    } else {
+      target.appendChild(bell);
+    }
+  }
+
+  function mountWithRetry() {
+    var attempts = 0;
+    var maxAttempts = 30;
+    var timer = setInterval(function() {
+      attempts++;
+      mount();
+      if (document.getElementById("cariana-noti-bell") || attempts >= maxAttempts) {
+        clearInterval(timer);
+      }
+    }, 400);
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", mount);
+    document.addEventListener("DOMContentLoaded", mountWithRetry);
   } else {
-    mount();
+    mountWithRetry();
   }
 })();`;
 
