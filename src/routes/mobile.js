@@ -1,68 +1,112 @@
 const express = require("express");
 const pool = require("../db/pool");
-const { upsertCustomerFromShopify } = require("../services/customerService");
+const { upsertCustomerFromShopify, getCustomerByEmail } = require("../services/customerService");
 
 const router = express.Router();
 
+async function activateTokenForCustomer({
+  shopDomain,
+  customerId,
+  token,
+  platform,
+  appVersion
+}) {
+  const normalizedPlatform = platform || "android";
+
+  await pool.query("BEGIN");
+  try {
+    // Keep only one active token per customer+platform to prevent duplicate sends
+    // when Android rotates tokens and old ones remain active.
+    await pool.query(
+      `
+      UPDATE fcm_tokens
+      SET is_active = FALSE, invalidated_at = NOW(), updated_at = NOW()
+      WHERE shop_domain = $1
+        AND customer_id = $2
+        AND platform = $3
+        AND token <> $4
+        AND is_active = TRUE
+      `,
+      [shopDomain, customerId, normalizedPlatform, token]
+    );
+
+    await pool.query(
+      `
+      INSERT INTO fcm_tokens
+        (shop_domain, customer_id, token, platform, app_version, is_active, last_seen_at, updated_at)
+      VALUES
+        ($1,$2,$3,$4,$5,TRUE,NOW(),NOW())
+      ON CONFLICT (shop_domain, token)
+      DO UPDATE SET
+        customer_id = EXCLUDED.customer_id,
+        platform = EXCLUDED.platform,
+        app_version = EXCLUDED.app_version,
+        is_active = TRUE,
+        invalidated_at = NULL,
+        last_seen_at = NOW(),
+        updated_at = NOW()
+      `,
+      [shopDomain, customerId, token, normalizedPlatform, appVersion || null]
+    );
+
+    await pool.query("COMMIT");
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    throw error;
+  }
+}
+
 router.post("/register-token", async (req, res, next) => {
   try {
-    const { shopDomain, shopifyCustomerId, email, firstName, lastName, token, platform, appVersion } = req.body;
-    if (!shopDomain || !shopifyCustomerId || !token) {
-      return res.status(400).json({ error: "shopDomain, shopifyCustomerId and token are required" });
+    const {
+      shopDomain,
+      shopifyCustomerId,
+      email,
+      firstName,
+      lastName,
+      token,
+      platform,
+      appVersion
+    } = req.body;
+
+    if (!shopDomain || !token || (!shopifyCustomerId && !email)) {
+      return res.status(400).json({
+        error: "shopDomain, token and (shopifyCustomerId or email) are required"
+      });
     }
 
-    const customer = await upsertCustomerFromShopify(shopDomain, {
-      id: shopifyCustomerId,
-      email,
-      first_name: firstName,
-      last_name: lastName
+    let customer = null;
+    let matchedBy = "shopifyCustomerId";
+
+    if (shopifyCustomerId) {
+      customer = await upsertCustomerFromShopify(shopDomain, {
+        id: shopifyCustomerId,
+        email,
+        first_name: firstName,
+        last_name: lastName
+      });
+    } else {
+      matchedBy = "email";
+      customer = await getCustomerByEmail(shopDomain, email);
+    }
+
+    if (!customer?.id) {
+      return res.status(404).json({
+        error: "Customer not found for token registration",
+        detail: "Provide shopifyCustomerId or ensure the customer exists in backend",
+        matchedBy
+      });
+    }
+
+    await activateTokenForCustomer({
+      shopDomain,
+      customerId: customer.id,
+      token,
+      platform,
+      appVersion
     });
 
-    const normalizedPlatform = platform || "android";
-
-    await pool.query("BEGIN");
-    try {
-      // Keep only one active token per customer+platform to prevent duplicate sends
-      // when Android rotates tokens and old ones remain active.
-      await pool.query(
-        `
-        UPDATE fcm_tokens
-        SET is_active = FALSE, invalidated_at = NOW(), updated_at = NOW()
-        WHERE shop_domain = $1
-          AND customer_id = $2
-          AND platform = $3
-          AND token <> $4
-          AND is_active = TRUE
-        `,
-        [shopDomain, customer.id, normalizedPlatform, token]
-      );
-
-      await pool.query(
-        `
-        INSERT INTO fcm_tokens
-          (shop_domain, customer_id, token, platform, app_version, is_active, last_seen_at, updated_at)
-        VALUES
-          ($1,$2,$3,$4,$5,TRUE,NOW(),NOW())
-        ON CONFLICT (shop_domain, token)
-        DO UPDATE SET
-          customer_id = EXCLUDED.customer_id,
-          platform = EXCLUDED.platform,
-          app_version = EXCLUDED.app_version,
-          is_active = TRUE,
-          invalidated_at = NULL,
-          last_seen_at = NOW(),
-          updated_at = NOW()
-        `,
-        [shopDomain, customer.id, token, normalizedPlatform, appVersion || null]
-      );
-
-      await pool.query("COMMIT");
-    } catch (error) {
-      await pool.query("ROLLBACK");
-      throw error;
-    }
-
-    return res.json({ ok: true });
+    return res.json({ ok: true, matchedBy });
   } catch (error) {
     return next(error);
   }

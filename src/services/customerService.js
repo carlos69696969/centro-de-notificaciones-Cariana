@@ -44,7 +44,27 @@ async function getCustomerByShopifyId(shopDomain, shopifyCustomerId) {
   return result.rows[0] || null;
 }
 
+async function getCustomerByEmail(shopDomain, email) {
+  if (!email) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT id, shopify_customer_id
+    FROM customers
+    WHERE shop_domain = $1
+      AND LOWER(email) = LOWER($2)
+    ORDER BY updated_at DESC
+    LIMIT 1
+    `,
+    [shopDomain, String(email).trim()]
+  );
+  return result.rows[0] || null;
+}
+
 module.exports = {
   upsertCustomerFromShopify,
-  getCustomerByShopifyId
+  getCustomerByShopifyId,
+  getCustomerByEmail
 };
