@@ -258,71 +258,37 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     a.href = url;
     a.id = "cariana-noti-bell";
     a.setAttribute("aria-label", "Notificaciones");
-    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin:0 8px;text-decoration:none;color:inherit;flex:0 0 auto;";
+    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-left:10px;text-decoration:none;color:inherit;flex:0 0 auto;";
 
     var icon = document.createElement("span");
-    icon.style.cssText = "display:inline-flex;align-items:center;justify-content:center;line-height:0;";
-    icon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true"><defs><linearGradient id="cariana-bell-grad" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse"><stop stop-color="#f7d154"></stop><stop offset="1" stop-color="#ff5f7f"></stop></linearGradient></defs><path d="M12 3.25c-3.5 0-6.34 2.84-6.34 6.34v3.06c0 .68-.21 1.33-.6 1.88l-1.07 1.47c-.26.36-.3.84-.1 1.23.2.39.6.63 1.04.63h14.14c.44 0 .84-.24 1.04-.63.2-.39.16-.87-.1-1.23l-1.07-1.47c-.39-.54-.6-1.2-.6-1.88V9.59c0-3.5-2.84-6.34-6.34-6.34Z" stroke="url(#cariana-bell-grad)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9.7 19.3a2.3 2.3 0 0 0 4.6 0" stroke="url(#cariana-bell-grad)" stroke-width="1.8" stroke-linecap="round"></path></svg>';
+    icon.textContent = "\uD83D\uDD14";
+    icon.style.cssText = "font-size:22px;line-height:1;display:inline-block;";
     a.appendChild(icon);
 
     var badge = document.createElement("span");
     badge.id = "cariana-noti-badge";
-    badge.style.cssText = "position:absolute;top:-3px;right:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:linear-gradient(135deg,#ffb45a,#ff5f7f);color:#fff;font-size:10px;line-height:17px;text-align:center;font-weight:700;box-sizing:border-box;display:none;";
+    badge.style.cssText = "position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:11px;line-height:18px;text-align:center;font-weight:700;box-sizing:border-box;";
     a.appendChild(badge);
     updateBadge(unread);
     return a;
   }
 
-  function isVisible(node) {
-    if (!node) return false;
-    var style = window.getComputedStyle(node);
-    if (!style) return false;
-    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
-    var rect = node.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0;
-  }
-
-  function findFirstVisible(selectorList) {
-    for (var i = 0; i < selectorList.length; i++) {
-      var list = document.querySelectorAll(selectorList[i]);
-      for (var j = 0; j < list.length; j++) {
-        if (isVisible(list[j])) return list[j];
-      }
-    }
-    return null;
-  }
-
   function findHeaderTarget() {
-    var cart = findFirstVisible([
-      'a[href*="/cart"]',
-      ".header__icon--cart",
-      ".icon-cart",
-      ".site-header__cart"
-    ]);
-    if (cart && cart.parentElement) return cart.parentElement;
-
-    var account = findFirstVisible([
-      'a[href*="/account"]',
-      ".header__icon--account",
-      ".icon-account",
-      ".site-header__account"
-    ]);
-    if (account && account.parentElement) return account.parentElement;
-
     var selectors = [
       ".header__icons",
       ".site-header__icons",
       ".header-icons",
       ".header__actions",
+      ".header__inline-menu",
+      ".header-wrapper .list-menu",
+      "header .list-menu",
       "header .header",
       "header .container",
       "header"
     ];
     for (var i = 0; i < selectors.length; i++) {
-      var list = document.querySelectorAll(selectors[i]);
-      for (var j = 0; j < list.length; j++) {
-        if (isVisible(list[j])) return list[j];
-      }
+      var node = document.querySelector(selectors[i]);
+      if (node) return node;
     }
     return null;
   }
@@ -332,42 +298,23 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     var target = findHeaderTarget();
     if (!target) return false;
 
-    var cart = findFirstVisible([
-      'a[href*="/cart"]',
-      ".header__icon--cart",
-      ".icon-cart",
-      ".site-header__cart"
-    ]);
-    var account = findFirstVisible([
-      'a[href*="/account"]',
-      ".header__icon--account",
-      ".icon-account",
-      ".site-header__account"
-    ]);
-
-    function placeOnRightSide(node) {
-      if (cart && cart.parentElement) {
-        if (cart.nextSibling !== node) {
-          cart.insertAdjacentElement("afterend", node);
-        }
-        return;
-      }
-      if (account && account.parentElement) {
-        if (account.nextSibling !== node) {
-          account.insertAdjacentElement("afterend", node);
-        }
-        return;
-      }
-      target.appendChild(node);
-    }
+    var cart = document.querySelector('a[href*="/cart"], .header__icon--cart, .icon-cart');
 
     if (existing) {
-      placeOnRightSide(existing);
+      if (cart && cart.parentElement && existing.parentElement !== cart.parentElement) {
+        cart.parentElement.insertBefore(existing, cart);
+      } else if (!cart && existing.parentElement !== target) {
+        target.appendChild(existing);
+      }
       return true;
     }
 
     var bell = createBellElement();
-    placeOnRightSide(bell);
+    if (cart && cart.parentElement) {
+      cart.parentElement.insertBefore(bell, cart);
+    } else {
+      target.appendChild(bell);
+    }
     return true;
   }
 
