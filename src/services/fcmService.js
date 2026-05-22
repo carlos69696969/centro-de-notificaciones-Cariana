@@ -34,27 +34,18 @@ async function sendToToken(token, payload) {
   }
 
   try {
-    const hasDeepLink =
-      Boolean(payload?.data?.deepLink) ||
-      Boolean(payload?.data?.deep_link) ||
-      Boolean(payload?.data?.url);
-
     const messageId = await admin.messaging().send({
       token,
-      notification: {
-        title: payload.title,
-        body: payload.body
+      // Data-only payload ensures Android handles the tap through
+      // CarianaFirebaseMessagingService + PendingIntent deep link.
+      data: {
+        ...(payload.data || {}),
+        title: payload.title || "CARIANA",
+        body: payload.body || "",
+        message: payload.body || payload.data?.message || ""
       },
-      data: payload.data || {},
       android: {
-        priority: "high",
-        notification: hasDeepLink
-          ? {
-              // Keep notification tap behavior generic so Android can pass
-              // payload extras to the launcher activity of WebIntoApp builds.
-              tag: "cariana-push"
-            }
-          : {}
+        priority: "high"
       }
     });
 
