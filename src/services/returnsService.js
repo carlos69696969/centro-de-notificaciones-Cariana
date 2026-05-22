@@ -1,5 +1,9 @@
 const pool = require("../db/pool");
-const { getCustomerByEmail, getCustomerByShopifyId } = require("./customerService");
+const {
+  getCustomerByEmail,
+  getCustomerByShopifyId,
+  upsertCustomerFromShopify
+} = require("./customerService");
 const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
 const { buildReturnDeepLink } = require("./deepLinkService");
@@ -155,10 +159,81 @@ async function resolveCustomer(shopDomain, payload) {
 
   const email = payload.email || payload.customer?.email || payload.customer_email || payload.customerEmail;
   if (email) {
-    return getCustomerByEmail(shopDomain, email);
+    const byEmail = await getCustomerByEmail(shopDomain, email);
+    if (byEmail) {
+      return byEmail;
+    }
   }
 
-  return null;
+  return resolveCustomerFromOrderContext(shopDomain, payload);
+}
+
+async function resolveCustomerFromOrderContext(shopDomain, payload) {
+  const email = String(
+    payload.email || payload.customer?.email || payload.customer_email || payload.customerEmail || ""
+  )
+    .trim()
+    .toLowerCase();
+  const orderNumberRaw =
+    payload.order_number ||
+    payload.orderNumber ||
+    payload.return_reference ||
+    payload.returnReference ||
+    payload.return_id ||
+    payload.returnId ||
+    "";
+  const orderNumber = String(orderNumberRaw).replace(/^#/, "").trim();
+
+  if (!email && !orderNumber) {
+    return null;
+  }
+
+  const orderContext = await pool.query(
+    `
+    SELECT
+      payload->>'order_number' AS order_number,
+      payload->>'name' AS order_name,
+      payload->'customer'->>'id' AS customer_id,
+      payload->'customer'->>'email' AS customer_email
+    FROM notification_events
+    WHERE shop_domain = $1
+      AND topic IN ('orders/create','orders/updated','orders/fulfilled')
+      AND (
+        ($2 <> '' AND (
+          payload->>'order_number' = $2
+          OR payload->>'name' = CONCAT('#', $2)
+        ))
+        OR ($3 <> '' AND LOWER(COALESCE(payload->'customer'->>'email', '')) = $3)
+      )
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [shopDomain, orderNumber, email]
+  );
+
+  const context = orderContext.rows[0];
+  if (!context) {
+    return null;
+  }
+
+  const contextCustomerId = Number(context.customer_id || 0);
+  const contextEmail = String(context.customer_email || email || "").trim() || null;
+
+  if (!contextCustomerId) {
+    if (!contextEmail) {
+      return null;
+    }
+    return getCustomerByEmail(shopDomain, contextEmail);
+  }
+
+  if (contextEmail) {
+    await upsertCustomerFromShopify(shopDomain, {
+      id: contextCustomerId,
+      email: contextEmail
+    });
+  }
+
+  return getCustomerByShopifyId(shopDomain, contextCustomerId);
 }
 
 function extractEventEmail(payload) {
