@@ -34,6 +34,11 @@ async function sendToToken(token, payload) {
   }
 
   try {
+    const hasDeepLink =
+      Boolean(payload?.data?.deepLink) ||
+      Boolean(payload?.data?.deep_link) ||
+      Boolean(payload?.data?.url);
+
     const messageId = await admin.messaging().send({
       token,
       notification: {
@@ -43,9 +48,13 @@ async function sendToToken(token, payload) {
       data: payload.data || {},
       android: {
         priority: "high",
-        notification: {
-          clickAction: "OPEN_ORDER_STATUS"
-        }
+        notification: hasDeepLink
+          ? {
+              // Keep notification tap behavior generic so Android can pass
+              // payload extras to the launcher activity of WebIntoApp builds.
+              tag: "cariana-push"
+            }
+          : {}
       }
     });
 
