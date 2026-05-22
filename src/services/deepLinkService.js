@@ -12,13 +12,17 @@ function normalizeOrderNumber(value) {
   return safeTrim(value).replace(/^#/, "");
 }
 
+function normalizeShopDomain(value) {
+  return safeTrim(value).replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+}
+
 function normalizeBaseUrl(shopDomain) {
   const configuredBase = safeTrim(process.env.SHOPIFY_STOREFRONT_BASE_URL || env.shopifyStorefrontBaseUrl || "");
   if (configuredBase) {
     return configuredBase.replace(/\/+$/, "");
   }
 
-  const normalizedShop = safeTrim(shopDomain).replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  const normalizedShop = normalizeShopDomain(shopDomain);
   if (!normalizedShop) {
     return "";
   }
@@ -52,13 +56,44 @@ function toAbsoluteShopDomainUrl(shopDomain, pathOrUrl) {
     return value;
   }
 
-  const normalizedShop = safeTrim(shopDomain).replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  const normalizedShop = normalizeShopDomain(shopDomain);
   if (!normalizedShop) {
     return value;
   }
 
   const normalizedPath = value.startsWith("/") ? value : `/${value}`;
   return `https://${normalizedShop}${normalizedPath}`;
+}
+
+function appendQueryParams(urlString, params) {
+  const validEntries = Object.entries(params).filter(([, value]) => safeTrim(value));
+  if (!validEntries.length) {
+    return urlString;
+  }
+
+  try {
+    const parsed = new URL(urlString);
+    for (const [key, value] of validEntries) {
+      parsed.searchParams.set(key, safeTrim(value));
+    }
+    return parsed.toString();
+  } catch (_error) {
+    const query = validEntries
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(safeTrim(value))}`)
+      .join("&");
+    const separator = urlString.includes("?") ? "&" : "?";
+    return `${urlString}${separator}${query}`;
+  }
+}
+
+function buildReturnsPortalBaseUrl(shopDomain) {
+  const configuredPortal = safeTrim(process.env.RETURNS_PORTAL_URL || env.returnsPortalUrl || "");
+  if (configuredPortal) {
+    return configuredPortal.replace(/\/+$/, "");
+  }
+
+  // Fallback to known production URL for Portal de Devoluciones.
+  return "https://gestion-devoluciones-pro.onrender.com/devoluciones";
 }
 
 function buildOrderDeepLink({ shopDomain, orderNumber, deepLink }) {
@@ -73,23 +108,21 @@ function buildOrderDeepLink({ shopDomain, orderNumber, deepLink }) {
 
 function buildReturnDeepLink({ shopDomain, orderNumber, email, deepLink }) {
   if (safeTrim(deepLink)) {
-    return toAbsoluteShopDomainUrl(shopDomain, deepLink);
+    if (isAbsoluteUrl(deepLink)) {
+      return deepLink;
+    }
   }
 
   const normalizedOrder = normalizeOrderNumber(orderNumber);
   const normalizedEmail = safeTrim(email).toLowerCase();
+  const normalizedShop = normalizeShopDomain(shopDomain);
+  const basePortalUrl = buildReturnsPortalBaseUrl(shopDomain);
 
-  const params = new URLSearchParams();
-  if (normalizedOrder) {
-    params.set("order", normalizedOrder);
-  }
-  if (normalizedEmail) {
-    params.set("email", normalizedEmail);
-  }
-
-  const query = params.toString();
-  const path = query ? `/apps/portal-devoluciones?${query}` : "/apps/portal-devoluciones";
-  return toAbsoluteShopDomainUrl(shopDomain, path);
+  return appendQueryParams(basePortalUrl, {
+    shop: normalizedShop,
+    order: normalizedOrder,
+    email: normalizedEmail
+  });
 }
 
 function buildCampaignDeepLink({ shopDomain, deepLink }) {
