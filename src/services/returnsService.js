@@ -4,36 +4,69 @@ const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
 
 const returnTemplateMap = {
+  // Generic review/request aliases
   in_review: "return_requested",
+  en_revision: "return_requested",
   review: "return_requested",
   pending_review: "return_requested",
   requested: "return_requested",
   request_received: "return_requested",
   return_requested: "return_requested",
+  approve_request: "return_approved",
+  confirm_request: "return_requested",
   solicitud_de_devolucion_recibida: "return_requested",
+
+  // Approved aliases
   approved_by_store: "return_approved",
   approve: "return_approved",
+  aprobada: "return_approved",
   approved: "return_approved",
   return_approved: "return_approved",
   devolucion_aprobada: "return_approved",
+
+  // Rejected aliases
   rejected_by_store: "return_rejected",
   reject: "return_rejected",
+  reject_request: "return_rejected",
+  reject_after_failed_pickups: "return_rejected",
+  deny_received: "return_rejected",
+  mark_returned_to_customer: "return_rejected",
+  mark_not_returned: "return_rejected",
   rejected: "return_rejected",
+  rechazada: "return_rejected",
+  reembolso_denegado: "return_rejected",
+  no_devuelto: "return_rejected",
   return_rejected: "return_rejected",
   devolucion_rechazada: "return_rejected",
+
+  // Pickup scheduled / attempt aliases
   schedule_pickup: "return_pickup_scheduled",
+  return_pickup_scheduled: "return_pickup_scheduled",
+  pickup_attempt_failed: "return_pickup_scheduled",
+  intento_fallido_1: "return_pickup_scheduled",
+  intento_fallido_2: "return_pickup_scheduled",
   pickup_scheduled: "return_pickup_scheduled",
   collection_scheduled: "return_pickup_scheduled",
   recoleccion_programada: "return_pickup_scheduled",
+
+  // Picked-up / received aliases
+  mark_received: "return_picked_up",
+  recibida: "return_picked_up",
+  return_picked_up: "return_picked_up",
   pickedup: "return_picked_up",
   picked_up: "return_picked_up",
   product_picked_up: "return_picked_up",
   producto_recogido: "return_picked_up",
+
+  // Refund aliases
+  process_refund: "refund_completed",
   refund_issued: "refund_processed",
   refund_in_process: "refund_processed",
   refund_processed: "refund_processed",
   reembolso_procesado: "refund_processed",
   refunded: "refund_completed",
+  reembolsada: "refund_completed",
+  completada: "refund_completed",
   refund_completed: "refund_completed",
   reembolso_completado: "refund_completed"
 };
