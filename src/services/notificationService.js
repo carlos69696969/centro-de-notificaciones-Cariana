@@ -141,6 +141,112 @@ async function sendToCustomerTokens({
   return { sent, failed, total: tokens.length };
 }
 
+async function sendToEmailTokens({
+  shopDomain,
+  email,
+  type,
+  title,
+  message,
+  deepLink,
+  data,
+  eventId,
+  campaignId
+}) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  if (!normalizedEmail) {
+    return { sent: 0, failed: 0, total: 0 };
+  }
+
+  const exactShopTokens = await pool.query(
+    `
+    SELECT DISTINCT ON (t.id)
+      t.id,
+      t.token,
+      t.customer_id
+    FROM fcm_tokens t
+    JOIN customers c ON c.id = t.customer_id
+    WHERE t.shop_domain = $1
+      AND t.is_active = TRUE
+      AND LOWER(COALESCE(c.email, '')) = $2
+    `,
+    [shopDomain, normalizedEmail]
+  );
+
+  let tokens = exactShopTokens.rows;
+  if (!tokens.length) {
+    // Fallback: when a merchant changed store domain during setup, try matching by
+    // customer email on active tokens from the same merchant database.
+    const crossShopTokens = await pool.query(
+      `
+      SELECT DISTINCT ON (t.id)
+        t.id,
+        t.token,
+        t.customer_id
+      FROM fcm_tokens t
+      JOIN customers c ON c.id = t.customer_id
+      WHERE t.is_active = TRUE
+        AND LOWER(COALESCE(c.email, '')) = $1
+      `,
+      [normalizedEmail]
+    );
+    tokens = crossShopTokens.rows;
+  }
+  let sent = 0;
+  let failed = 0;
+
+  for (const tokenRow of tokens) {
+    const payload = {
+      title,
+      body: message,
+      data: normalizeData({
+        deepLink: deepLink || "",
+        ...data
+      })
+    };
+
+    const fcmResult = await fcmService.sendToToken(tokenRow.token, payload);
+    if (fcmResult.ok) {
+      sent += 1;
+      await insertNotificationRecord({
+        shopDomain,
+        customerId: tokenRow.customer_id || null,
+        tokenId: tokenRow.id,
+        eventId,
+        campaignId,
+        type,
+        title,
+        message,
+        deepLink,
+        data,
+        status: "sent",
+        fcmMessageId: fcmResult.messageId
+      });
+    } else {
+      failed += 1;
+      if (fcmResult.error && fcmResult.error.includes("registration-token-not-registered")) {
+        await markTokenInvalid(tokenRow.id);
+      }
+
+      await insertNotificationRecord({
+        shopDomain,
+        customerId: tokenRow.customer_id || null,
+        tokenId: tokenRow.id,
+        eventId,
+        campaignId,
+        type,
+        title,
+        message,
+        deepLink,
+        data,
+        status: "failed",
+        errorMessage: fcmResult.error
+      });
+    }
+  }
+
+  return { sent, failed, total: tokens.length };
+}
+
 async function sendToAudience({
   shopDomain,
   audienceType,
@@ -214,5 +320,6 @@ async function sendToAudience({
 
 module.exports = {
   sendToCustomerTokens,
+  sendToEmailTokens,
   sendToAudience
 };

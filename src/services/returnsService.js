@@ -1,7 +1,7 @@
 const pool = require("../db/pool");
 const { getCustomerByEmail, getCustomerByShopifyId } = require("./customerService");
 const { getTemplate } = require("./templateService");
-const { sendToCustomerTokens } = require("./notificationService");
+const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
 
 const returnTemplateMap = {
   in_review: "return_requested",
@@ -96,6 +96,16 @@ async function resolveCustomer(shopDomain, payload) {
   return null;
 }
 
+function extractEventEmail(payload) {
+  return (
+    payload.email ||
+    payload.customer?.email ||
+    payload.customer_email ||
+    payload.customerEmail ||
+    ""
+  );
+}
+
 async function processReturnEvent({ shopDomain, payload }) {
   const { templateCode, normalizedStatus } = resolveTemplateCodeFromReturnPayload(payload);
   const returnReference =
@@ -129,28 +139,51 @@ async function processReturnEvent({ shopDomain, payload }) {
     return { skipped: true, reason: "Unknown status", eventId: eventInsert.rows[0].id };
   }
 
+  const eventEmail = extractEventEmail(payload);
   const customer = await resolveCustomer(shopDomain, payload);
-  if (!customer) {
-    return { skipped: true, reason: "Customer not found", eventId: eventInsert.rows[0].id };
-  }
 
   const template = await getTemplate(shopDomain, templateCode);
   if (!template) {
     return { skipped: true, reason: "Template not found", eventId: eventInsert.rows[0].id };
   }
 
-  return sendToCustomerTokens({
-    shopDomain,
-    customerId: customer.id,
-    type: "return_event",
-    title: template.title,
-    message: template.message,
-    deepLink: template.deep_link || `/returns/${returnReference || ""}`,
-    data: {
-      returnReference: returnReference || "",
-      status: templateCode
+  if (customer?.id) {
+    const primaryResult = await sendToCustomerTokens({
+      shopDomain,
+      customerId: customer.id,
+      type: "return_event",
+      title: template.title,
+      message: template.message,
+      deepLink: template.deep_link || `/returns/${returnReference || ""}`,
+      data: {
+        returnReference: returnReference || "",
+        status: templateCode
+      },
+      eventId: eventInsert.rows[0].id
+    });
+
+    if (primaryResult.total > 0 || !eventEmail) {
+      return primaryResult;
     }
-  });
+  }
+
+  if (eventEmail) {
+    return sendToEmailTokens({
+      shopDomain,
+      email: eventEmail,
+      type: "return_event",
+      title: template.title,
+      message: template.message,
+      deepLink: template.deep_link || `/returns/${returnReference || ""}`,
+      data: {
+        returnReference: returnReference || "",
+        status: templateCode
+      },
+      eventId: eventInsert.rows[0].id
+    });
+  }
+
+  return { skipped: true, reason: "Customer not found", eventId: eventInsert.rows[0].id };
 }
 
 module.exports = {
