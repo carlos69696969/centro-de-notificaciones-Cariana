@@ -43,6 +43,24 @@ function toAbsoluteStorefrontUrl(shopDomain, pathOrUrl) {
   return `${base}${normalizedPath}`;
 }
 
+function toAbsoluteShopDomainUrl(shopDomain, pathOrUrl) {
+  const value = safeTrim(pathOrUrl);
+  if (!value) {
+    return "";
+  }
+  if (isAbsoluteUrl(value)) {
+    return value;
+  }
+
+  const normalizedShop = safeTrim(shopDomain).replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  if (!normalizedShop) {
+    return value;
+  }
+
+  const normalizedPath = value.startsWith("/") ? value : `/${value}`;
+  return `https://${normalizedShop}${normalizedPath}`;
+}
+
 function buildOrderDeepLink({ shopDomain, orderNumber, deepLink }) {
   if (safeTrim(deepLink)) {
     return toAbsoluteStorefrontUrl(shopDomain, deepLink);
@@ -55,7 +73,7 @@ function buildOrderDeepLink({ shopDomain, orderNumber, deepLink }) {
 
 function buildReturnDeepLink({ shopDomain, orderNumber, email, deepLink }) {
   if (safeTrim(deepLink)) {
-    return toAbsoluteStorefrontUrl(shopDomain, deepLink);
+    return toAbsoluteShopDomainUrl(shopDomain, deepLink);
   }
 
   const normalizedOrder = normalizeOrderNumber(orderNumber);
@@ -71,7 +89,7 @@ function buildReturnDeepLink({ shopDomain, orderNumber, email, deepLink }) {
 
   const query = params.toString();
   const path = query ? `/apps/portal-devoluciones?${query}` : "/apps/portal-devoluciones";
-  return toAbsoluteStorefrontUrl(shopDomain, path);
+  return toAbsoluteShopDomainUrl(shopDomain, path);
 }
 
 function buildCampaignDeepLink({ shopDomain, deepLink }) {
