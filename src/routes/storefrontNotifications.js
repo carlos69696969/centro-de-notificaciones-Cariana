@@ -240,10 +240,18 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
   return result.rows[0]?.unread || 0;
 }
 
+function resolveShopDomain(req) {
+  return req.query.shop || req.header("x-shopify-shop-domain") || "";
+}
+
+function resolveCustomerId(req) {
+  return req.query.logged_in_customer_id || req.query.cid || "";
+}
+
 router.get("/badge", requireValidProxy, async (req, res, next) => {
   try {
-    const shopDomain = req.query.shop || "";
-    const shopifyCustomerId = req.query.logged_in_customer_id || "";
+    const shopDomain = resolveShopDomain(req);
+    const shopifyCustomerId = resolveCustomerId(req);
     const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
     return res.json({
       unread,
@@ -259,6 +267,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     const shopDomain = req.query.shop || "";
     const shopifyCustomerId = req.query.logged_in_customer_id || "";
     const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
+    const customerHint = String(shopifyCustomerId || "");
 
     const js = `
 (function() {
@@ -266,7 +275,8 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   window.__carianaBellInit = true;
 
   var unread = ${Number(unread) || 0};
-  var url = "/apps/notificaciones";
+  var customerHint = ${JSON.stringify(customerHint)};
+  var url = "/apps/notificaciones" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
 
   function updateBadge(count) {
     unread = Number(count) || 0;
@@ -369,7 +379,8 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   }
 
   function refreshBadge() {
-    fetch("/apps/notificaciones/badge")
+    var badgeUrl = "/apps/notificaciones/badge" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
+    fetch(badgeUrl)
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(data) {
         if (!data) return;
@@ -400,8 +411,8 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 });
 
 router.get("/", requireValidProxy, async (req, res) => {
-  const shopDomain = req.query.shop || "";
-  const shopifyCustomerId = req.query.logged_in_customer_id || "";
+  const shopDomain = resolveShopDomain(req);
+  const shopifyCustomerId = resolveCustomerId(req);
 
   if (!shopifyCustomerId) {
     return res.status(200).send(
@@ -419,8 +430,8 @@ router.get("/", requireValidProxy, async (req, res) => {
 
 router.get("/list", requireValidProxy, async (req, res, next) => {
   try {
-    const shopDomain = req.query.shop || "";
-    const shopifyCustomerId = req.query.logged_in_customer_id || "";
+    const shopDomain = resolveShopDomain(req);
+    const shopifyCustomerId = resolveCustomerId(req);
     if (!shopDomain || !shopifyCustomerId) {
       return res.status(400).json({ error: "Missing shop or logged_in_customer_id" });
     }
@@ -434,8 +445,8 @@ router.get("/list", requireValidProxy, async (req, res, next) => {
 
 router.post("/open", requireValidProxy, async (req, res, next) => {
   try {
-    const shopDomain = req.query.shop || "";
-    const shopifyCustomerId = req.query.logged_in_customer_id || "";
+    const shopDomain = resolveShopDomain(req);
+    const shopifyCustomerId = resolveCustomerId(req);
     const notificationId = Number(req.query.id || req.body?.id || 0);
     if (!shopDomain || !shopifyCustomerId || !notificationId) {
       return res.status(400).json({ error: "Missing required params" });
