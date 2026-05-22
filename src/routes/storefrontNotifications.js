@@ -17,9 +17,48 @@ function requireValidProxy(req, res, next) {
   return next();
 }
 
-function renderShellHtml({ shop, customerId }) {
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderItemsHtml(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return '<div class="item"><div class="msg">Aun no tienes notificaciones.</div></div>';
+  }
+
+  return items
+    .map((item) => {
+      const unread = !item.opened_at;
+      const deepLink = item.deep_link
+        ? `<div class="meta"><a class="link" href="${escapeHtml(item.deep_link)}">Abrir</a></div>`
+        : "";
+
+      return `
+      <div class="item" data-id="${Number(item.id)}" data-unread="${unread ? "1" : "0"}">
+        <h3 class="title">
+          ${escapeHtml(item.title)}
+          <span class="badge ${unread ? "new" : ""}">${unread ? "Nueva" : "Leida"}</span>
+        </h3>
+        <div class="meta">${escapeHtml(item.created_at)}</div>
+        <div class="msg">${escapeHtml(item.message || "")}</div>
+        ${deepLink}
+      </div>`;
+    })
+    .join("");
+}
+
+function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread = 0 }) {
   const safeShop = JSON.stringify(shop || "");
   const safeCustomerId = JSON.stringify(customerId || "");
+  const safeInitialHistory = JSON.stringify(initialHistory || []);
+  const safeInitialUnread = Number(initialUnread) || 0;
+  const serverSummary = `Total: ${initialHistory.length} | No leidas: ${safeInitialUnread}`;
+  const serverItems = renderItemsHtml(initialHistory);
 
   return `<!doctype html>
 <html lang="es">
@@ -115,16 +154,17 @@ function renderShellHtml({ shop, customerId }) {
   <body>
     <div class="wrap">
       <h1>Notificaciones</h1>
-      <div class="muted" id="summary">Cargando...</div>
+      <div class="muted" id="summary">${escapeHtml(serverSummary)}</div>
       <div class="toolbar">
         <button id="reloadBtn">Actualizar</button>
       </div>
-      <div class="list" id="list"></div>
+      <div class="list" id="list">${serverItems}</div>
     </div>
 
     <script>
       const SHOP = ${safeShop};
       const CUSTOMER_ID = ${safeCustomerId};
+      const INITIAL_HISTORY = ${safeInitialHistory};
 
       const listEl = document.getElementById("list");
       const summaryEl = document.getElementById("summary");
@@ -134,6 +174,54 @@ function renderShellHtml({ shop, customerId }) {
       function fmtDate(value) {
         const d = new Date(value);
         return isNaN(d.getTime()) ? value : d.toLocaleString();
+      }
+
+      function escapeHtmlClient(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      }
+
+      function renderHistory(history, unreadCount) {
+        summaryEl.textContent = "Total: " + history.length + " | No leidas: " + (unreadCount || 0);
+        listEl.innerHTML = "";
+        if (!history.length) {
+          const empty = document.createElement("div");
+          empty.className = "item";
+          empty.innerHTML = '<div class="msg">Aun no tienes notificaciones.</div>';
+          listEl.appendChild(empty);
+          return;
+        }
+
+        for (const item of history) {
+          const div = document.createElement("div");
+          div.className = "item";
+          div.dataset.id = String(item.id);
+          const unread = !item.opened_at;
+          div.dataset.unread = unread ? "1" : "0";
+
+          div.innerHTML = \`
+            <h3 class="title">
+              \${escapeHtmlClient(item.title)}
+              <span class="badge \${unread ? "new" : ""}">\${unread ? "Nueva" : "Leida"}</span>
+            </h3>
+            <div class="meta">\${fmtDate(item.created_at)}</div>
+            <div class="msg">\${escapeHtmlClient(item.message || "")}</div>
+            \${item.deep_link ? '<div class="meta"><a class="link" href="' + escapeHtmlClient(item.deep_link) + '">Abrir</a></div>' : ""}
+          \`;
+
+          div.addEventListener("click", async () => {
+            if (div.dataset.unread === "1") {
+              await markOpened(item.id);
+              await load();
+            }
+          });
+
+          listEl.appendChild(div);
+        }
       }
 
       async function markOpened(id) {
@@ -157,33 +245,7 @@ function renderShellHtml({ shop, customerId }) {
           }
           const data = await response.json();
           const history = data.history || [];
-          summaryEl.textContent = "Total: " + history.length + " | No leidas: " + (data.unread || 0);
-
-          listEl.innerHTML = "";
-          for (const item of history) {
-            const div = document.createElement("div");
-            div.className = "item";
-
-            const unread = !item.opened_at;
-            div.innerHTML = \`
-              <h3 class="title">
-                \${item.title}
-                <span class="badge \${unread ? "new" : ""}">\${unread ? "Nueva" : "Leida"}</span>
-              </h3>
-              <div class="meta">\${fmtDate(item.created_at)}</div>
-              <div class="msg">\${item.message || ""}</div>
-              \${item.deep_link ? '<div class="meta"><a class="link" href="' + item.deep_link + '">Abrir</a></div>' : ""}
-            \`;
-
-            div.addEventListener("click", async () => {
-              if (unread) {
-                await markOpened(item.id);
-                await load();
-              }
-            });
-
-            listEl.appendChild(div);
-          }
+          renderHistory(history, data.unread || 0);
         } catch (error) {
           summaryEl.textContent = "No se pudieron cargar las notificaciones";
           listEl.innerHTML = "";
@@ -195,8 +257,8 @@ function renderShellHtml({ shop, customerId }) {
         }
       }
 
+      renderHistory(INITIAL_HISTORY, ${safeInitialUnread});
       reloadBtn.addEventListener("click", load);
-      load();
     </script>
   </body>
 </html>`;
@@ -420,10 +482,19 @@ router.get("/", requireValidProxy, async (req, res) => {
     );
   }
 
+  let initial = { history: [], unread: 0 };
+  try {
+    initial = await getNotificationsByCustomer(shopDomain, shopifyCustomerId);
+  } catch (_error) {
+    initial = { history: [], unread: 0 };
+  }
+
   return res.status(200).send(
     renderShellHtml({
       shop: shopDomain,
-      customerId: shopifyCustomerId
+      customerId: shopifyCustomerId,
+      initialHistory: initial.history,
+      initialUnread: initial.unread
     })
   );
 });
