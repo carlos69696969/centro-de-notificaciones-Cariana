@@ -27,7 +27,19 @@ function hasDeliveredSignal(payload) {
   return candidates.some((status) => deliveredValues.has(status));
 }
 
-function resolveTemplateCodeFromOrder(topic, payload) {
+function hasLocalDeliverySignal(payload) {
+  if (!Array.isArray(payload.shipping_lines)) {
+    return false;
+  }
+
+  return payload.shipping_lines.some((line) => {
+    const code = normalizeStatus(line?.code);
+    const title = normalizeStatus(line?.title);
+    return code.includes("local_delivery") || title.includes("local_delivery");
+  });
+}
+
+function resolveTemplateCodeFromOrder(topic, payload, existingMap) {
   if (topic === "orders/cancelled") {
     return "order_cancelled";
   }
@@ -50,6 +62,14 @@ function resolveTemplateCodeFromOrder(topic, payload) {
     if (payload.fulfillment_status === "fulfilled") {
       return "order_in_transit";
     }
+
+    // Local delivery can stay with null fulfillment_status when merchant marks
+    // "ready for delivery". In that case, the second update after "preparing"
+    // should move to "in transit".
+    if (hasLocalDeliverySignal(payload) && existingMap?.last_status === "order_preparing") {
+      return "order_in_transit";
+    }
+
     return "order_preparing";
   }
   return null;
@@ -71,15 +91,6 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   }
 
   const eventId = eventResult.rows[0].id;
-  const templateCode = resolveTemplateCodeFromOrder(topic, payload);
-  if (!templateCode) {
-    await pool.query(
-      `UPDATE notification_events SET status = 'skipped', processed_at = NOW() WHERE id = $1`,
-      [eventId]
-    );
-    return { skipped: true };
-  }
-
   const mappedOrder = await pool.query(
     `
     SELECT shopify_customer_id, order_number, last_status
@@ -90,6 +101,15 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   );
 
   const existingMap = mappedOrder.rowCount > 0 ? mappedOrder.rows[0] : null;
+  const templateCode = resolveTemplateCodeFromOrder(topic, payload, existingMap);
+  if (!templateCode) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true };
+  }
+
   if (existingMap && existingMap.last_status === templateCode) {
     await pool.query(
       `UPDATE notification_events SET status = 'skipped', error_message = 'Duplicate status event', processed_at = NOW() WHERE id = $1`,

@@ -5,9 +5,11 @@ const router = express.Router();
 
 router.post("/events", async (req, res, next) => {
   try {
-    const { shopDomain, event } = req.body;
-    if (!shopDomain || !event) {
-      return res.status(400).json({ error: "shopDomain and event are required" });
+    const shopDomain = req.body.shopDomain || req.shopDomain;
+    const event = req.body.event && typeof req.body.event === "object" ? req.body.event : req.body;
+
+    if (!shopDomain || !event || typeof event !== "object") {
+      return res.status(400).json({ error: "shopDomain and event payload are required" });
     }
 
     const result = await processReturnEvent({ shopDomain, payload: event });
