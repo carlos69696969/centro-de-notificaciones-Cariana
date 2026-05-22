@@ -17,10 +17,9 @@ function requireValidProxy(req, res, next) {
   return next();
 }
 
-function renderShellHtml({ shop, customerId, proxyQuery }) {
+function renderShellHtml({ shop, customerId }) {
   const safeShop = JSON.stringify(shop || "");
   const safeCustomerId = JSON.stringify(customerId || "");
-  const safeProxyQuery = JSON.stringify(proxyQuery || "");
 
   return `<!doctype html>
 <html lang="es">
@@ -126,7 +125,6 @@ function renderShellHtml({ shop, customerId, proxyQuery }) {
     <script>
       const SHOP = ${safeShop};
       const CUSTOMER_ID = ${safeCustomerId};
-      const PROXY_QUERY = ${safeProxyQuery};
 
       const listEl = document.getElementById("list");
       const summaryEl = document.getElementById("summary");
@@ -137,13 +135,8 @@ function renderShellHtml({ shop, customerId, proxyQuery }) {
         return isNaN(d.getTime()) ? value : d.toLocaleString();
       }
 
-      function buildProxyUrl(relativePath) {
-        const qs = PROXY_QUERY || window.location.search.replace(/^\\?/, "");
-        return qs ? (relativePath + "?" + qs) : relativePath;
-      }
-
       async function markOpened(id) {
-        const response = await fetch(buildProxyUrl("./open"), {
+        const response = await fetch("./open", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -157,7 +150,7 @@ function renderShellHtml({ shop, customerId, proxyQuery }) {
 
       async function load() {
         try {
-          const response = await fetch(buildProxyUrl("./list"));
+          const response = await fetch("./list");
           if (!response.ok) {
             throw new Error("No se pudo cargar el historial");
           }
@@ -265,7 +258,6 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     const shopDomain = req.query.shop || "";
     const shopifyCustomerId = req.query.logged_in_customer_id || "";
     const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
-    const signedQuery = extractQueryString(req);
 
     const js = `
 (function() {
@@ -273,8 +265,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   window.__carianaBellInit = true;
 
   var unread = ${Number(unread) || 0};
-  var signedQuery = ${JSON.stringify(signedQuery)};
-  var url = "/apps/notificaciones" + (signedQuery ? ("?" + signedQuery) : "");
+  var url = "/apps/notificaciones";
 
   function updateBadge(count) {
     unread = Number(count) || 0;
@@ -377,8 +368,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   }
 
   function refreshBadge() {
-    var badgeUrl = "/apps/notificaciones/badge" + (signedQuery ? ("?" + signedQuery) : "");
-    fetch(badgeUrl)
+    fetch("/apps/notificaciones/badge")
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(data) {
         if (!data) return;
@@ -421,8 +411,7 @@ router.get("/", requireValidProxy, async (req, res) => {
   return res.status(200).send(
     renderShellHtml({
       shop: shopDomain,
-      customerId: shopifyCustomerId,
-      proxyQuery: extractQueryString(req)
+      customerId: shopifyCustomerId
     })
   );
 });
