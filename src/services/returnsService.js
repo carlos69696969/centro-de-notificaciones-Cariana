@@ -71,6 +71,37 @@ const returnTemplateMap = {
   reembolso_completado: "refund_completed"
 };
 
+const defaultReturnTemplates = {
+  return_requested: {
+    title: "Devolucion solicitada",
+    message: "Tu solicitud de devolucion ha sido recibida."
+  },
+  return_approved: {
+    title: "Devolucion aprobada",
+    message: "Tu devolucion ha sido aprobada."
+  },
+  return_rejected: {
+    title: "Devolucion rechazada",
+    message: "Tu devolucion ha sido rechazada."
+  },
+  return_pickup_scheduled: {
+    title: "Recoleccion programada",
+    message: "La recoleccion de tu devolucion fue programada."
+  },
+  return_picked_up: {
+    title: "Producto recogido",
+    message: "Recibimos tu producto para continuar con tu devolucion."
+  },
+  refund_processed: {
+    title: "Reembolso procesado",
+    message: "Tu reembolso ya fue procesado."
+  },
+  refund_completed: {
+    title: "Reembolso completado",
+    message: "Tu reembolso fue completado."
+  }
+};
+
 function normalizeReturnStatus(value) {
   return String(value || "")
     .normalize("NFD")
@@ -139,6 +170,20 @@ function extractEventEmail(payload) {
   );
 }
 
+function fallbackTemplateFor(templateCode, payload) {
+  const base = defaultReturnTemplates[templateCode];
+  if (!base) {
+    return null;
+  }
+
+  const note = String(payload.note || payload.message || "").trim();
+  return {
+    title: base.title,
+    message: note || base.message,
+    deep_link: null
+  };
+}
+
 async function processReturnEvent({ shopDomain, payload }) {
   const { templateCode, normalizedStatus } = resolveTemplateCodeFromReturnPayload(payload);
   const returnReference =
@@ -175,7 +220,8 @@ async function processReturnEvent({ shopDomain, payload }) {
   const eventEmail = extractEventEmail(payload);
   const customer = await resolveCustomer(shopDomain, payload);
 
-  const template = await getTemplate(shopDomain, templateCode);
+  const dbTemplate = await getTemplate(shopDomain, templateCode);
+  const template = dbTemplate || fallbackTemplateFor(templateCode, payload);
   if (!template) {
     return { skipped: true, reason: "Template not found", eventId: eventInsert.rows[0].id };
   }
