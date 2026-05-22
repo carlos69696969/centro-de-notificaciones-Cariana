@@ -17,9 +17,10 @@ function requireValidProxy(req, res, next) {
   return next();
 }
 
-function renderShellHtml({ shop, customerId }) {
+function renderShellHtml({ shop, customerId, proxyQuery }) {
   const safeShop = JSON.stringify(shop || "");
   const safeCustomerId = JSON.stringify(customerId || "");
+  const safeProxyQuery = JSON.stringify(proxyQuery || "");
 
   return `<!doctype html>
 <html lang="es">
@@ -125,6 +126,7 @@ function renderShellHtml({ shop, customerId }) {
     <script>
       const SHOP = ${safeShop};
       const CUSTOMER_ID = ${safeCustomerId};
+      const PROXY_QUERY = ${safeProxyQuery};
 
       const listEl = document.getElementById("list");
       const summaryEl = document.getElementById("summary");
@@ -135,42 +137,67 @@ function renderShellHtml({ shop, customerId }) {
         return isNaN(d.getTime()) ? value : d.toLocaleString();
       }
 
+      function buildProxyUrl(relativePath) {
+        const qs = PROXY_QUERY || window.location.search.replace(/^\\?/, "");
+        return qs ? (relativePath + "?" + qs) : relativePath;
+      }
+
       async function markOpened(id) {
-        const qs = new URLSearchParams(window.location.search);
-        qs.set("id", id);
-        await fetch("./open?" + qs.toString(), { method: "POST" });
+        const response = await fetch(buildProxyUrl("./open"), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ id })
+        });
+        if (!response.ok) {
+          throw new Error("No se pudo marcar como leida");
+        }
       }
 
       async function load() {
-        const response = await fetch("./list" + window.location.search);
-        const data = await response.json();
-        const history = data.history || [];
-        summaryEl.textContent = "Total: " + history.length + " | No leidas: " + (data.unread || 0);
+        try {
+          const response = await fetch(buildProxyUrl("./list"));
+          if (!response.ok) {
+            throw new Error("No se pudo cargar el historial");
+          }
+          const data = await response.json();
+          const history = data.history || [];
+          summaryEl.textContent = "Total: " + history.length + " | No leidas: " + (data.unread || 0);
 
-        listEl.innerHTML = "";
-        for (const item of history) {
-          const div = document.createElement("div");
-          div.className = "item";
+          listEl.innerHTML = "";
+          for (const item of history) {
+            const div = document.createElement("div");
+            div.className = "item";
 
-          const unread = !item.opened_at;
-          div.innerHTML = \`
-            <h3 class="title">
-              \${item.title}
-              <span class="badge \${unread ? "new" : ""}">\${unread ? "Nueva" : "Leida"}</span>
-            </h3>
-            <div class="meta">\${fmtDate(item.created_at)}</div>
-            <div class="msg">\${item.message || ""}</div>
-            \${item.deep_link ? '<div class="meta"><a class="link" href="' + item.deep_link + '">Abrir</a></div>' : ""}
-          \`;
+            const unread = !item.opened_at;
+            div.innerHTML = \`
+              <h3 class="title">
+                \${item.title}
+                <span class="badge \${unread ? "new" : ""}">\${unread ? "Nueva" : "Leida"}</span>
+              </h3>
+              <div class="meta">\${fmtDate(item.created_at)}</div>
+              <div class="msg">\${item.message || ""}</div>
+              \${item.deep_link ? '<div class="meta"><a class="link" href="' + item.deep_link + '">Abrir</a></div>' : ""}
+            \`;
 
-          div.addEventListener("click", async () => {
-            if (unread) {
-              await markOpened(item.id);
-              await load();
-            }
-          });
+            div.addEventListener("click", async () => {
+              if (unread) {
+                await markOpened(item.id);
+                await load();
+              }
+            });
 
-          listEl.appendChild(div);
+            listEl.appendChild(div);
+          }
+        } catch (error) {
+          summaryEl.textContent = "No se pudieron cargar las notificaciones";
+          listEl.innerHTML = "";
+          const err = document.createElement("div");
+          err.className = "item";
+          err.innerHTML = '<div class="msg">Intenta de nuevo con el boton Actualizar.</div>';
+          listEl.appendChild(err);
+          console.error(error);
         }
       }
 
@@ -238,6 +265,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     const shopDomain = req.query.shop || "";
     const shopifyCustomerId = req.query.logged_in_customer_id || "";
     const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
+    const signedQuery = extractQueryString(req);
 
     const js = `
 (function() {
@@ -245,7 +273,8 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   window.__carianaBellInit = true;
 
   var unread = ${Number(unread) || 0};
-  var url = "/apps/notificaciones";
+  var signedQuery = ${JSON.stringify(signedQuery)};
+  var url = "/apps/notificaciones" + (signedQuery ? ("?" + signedQuery) : "");
 
   function updateBadge(count) {
     unread = Number(count) || 0;
@@ -348,7 +377,8 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   }
 
   function refreshBadge() {
-    fetch("/apps/notificaciones/badge")
+    var badgeUrl = "/apps/notificaciones/badge" + (signedQuery ? ("?" + signedQuery) : "");
+    fetch(badgeUrl)
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(data) {
         if (!data) return;
@@ -388,7 +418,13 @@ router.get("/", requireValidProxy, async (req, res) => {
     );
   }
 
-  return res.status(200).send(renderShellHtml({ shop: shopDomain, customerId: shopifyCustomerId }));
+  return res.status(200).send(
+    renderShellHtml({
+      shop: shopDomain,
+      customerId: shopifyCustomerId,
+      proxyQuery: extractQueryString(req)
+    })
+  );
 });
 
 router.get("/list", requireValidProxy, async (req, res, next) => {
