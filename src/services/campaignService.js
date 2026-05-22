@@ -1,5 +1,6 @@
 const pool = require("../db/pool");
 const { sendToAudience } = require("./notificationService");
+const { buildCampaignDeepLink } = require("./deepLinkService");
 
 async function createCampaign({
   shopDomain,
@@ -65,10 +66,14 @@ async function sendCampaignNow(shopDomain, campaignId) {
     audienceType: campaign.audience_type,
     title: campaign.title,
     message: campaign.message,
-    deepLink: campaign.deep_link,
+    deepLink: buildCampaignDeepLink({
+      shopDomain,
+      deepLink: campaign.deep_link
+    }),
     data: {
       campaignId: campaign.id,
-      campaignName: campaign.name
+      campaignName: campaign.name,
+      deepLinkType: "campaign"
     },
     campaignId: campaign.id
   });

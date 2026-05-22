@@ -2,6 +2,7 @@ const pool = require("../db/pool");
 const { getCustomerByEmail, getCustomerByShopifyId } = require("./customerService");
 const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
+const { buildReturnDeepLink } = require("./deepLinkService");
 
 const returnTemplateMap = {
   // Generic review/request aliases
@@ -218,6 +219,7 @@ async function processReturnEvent({ shopDomain, payload }) {
   }
 
   const eventEmail = extractEventEmail(payload);
+  const orderNumber = payload.order_number || payload.orderNumber || returnReference || "";
   const customer = await resolveCustomer(shopDomain, payload);
 
   const dbTemplate = await getTemplate(shopDomain, templateCode);
@@ -233,10 +235,18 @@ async function processReturnEvent({ shopDomain, payload }) {
       type: "return_event",
       title: template.title,
       message: template.message,
-      deepLink: template.deep_link || `/returns/${returnReference || ""}`,
+      deepLink: buildReturnDeepLink({
+        shopDomain,
+        orderNumber,
+        email: eventEmail,
+        deepLink: template.deep_link
+      }),
       data: {
         returnReference: returnReference || "",
-        status: templateCode
+        status: templateCode,
+        orderNumber: orderNumber || "",
+        customerEmail: eventEmail || "",
+        deepLinkType: "return"
       },
       eventId: eventInsert.rows[0].id
     });
@@ -253,10 +263,18 @@ async function processReturnEvent({ shopDomain, payload }) {
       type: "return_event",
       title: template.title,
       message: template.message,
-      deepLink: template.deep_link || `/returns/${returnReference || ""}`,
+      deepLink: buildReturnDeepLink({
+        shopDomain,
+        orderNumber,
+        email: eventEmail,
+        deepLink: template.deep_link
+      }),
       data: {
         returnReference: returnReference || "",
-        status: templateCode
+        status: templateCode,
+        orderNumber: orderNumber || "",
+        customerEmail: eventEmail || "",
+        deepLinkType: "return"
       },
       eventId: eventInsert.rows[0].id
     });

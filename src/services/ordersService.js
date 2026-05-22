@@ -2,6 +2,7 @@ const pool = require("../db/pool");
 const { upsertCustomerFromShopify, getCustomerByShopifyId } = require("./customerService");
 const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens } = require("./notificationService");
+const { buildOrderDeepLink } = require("./deepLinkService");
 
 function normalizeStatus(value) {
   return String(value || "")
@@ -171,7 +172,9 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   const data = {
     orderId: payload.id,
     orderNumber: payload.order_number,
-    status: templateCode
+    status: templateCode,
+    deepLinkType: "order",
+    customerEmail: payload.customer?.email || ""
   };
 
   const sendResult = await sendToCustomerTokens({
@@ -180,7 +183,11 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     type: "order_event",
     title: template.title,
     message: template.message,
-    deepLink: template.deep_link || `/orders/${payload.id}`,
+    deepLink: buildOrderDeepLink({
+      shopDomain,
+      orderNumber: payload.order_number,
+      deepLink: template.deep_link
+    }),
     data,
     eventId
   });
@@ -227,11 +234,16 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, o
     type: "order_manual",
     title: template.title,
     message: template.message,
-    deepLink: template.deep_link || `/orders/${orderId}`,
+    deepLink: buildOrderDeepLink({
+      shopDomain,
+      orderNumber,
+      deepLink: template.deep_link
+    }),
     data: {
       orderId,
       orderNumber,
-      status: templateCode
+      status: templateCode,
+      deepLinkType: "order"
     }
   });
 }
@@ -294,11 +306,16 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
     type: "refund_event",
     title: template.title,
     message: template.message,
-    deepLink: template.deep_link || `/orders/${payload.order_id}`,
+    deepLink: buildOrderDeepLink({
+      shopDomain,
+      orderNumber: mapped.order_number,
+      deepLink: template.deep_link
+    }),
     data: {
       orderId: payload.order_id,
       orderNumber: mapped.order_number || "",
-      refundId: payload.id || ""
+      refundId: payload.id || "",
+      deepLinkType: "order"
     },
     eventId
   });

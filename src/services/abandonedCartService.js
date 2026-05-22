@@ -2,6 +2,7 @@ const pool = require("../db/pool");
 const { getTemplate } = require("./templateService");
 const { getCustomerByShopifyId } = require("./customerService");
 const { sendToCustomerTokens } = require("./notificationService");
+const { toAbsoluteStorefrontUrl } = require("./deepLinkService");
 
 async function upsertCheckoutEvent({ shopDomain, payload }) {
   const checkoutId = payload.id ? String(payload.id) : null;
@@ -84,10 +85,13 @@ async function runAbandonedCartSweep() {
       type: "abandoned_cart",
       title: template.title,
       message: template.message,
-      deepLink: template.deep_link || `/checkout/${row.checkout_id}`,
+      deepLink: template.deep_link
+        ? toAbsoluteStorefrontUrl(row.shop_domain, template.deep_link)
+        : toAbsoluteStorefrontUrl(row.shop_domain, "/cart"),
       data: {
         checkoutId: row.checkout_id,
-        stage: nextStage
+        stage: nextStage,
+        deepLinkType: "cart"
       }
     });
 

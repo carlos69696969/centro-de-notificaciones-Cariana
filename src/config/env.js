@@ -18,6 +18,7 @@ const env = {
   shopifyApiSecret: process.env.SHOPIFY_API_SECRET || "",
   shopifyScopes: process.env.SHOPIFY_SCOPES || "",
   shopifyAppUrl: process.env.SHOPIFY_APP_URL || "http://localhost:3000",
+  shopifyStorefrontBaseUrl: process.env.SHOPIFY_STOREFRONT_BASE_URL || "",
   appInternalApiKey: process.env.APP_INTERNAL_API_KEY || "",
   jwtSecret: process.env.JWT_SECRET || "change_me",
   fcmProjectId: process.env.FCM_PROJECT_ID || "",
