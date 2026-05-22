@@ -129,6 +129,7 @@ function renderShellHtml({ shop, customerId }) {
       const listEl = document.getElementById("list");
       const summaryEl = document.getElementById("summary");
       const reloadBtn = document.getElementById("reloadBtn");
+      const basePath = window.location.pathname.replace(/\/$/, "");
 
       function fmtDate(value) {
         const d = new Date(value);
@@ -136,7 +137,7 @@ function renderShellHtml({ shop, customerId }) {
       }
 
       async function markOpened(id) {
-        const response = await fetch("./open", {
+        const response = await fetch(basePath + "/open", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -150,7 +151,7 @@ function renderShellHtml({ shop, customerId }) {
 
       async function load() {
         try {
-          const response = await fetch("./list");
+          const response = await fetch(basePath + "/list");
           if (!response.ok) {
             throw new Error("No se pudo cargar el historial");
           }
