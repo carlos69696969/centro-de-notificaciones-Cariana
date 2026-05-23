@@ -4,11 +4,25 @@ const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens } = require("./notificationService");
 const { buildOrderDeepLink } = require("./deepLinkService");
 
+const LOCAL_DELIVERY_READY_TOPIC = "fulfillment_orders/line_items_prepared_for_local_delivery";
+
 function normalizeStatus(value) {
   return String(value || "")
     .trim()
     .toLowerCase()
     .replace(/[\s-]+/g, "_");
+}
+
+function parseLegacyNumericId(value) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return null;
+  }
+  if (/^\d+$/.test(text)) {
+    return text;
+  }
+  const match = text.match(/(\d+)(?!.*\d)/);
+  return match ? match[1] : null;
 }
 
 function hasDeliveredSignal(payload) {
@@ -73,11 +87,141 @@ function resolveTemplateCodeFromOrder(topic, payload, existingMap) {
 
     return "order_preparing";
   }
+  if (topic === LOCAL_DELIVERY_READY_TOPIC) {
+    return "order_in_transit";
+  }
   return null;
+}
+
+const orderStatusRank = {
+  order_confirmed: 10,
+  order_preparing: 20,
+  order_in_transit: 30,
+  order_shipped: 30,
+  order_delivered: 40,
+  order_cancelled: 50
+};
+
+function isStaleOrderTransition(previousStatus, nextStatus) {
+  const previousRank = orderStatusRank[previousStatus] || 0;
+  const nextRank = orderStatusRank[nextStatus] || 0;
+  if (!previousRank || !nextRank) {
+    return false;
+  }
+  return nextRank < previousRank;
 }
 
 function normalizeOrderNumber(value) {
   return String(value || "").replace(/^#/, "").trim();
+}
+
+function extractOrderContext(topic, payload) {
+  const orderIdCandidates = [];
+  const orderNumberCandidates = [];
+  const customerIdCandidates = [];
+
+  if (topic.startsWith("orders/")) {
+    orderIdCandidates.push(payload?.id);
+    orderNumberCandidates.push(payload?.order_number, payload?.name);
+    customerIdCandidates.push(payload?.customer?.id);
+  }
+
+  if (topic === LOCAL_DELIVERY_READY_TOPIC) {
+    orderIdCandidates.push(payload?.order_id);
+    orderIdCandidates.push(payload?.fulfillment_order?.order_id);
+    orderIdCandidates.push(payload?.fulfillmentOrder?.order_id);
+    orderNumberCandidates.push(
+      payload?.order_number,
+      payload?.order_name,
+      payload?.order?.order_number,
+      payload?.order?.name
+    );
+  }
+
+  const orderId = orderIdCandidates.map(parseLegacyNumericId).find(Boolean) || null;
+  const orderNumberRaw = orderNumberCandidates.map((value) => String(value || "").trim()).find(Boolean) || "";
+  const orderNumber = normalizeOrderNumber(orderNumberRaw);
+  const customerId = customerIdCandidates.map(parseLegacyNumericId).find(Boolean) || null;
+
+  return { orderId, orderNumber, customerId };
+}
+
+async function getShopAccessToken(shopDomain) {
+  const result = await pool.query(
+    `
+    SELECT access_token
+    FROM shops
+    WHERE shop_domain = $1
+    LIMIT 1
+    `,
+    [shopDomain]
+  );
+  if (result.rowCount === 0) {
+    return null;
+  }
+  const token = String(result.rows[0].access_token || "").trim();
+  return token || null;
+}
+
+async function fetchShopifyOrderById(shopDomain, orderId) {
+  const token = await getShopAccessToken(shopDomain);
+  if (!token || !orderId) {
+    return null;
+  }
+
+  const apiVersion = "2026-04";
+  const fields = [
+    "id",
+    "name",
+    "order_number",
+    "customer",
+    "line_items",
+    "shipping_lines",
+    "fulfillment_status",
+    "display_fulfillment_status",
+    "fulfillments",
+    "cancelled_at"
+  ].join(",");
+
+  const url = `https://${shopDomain}/admin/api/${apiVersion}/orders/${orderId}.json?status=any&fields=${fields}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "X-Shopify-Access-Token": token,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  return data?.order || null;
+}
+
+async function fetchOrderIdFromFulfillmentOrder(shopDomain, fulfillmentOrderId) {
+  const token = await getShopAccessToken(shopDomain);
+  if (!token || !fulfillmentOrderId) {
+    return null;
+  }
+
+  const apiVersion = "2026-04";
+  const url = `https://${shopDomain}/admin/api/${apiVersion}/fulfillment_orders/${fulfillmentOrderId}.json`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "X-Shopify-Access-Token": token,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  return parseLegacyNumericId(data?.fulfillment_order?.order_id);
 }
 
 function pickFirstString(candidates) {
@@ -221,23 +365,58 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   }
 
   const eventId = eventResult.rows[0].id;
+  const context = extractOrderContext(topic, payload);
+  let orderId = context.orderId;
+
+  if (!orderId && topic === LOCAL_DELIVERY_READY_TOPIC) {
+    const fulfillmentOrderId = parseLegacyNumericId(payload?.fulfillment_order?.id || payload?.fulfillmentOrder?.id);
+    if (fulfillmentOrderId) {
+      orderId = await fetchOrderIdFromFulfillmentOrder(shopDomain, fulfillmentOrderId);
+    }
+  }
+
+  if (!orderId) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Order id not found in webhook payload', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Order id not found in webhook payload" };
+  }
+
   const mappedOrder = await pool.query(
     `
     SELECT shopify_customer_id, order_number, last_status
     FROM order_customer_map
     WHERE shop_domain = $1 AND order_id = $2
     `,
-    [shopDomain, payload.id]
+    [shopDomain, orderId]
   );
 
   const existingMap = mappedOrder.rowCount > 0 ? mappedOrder.rows[0] : null;
-  const templateCode = resolveTemplateCodeFromOrder(topic, payload, existingMap);
+  let effectivePayload = payload;
+
+  if (topic === LOCAL_DELIVERY_READY_TOPIC) {
+    const hydratedOrder = await fetchShopifyOrderById(shopDomain, orderId);
+    if (hydratedOrder) {
+      effectivePayload = hydratedOrder;
+    }
+  }
+
+  const templateCode = resolveTemplateCodeFromOrder(topic, effectivePayload, existingMap);
   if (!templateCode) {
     await pool.query(
       `UPDATE notification_events SET status = 'skipped', processed_at = NOW() WHERE id = $1`,
       [eventId]
     );
     return { skipped: true };
+  }
+
+  if (existingMap?.last_status && isStaleOrderTransition(existingMap.last_status, templateCode)) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Stale status transition', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Stale status transition" };
   }
 
   if (existingMap && existingMap.last_status === templateCode) {
@@ -249,12 +428,12 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   }
 
   let customer = null;
-  const customerIdFromPayload = payload.customer?.id || null;
+  const customerIdFromPayload = effectivePayload.customer?.id || context.customerId || null;
   const customerIdFromMap = existingMap?.shopify_customer_id || null;
   const mappedCustomerId = customerIdFromPayload || customerIdFromMap;
 
-  if (payload.customer?.id) {
-    customer = await upsertCustomerFromShopify(shopDomain, payload.customer);
+  if (effectivePayload.customer?.id) {
+    customer = await upsertCustomerFromShopify(shopDomain, effectivePayload.customer);
   } else if (mappedCustomerId) {
     customer = await getCustomerByShopifyId(shopDomain, mappedCustomerId);
   }
@@ -282,9 +461,9 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     `,
     [
       shopDomain,
-      payload.id,
+      orderId,
       mappedCustomerId || customer.shopify_customer_id,
-      payload.order_number || existingMap?.order_number || null,
+      effectivePayload.order_number || context.orderNumber || existingMap?.order_number || null,
       templateCode
     ]
   );
@@ -300,21 +479,21 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
 
   const copy = buildOrderNotificationCopy({
     templateCode,
-    orderNumber: payload.order_number,
-    payload,
+    orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
+    payload: effectivePayload,
     fallbackTitle: template.title,
     fallbackMessage: template.message
   });
 
   const data = {
-    orderId: payload.id,
-    orderNumber: payload.order_number,
+    orderId,
+    orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
     status: templateCode,
     statusLabel: copy.statusLabel,
     productName: copy.productsInline || "",
     productNames: copy.productNames || [],
     deepLinkType: "order",
-    customerEmail: payload.customer?.email || ""
+    customerEmail: effectivePayload.customer?.email || ""
   };
 
   const sendResult = await sendToCustomerTokens({
@@ -325,7 +504,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     message: copy.message,
     deepLink: buildOrderDeepLink({
       shopDomain,
-      orderNumber: payload.order_number,
+      orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
       deepLink: template.deep_link
     }),
     data,

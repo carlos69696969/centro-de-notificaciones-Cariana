@@ -7,7 +7,7 @@ embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_orders,read_customers,write_app_proxy"
+scopes = "read_orders,read_customers,read_merchant_managed_fulfillment_orders,write_app_proxy"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 
@@ -23,7 +23,7 @@ prefix = "apps"
 api_version = "2026-04"
 
 [[webhooks.subscriptions]]
-topics = [ "orders/create", "orders/updated", "orders/fulfilled", "orders/cancelled", "refunds/create", "checkouts/update" ]
+topics = [ "orders/create", "orders/updated", "orders/fulfilled", "orders/cancelled", "fulfillment_orders/line_items_prepared_for_local_delivery", "refunds/create", "checkouts/update" ]
 uri = "/webhooks/shopify"
 
 [build]

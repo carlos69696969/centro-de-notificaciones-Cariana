@@ -19,7 +19,15 @@ router.post("/shopify", express.raw({ type: "*/*" }), async (req, res, next) => 
 
     const payload = JSON.parse(req.body.toString("utf8"));
 
-    if (["orders/create", "orders/updated", "orders/fulfilled", "orders/cancelled"].includes(topic)) {
+    if (
+      [
+        "orders/create",
+        "orders/updated",
+        "orders/fulfilled",
+        "orders/cancelled",
+        "fulfillment_orders/line_items_prepared_for_local_delivery"
+      ].includes(topic)
+    ) {
       await processOrderWebhook({ topic, shopDomain, payload, webhookId });
     } else if (topic === "checkouts/update") {
       await upsertCheckoutEvent({ shopDomain, payload });
