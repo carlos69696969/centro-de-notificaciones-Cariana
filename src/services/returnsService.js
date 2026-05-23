@@ -321,7 +321,13 @@ async function processReturnEvent({ shopDomain, payload }) {
         status: templateCode,
         orderNumber: orderNumber || "",
         customerEmail: eventEmail || "",
-        deepLinkType: "return"
+        deepLinkType: "return",
+        deeplinkType: "return",
+        linkType: "return",
+        notificationType: "return_event",
+        eventType: "return_event",
+        route: "returns",
+        openScreen: "returns_portal"
       },
       eventId: eventInsert.rows[0].id
     });
@@ -349,7 +355,13 @@ async function processReturnEvent({ shopDomain, payload }) {
         status: templateCode,
         orderNumber: orderNumber || "",
         customerEmail: eventEmail || "",
-        deepLinkType: "return"
+        deepLinkType: "return",
+        deeplinkType: "return",
+        linkType: "return",
+        notificationType: "return_event",
+        eventType: "return_event",
+        route: "returns",
+        openScreen: "returns_portal"
       },
       eventId: eventInsert.rows[0].id
     });

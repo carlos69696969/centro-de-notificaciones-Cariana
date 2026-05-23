@@ -94,11 +94,16 @@ async function sendToCustomerTokens({
       body: message,
       data: normalizeData({
         deepLink: deepLink || "",
+        deeplink: deepLink || "",
         deep_link: deepLink || "",
+        deepLinkUrl: deepLink || "",
+        deeplink_url: deepLink || "",
         url: deepLink || "",
         link: deepLink || "",
         targetUrl: deepLink || "",
+        target_url: deepLink || "",
         openUrl: deepLink || "",
+        open_url: deepLink || "",
         ...data
       })
     };
@@ -205,11 +210,16 @@ async function sendToEmailTokens({
       body: message,
       data: normalizeData({
         deepLink: deepLink || "",
+        deeplink: deepLink || "",
         deep_link: deepLink || "",
+        deepLinkUrl: deepLink || "",
+        deeplink_url: deepLink || "",
         url: deepLink || "",
         link: deepLink || "",
         targetUrl: deepLink || "",
+        target_url: deepLink || "",
         openUrl: deepLink || "",
+        open_url: deepLink || "",
         ...data
       })
     };
