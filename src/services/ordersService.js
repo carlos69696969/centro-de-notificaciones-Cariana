@@ -378,6 +378,21 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     };
   }
 
+  if (templateCode === "order_in_transit") {
+    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
+    const message = orderRef
+      ? `¡Tu pedido ${orderRef} ya está en camino! 🚚✨\n\nNuestro repartidor se dirige a tu ubicación. La entrega está programada para hoy antes de las 8:00 p.m.\n\nGracias por confiar en Cariana. 💙`
+      : `¡Tu pedido ya está en camino! 🚚✨\n\nNuestro repartidor se dirige a tu ubicación. La entrega está programada para hoy antes de las 8:00 p.m.\n\nGracias por confiar en Cariana. 💙`;
+
+    return {
+      title,
+      message,
+      statusLabel,
+      productNames,
+      productsInline
+    };
+  }
+
   const parts = [];
   if (normalizedOrder) {
     parts.push(`Pedido #${normalizedOrder}.`);
