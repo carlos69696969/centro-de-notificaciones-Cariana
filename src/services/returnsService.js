@@ -355,6 +355,10 @@ function buildReturnStatusTitle(templateCode) {
 }
 
 function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
+  if (templateCode === "return_picked_up") {
+    return "Recibimos tu producto con exito, lo revisaremos. Una vez finalicemos realizaremos tu reembolso.";
+  }
+
   const fromPayload = truncateText(
     pickFirstString([
       payload.portal_status_message,
