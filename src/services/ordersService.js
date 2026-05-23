@@ -224,6 +224,53 @@ async function fetchOrderIdFromFulfillmentOrder(shopDomain, fulfillmentOrderId) 
   return parseLegacyNumericId(data?.fulfillment_order?.order_id);
 }
 
+async function inferOrderIdFromRecentLocalDeliveryContext({ shopDomain, eventId }) {
+  const eventResult = await pool.query(
+    `
+    SELECT created_at
+    FROM notification_events
+    WHERE id = $1
+    LIMIT 1
+    `,
+    [eventId]
+  );
+
+  if (eventResult.rowCount === 0) {
+    return null;
+  }
+
+  const eventCreatedAt = eventResult.rows[0].created_at;
+  const candidateResult = await pool.query(
+    `
+    SELECT ocm.order_id
+    FROM order_customer_map ocm
+    JOIN notification_events ne
+      ON ne.shop_domain = ocm.shop_domain
+     AND ne.topic = 'orders/updated'
+     AND (ne.payload->>'id') ~ '^[0-9]+$'
+     AND (ne.payload->>'id')::BIGINT = ocm.order_id
+    WHERE ocm.shop_domain = $1
+      AND ocm.last_status = 'order_preparing'
+      AND ne.created_at BETWEEN ($2::timestamptz - interval '90 minutes') AND ($2::timestamptz + interval '5 minutes')
+      AND EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(COALESCE(ne.payload->'shipping_lines', '[]'::jsonb)) AS line
+        WHERE lower(COALESCE(line->>'code', '')) LIKE '%local%'
+           OR lower(COALESCE(line->>'title', '')) LIKE '%local%'
+      )
+    ORDER BY ABS(EXTRACT(EPOCH FROM ($2::timestamptz - ne.created_at))) ASC, ne.created_at DESC
+    LIMIT 1
+    `,
+    [shopDomain, eventCreatedAt]
+  );
+
+  if (candidateResult.rowCount === 0) {
+    return null;
+  }
+
+  return String(candidateResult.rows[0].order_id);
+}
+
 function pickFirstString(candidates) {
   for (const value of candidates) {
     const text = String(value || "").trim();
@@ -372,6 +419,12 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     const fulfillmentOrderId = parseLegacyNumericId(payload?.fulfillment_order?.id || payload?.fulfillmentOrder?.id);
     if (fulfillmentOrderId) {
       orderId = await fetchOrderIdFromFulfillmentOrder(shopDomain, fulfillmentOrderId);
+    }
+
+    // Fallback for stores where OAuth token has not been persisted yet:
+    // infer the order from the latest local-delivery "preparing" event.
+    if (!orderId) {
+      orderId = await inferOrderIdFromRecentLocalDeliveryContext({ shopDomain, eventId });
     }
   }
 
