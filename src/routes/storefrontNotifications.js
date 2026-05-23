@@ -384,10 +384,42 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
   function updateBadge(count) {
     unread = Number(count) || 0;
+    var bell = document.getElementById("cariana-noti-bell");
+    if (!bell) return;
+
     var badge = document.getElementById("cariana-noti-badge");
-    if (!badge) return;
+    if (unread <= 0) {
+      if (badge && badge.parentElement) {
+        badge.parentElement.removeChild(badge);
+      }
+      return;
+    }
+
+    if (!badge) {
+      badge = document.createElement("span");
+      badge.id = "cariana-noti-badge";
+      bell.appendChild(badge);
+    }
+
     badge.textContent = unread > 99 ? "99+" : String(unread);
-    badge.style.display = unread > 0 ? "" : "none";
+    badge.style.setProperty("position", "absolute", "important");
+    badge.style.setProperty("top", "-6px", "important");
+    badge.style.setProperty("right", "-8px", "important");
+    badge.style.setProperty("min-width", "18px", "important");
+    badge.style.setProperty("height", "18px", "important");
+    badge.style.setProperty("padding", "0 4px", "important");
+    badge.style.setProperty("border-radius", "999px", "important");
+    badge.style.setProperty("background", "#ef4444", "important");
+    badge.style.setProperty("color", "#ffffff", "important");
+    badge.style.setProperty("font-size", "11px", "important");
+    badge.style.setProperty("font-family", "Arial, sans-serif", "important");
+    badge.style.setProperty("font-weight", "700", "important");
+    badge.style.setProperty("line-height", "18px", "important");
+    badge.style.setProperty("text-align", "center", "important");
+    badge.style.setProperty("display", "inline-flex", "important");
+    badge.style.setProperty("align-items", "center", "important");
+    badge.style.setProperty("justify-content", "center", "important");
+    badge.style.setProperty("box-sizing", "border-box", "important");
   }
 
   function createBellElement() {
@@ -402,10 +434,6 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     icon.style.cssText = "font-size:22px;line-height:1;display:inline-block;";
     a.appendChild(icon);
 
-    var badge = document.createElement("span");
-    badge.id = "cariana-noti-badge";
-    badge.style.cssText = "position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#ef4444;color:#fff;font-size:11px;line-height:18px;text-align:center;font-weight:700;box-sizing:border-box;";
-    a.appendChild(badge);
     updateBadge(unread);
     return a;
   }
