@@ -363,6 +363,21 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     };
   }
 
+  if (templateCode === "order_delivered") {
+    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
+    const message = orderRef
+      ? `¡Tu pedido ${orderRef} ha sido entregado con éxito! 📦✨\n\nEsperamos que te encante tu compra. Gracias por confiar en Cariana y ser parte de nuestra comunidad. 💙`
+      : `¡Tu pedido ha sido entregado con éxito! 📦✨\n\nEsperamos que te encante tu compra. Gracias por confiar en Cariana y ser parte de nuestra comunidad. 💙`;
+
+    return {
+      title,
+      message,
+      statusLabel,
+      productNames,
+      productsInline
+    };
+  }
+
   const parts = [];
   if (normalizedOrder) {
     parts.push(`Pedido #${normalizedOrder}.`);
