@@ -347,6 +347,22 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const productNames = extractProductNames(payload);
   const productsInline = formatProductsInline(productNames);
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
+
+  if (templateCode === "order_preparing") {
+    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
+    const message = orderRef
+      ? `Tu pedido ${orderRef} esta siendo preparado para ser enviado. Llegara manana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`
+      : `Tu pedido esta siendo preparado para ser enviado. Llegara manana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`;
+
+    return {
+      title,
+      message,
+      statusLabel,
+      productNames,
+      productsInline
+    };
+  }
+
   const parts = [];
   if (normalizedOrder) {
     parts.push(`Pedido #${normalizedOrder}.`);
