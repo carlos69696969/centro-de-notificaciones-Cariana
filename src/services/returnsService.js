@@ -354,7 +354,25 @@ function buildReturnStatusTitle(templateCode) {
   return map[templateCode] || "Actualizacion de devolucion";
 }
 
+function isBranchReturnMethod(payload = {}) {
+  const method = normalizeReturnStatus(
+    payload.return_method ||
+      payload.returnMethod ||
+      payload.method ||
+      payload.delivery_method ||
+      payload.deliveryMethod ||
+      payload.metodo ||
+      ""
+  );
+
+  return method === "branch" || method === "sucursal" || method === "store_dropoff";
+}
+
 function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
+  if (templateCode === "return_approved" && isBranchReturnMethod(payload)) {
+    return "Tu solicitud de devolución fue aprobada. 📦 Por favor, lleva tu producto a la sucursal de devoluciones siguiendo las instrucciones de entrega.";
+  }
+
   if (templateCode === "return_picked_up") {
     return "Recibimos tu producto con exito, lo revisaremos. Una vez finalicemos realizaremos tu reembolso.";
   }
