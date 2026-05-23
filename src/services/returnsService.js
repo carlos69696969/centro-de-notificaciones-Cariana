@@ -354,6 +354,40 @@ function buildReturnStatusTitle(templateCode) {
   return map[templateCode] || "Actualizacion de devolucion";
 }
 
+function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
+  const fromPayload = truncateText(
+    pickFirstString([
+      payload.portal_status_message,
+      payload.portalStatusMessage,
+      payload.status_message,
+      payload.statusMessage
+    ]),
+    180
+  );
+  if (fromPayload) {
+    return fromPayload;
+  }
+
+  const byStatus = {
+    return_requested:
+      "Tu solicitud esta siendo revisada por nuestro equipo, regresa mas tarde para revisar el estado de tu solicitud.",
+    return_approved:
+      "Tu solicitud fue aprobada y estamos coordinando el siguiente paso de tu devolucion.",
+    return_rejected:
+      "Tu solicitud fue rechazada. Revisa el detalle para conocer el motivo y las opciones disponibles.",
+    return_pickup_scheduled:
+      "No se pudo completar la recoleccion. Estamos gestionando un nuevo intento para tu devolucion.",
+    return_picked_up:
+      "Tu paquete ya fue recolectado y estamos procesando tu devolucion.",
+    refund_processed:
+      "Tu reembolso fue procesado y se vera reflejado segun los tiempos de tu metodo de pago.",
+    refund_completed:
+      "Tu reembolso fue completado correctamente."
+  };
+
+  return byStatus[templateCode] || truncateText(fallbackMessage, 180);
+}
+
 function buildReturnPremiumTemplate({
   templateCode,
   orderNumber,
@@ -373,6 +407,7 @@ function buildReturnPremiumTemplate({
   });
   const statusLabel = returnStatusLabels[templateCode] || "Actualizacion";
   const statusTitle = buildReturnStatusTitle(templateCode);
+  const portalCurrentText = buildPortalCurrentStatusText(templateCode, payload, fallbackMessage);
 
   if (templateCode === "return_rejected") {
     const formalTitle = statusTitle;
@@ -387,7 +422,9 @@ function buildReturnPremiumTemplate({
     if (!productsInline && fallbackDetail) {
       formalParts.push(`${fallbackDetail}.`);
     }
-    formalParts.push("Toca para ver el detalle.");
+    if (portalCurrentText) {
+      formalParts.push(portalCurrentText);
+    }
 
     return {
       title: formalTitle,
@@ -412,7 +449,9 @@ function buildReturnPremiumTemplate({
   if (detail && !productsInline) {
     parts.push(`${detail}.`);
   }
-  parts.push("Toca para ver el detalle.");
+  if (portalCurrentText) {
+    parts.push(portalCurrentText);
+  }
 
   return {
     title,
