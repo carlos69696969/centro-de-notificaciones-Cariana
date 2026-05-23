@@ -35,12 +35,12 @@ function buildCampaignNotificationCopy(campaign) {
   const audienceLabel = audienceLabelMap[campaign.audience_type] || "Clientes seleccionados";
   const bodyMessage = truncateText(campaign.message, 90);
 
-  const title = `Campana Cariana | ${headline}`;
+  const title = `Campana Cariana - ${headline}`;
   const parts = [`Segmento: ${audienceLabel}.`];
   if (bodyMessage) {
     parts.push(`Detalle: ${bodyMessage}.`);
   }
-  parts.push("Toca para ver mas informacion.");
+  parts.push("Toca para ver el detalle.");
 
   return {
     title,

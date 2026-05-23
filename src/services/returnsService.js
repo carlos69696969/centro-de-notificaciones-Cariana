@@ -363,21 +363,22 @@ function buildReturnPremiumTemplate({ templateCode, orderNumber, payload, fallba
   }
 
   const title = normalizedOrder
-    ? `Actualizacion de tu devolucion | Pedido #${normalizedOrder}`
-    : "Actualizacion de tu devolucion";
+    ? `${statusLabel} - Pedido #${normalizedOrder}`
+    : `${statusLabel} - Devolucion`;
 
-  const parts = [`Estado: ${statusLabel}.`];
+  const parts = [];
   if (productName) {
     parts.push(`Producto: ${productName}.`);
   }
+  parts.push(`Estado: ${statusLabel}.`);
   if (rejectionReason) {
     parts.push(`Motivo: ${rejectionReason}.`);
   }
-  const detail = truncateText(fallbackMessage, 80);
+  const detail = truncateText(fallbackMessage, 70);
   if (detail && !rejectionReason && templateCode !== "return_rejected") {
     parts.push(`Detalle: ${detail}.`);
   }
-  parts.push("Ver opciones en detalle.");
+  parts.push("Toca para ver el detalle.");
 
   return {
     title,

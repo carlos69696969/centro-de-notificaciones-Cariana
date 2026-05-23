@@ -141,22 +141,21 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const normalizedOrder = normalizeOrderNumber(orderNumber);
   const statusLabel = orderStatusLabels[templateCode] || pickFirstString([fallbackTitle, "Actualizacion"]);
   const productName = extractProductName(payload);
-
-  const title = normalizedOrder
-    ? `Actualizacion de tu pedido | #${normalizedOrder}`
-    : "Actualizacion de tu pedido";
-  const parts = [`Estado: ${statusLabel}.`];
+  const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
+  const parts = [];
 
   if (productName) {
     parts.push(`Producto: ${productName}.`);
   }
 
-  const detail = truncateText(fallbackMessage, 80);
-  if (detail && !productName) {
+  parts.push(`Estado: ${statusLabel}.`);
+
+  const detail = truncateText(fallbackMessage, 70);
+  if (detail) {
     parts.push(`Detalle: ${detail}.`);
   }
 
-  parts.push("Ver detalle del pedido.");
+  parts.push("Toca para ver el detalle.");
 
   return {
     title,
@@ -169,15 +168,15 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
 function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessage }) {
   const normalizedOrder = normalizeOrderNumber(orderNumber);
   const title = normalizedOrder
-    ? `Actualizacion de tu reembolso | Pedido #${normalizedOrder}`
-    : "Actualizacion de tu reembolso";
+    ? `Reembolso procesado - Pedido #${normalizedOrder}`
+    : "Reembolso procesado - Pedido";
   const detail = truncateText(fallbackMessage, 90);
   const parts = ["Estado: Reembolso procesado."];
 
   if (detail) {
     parts.push(`Detalle: ${detail}.`);
   }
-  parts.push("Ver detalle del pedido.");
+  parts.push("Toca para ver el detalle.");
 
   return {
     title,

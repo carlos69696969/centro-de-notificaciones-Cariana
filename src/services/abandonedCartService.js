@@ -52,19 +52,20 @@ const abandonedStageLabel = {
 function buildAbandonedCartCopy({ stage, payload, fallbackMessage }) {
   const productName = extractCheckoutProductName(payload || {});
   const stageLabel = abandonedStageLabel[stage] || "Carrito pendiente";
-  const title = `Actualizacion de tu carrito | ${stageLabel}`;
-  const parts = [`Estado: ${stageLabel}.`];
+  const title = `${stageLabel} - Carrito`;
+  const parts = [];
 
   if (productName) {
     parts.push(`Producto: ${productName}.`);
   }
+  parts.push(`Estado: ${stageLabel}.`);
 
-  const detail = truncateText(fallbackMessage, 80);
-  if (detail && !productName) {
+  const detail = truncateText(fallbackMessage, 70);
+  if (detail) {
     parts.push(`Detalle: ${detail}.`);
   }
 
-  parts.push("Toca para finalizar tu compra.");
+  parts.push("Toca para ver el detalle.");
 
   return {
     title,
