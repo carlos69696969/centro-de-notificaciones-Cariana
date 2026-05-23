@@ -341,6 +341,19 @@ const returnStatusLabels = {
   refund_completed: "Reembolso completado"
 };
 
+function buildReturnStatusTitle(templateCode) {
+  const map = {
+    return_requested: "Devolucion en revision",
+    return_approved: "Devolucion aprobada",
+    return_rejected: "Devolucion rechazada",
+    return_pickup_scheduled: "Recoleccion programada",
+    return_picked_up: "Producto recogido",
+    refund_processed: "Reembolso procesado",
+    refund_completed: "Reembolso completado"
+  };
+  return map[templateCode] || "Actualizacion de devolucion";
+}
+
 function buildReturnPremiumTemplate({
   templateCode,
   orderNumber,
@@ -359,11 +372,10 @@ function buildReturnPremiumTemplate({
     allowMessageFallback: templateCode === "return_rejected"
   });
   const statusLabel = returnStatusLabels[templateCode] || "Actualizacion";
+  const statusTitle = buildReturnStatusTitle(templateCode);
 
   if (templateCode === "return_rejected") {
-    const formalTitle = normalizedOrder
-      ? `Devolucion rechazada - Pedido #${normalizedOrder}`
-      : "Devolucion rechazada";
+    const formalTitle = statusTitle;
     const formalParts = [];
     if (normalizedOrder) {
       formalParts.push(`Pedido #${normalizedOrder} ${statusLabel}.`);
@@ -389,7 +401,7 @@ function buildReturnPremiumTemplate({
     };
   }
 
-  const title = normalizedOrder ? `Pedido #${normalizedOrder} ${statusLabel}` : `${statusLabel} - Devolucion`;
+  const title = statusTitle;
 
   const parts = [];
   if (normalizedOrder) {
