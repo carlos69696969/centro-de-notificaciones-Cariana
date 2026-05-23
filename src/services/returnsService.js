@@ -90,8 +90,8 @@ const defaultReturnTemplates = {
     message: "Tu devolucion ha sido rechazada."
   },
   return_pickup_scheduled: {
-    title: "Recoleccion programada",
-    message: "La recoleccion de tu devolucion fue programada."
+    title: "Intento de recoleccion fallido",
+    message: "No se pudo completar la recoleccion de tu devolucion."
   },
   return_picked_up: {
     title: "Producto recogido",
@@ -335,7 +335,7 @@ const returnStatusLabels = {
   return_requested: "Solicitud recibida",
   return_approved: "Aprobada",
   return_rejected: "Rechazada",
-  return_pickup_scheduled: "Recoleccion programada",
+  return_pickup_scheduled: "Intento de recoleccion fallido",
   return_picked_up: "Producto recogido",
   refund_processed: "Reembolso procesado",
   refund_completed: "Reembolso completado"
@@ -346,7 +346,7 @@ function buildReturnStatusTitle(templateCode) {
     return_requested: "Devolucion en revision",
     return_approved: "Devolucion aprobada",
     return_rejected: "Devolucion rechazada",
-    return_pickup_scheduled: "Recoleccion programada",
+    return_pickup_scheduled: "Intento de recoleccion fallido",
     return_picked_up: "Producto recogido",
     refund_processed: "Reembolso procesado",
     refund_completed: "Reembolso completado"
@@ -378,9 +378,7 @@ function buildReturnPremiumTemplate({
     const formalTitle = statusTitle;
     const formalParts = [];
     if (normalizedOrder) {
-      formalParts.push(`Pedido #${normalizedOrder} ${statusLabel}.`);
-    } else {
-      formalParts.push(`${statusLabel}.`);
+      formalParts.push(`Pedido #${normalizedOrder}.`);
     }
     if (productsInline) {
       formalParts.push(`${productsInline}.`);
@@ -405,9 +403,7 @@ function buildReturnPremiumTemplate({
 
   const parts = [];
   if (normalizedOrder) {
-    parts.push(`Pedido #${normalizedOrder} ${statusLabel}.`);
-  } else {
-    parts.push(`${statusLabel}.`);
+    parts.push(`Pedido #${normalizedOrder}.`);
   }
   if (productsInline) {
     parts.push(`${productsInline}.`);

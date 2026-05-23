@@ -158,9 +158,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
   const parts = [];
   if (normalizedOrder) {
-    parts.push(`Pedido #${normalizedOrder} ${statusLabel}.`);
-  } else {
-    parts.push(`${statusLabel}.`);
+    parts.push(`Pedido #${normalizedOrder}.`);
   }
 
   if (productsInline) {
@@ -190,7 +188,7 @@ function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessa
     : "Reembolso procesado - Pedido";
   const detail = truncateText(fallbackMessage, 90);
   const parts = normalizedOrder
-    ? [`Pedido #${normalizedOrder} Reembolso procesado.`]
+    ? [`Pedido #${normalizedOrder}.`]
     : ["Reembolso procesado."];
 
   if (detail) {
