@@ -358,6 +358,9 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
   if (templateCode === "return_picked_up") {
     return "Recibimos tu producto con exito, lo revisaremos. Una vez finalicemos realizaremos tu reembolso.";
   }
+  if (templateCode === "refund_processed") {
+    return "Tu reembolso ya fue procesado correctamente. Dependiendo de tu banco, puede reflejarse en un plazo de 5 a 10 dias habiles.";
+  }
 
   const fromPayload = truncateText(
     pickFirstString([
@@ -559,6 +562,10 @@ async function processReturnEvent({ shopDomain, payload }) {
 
   if (!templateCode) {
     return { skipped: true, reason: "Unknown status", eventId: eventInsert.rows[0].id };
+  }
+
+  if (templateCode === "refund_completed") {
+    return { skipped: true, reason: "Refund completed notifications are disabled", eventId: eventInsert.rows[0].id };
   }
 
   const eventEmail = extractEventEmail(payload);
