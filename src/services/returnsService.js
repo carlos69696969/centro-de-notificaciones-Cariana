@@ -246,6 +246,101 @@ function extractEventEmail(payload) {
   );
 }
 
+function pickFirstString(candidates) {
+  for (const value of candidates) {
+    const text = String(value || "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function truncateText(value, max = 90) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function extractProductName(payload) {
+  const fromArrays = []
+    .concat(Array.isArray(payload.items) ? payload.items : [])
+    .concat(Array.isArray(payload.products) ? payload.products : [])
+    .concat(Array.isArray(payload.line_items) ? payload.line_items : [])
+    .concat(Array.isArray(payload.lineItems) ? payload.lineItems : []);
+
+  const fromArrayName = fromArrays
+    .map((item) =>
+      pickFirstString([
+        item?.name,
+        item?.title,
+        item?.product_name,
+        item?.productName,
+        item?.sku_name
+      ])
+    )
+    .find(Boolean);
+
+  return truncateText(
+    pickFirstString([
+      payload.product_name,
+      payload.productName,
+      payload.item_name,
+      payload.itemName,
+      payload.product?.name,
+      payload.product?.title,
+      fromArrayName
+    ])
+  );
+}
+
+function extractRejectionReason(payload) {
+  return truncateText(
+    pickFirstString([
+      payload.reason,
+      payload.rejection_reason,
+      payload.rejectionReason,
+      payload.reject_reason,
+      payload.rejectReason,
+      payload.denial_reason,
+      payload.denialReason,
+      payload.motivo,
+      payload.motivo_de_negacion,
+      payload.motivoNegacion,
+      payload.note,
+      payload.message
+    ])
+  );
+}
+
+function buildRejectedPremiumTemplate({ orderNumber, payload }) {
+  const normalizedOrder = String(orderNumber || "").replace(/^#/, "").trim();
+  const productName = extractProductName(payload);
+  const rejectionReason = extractRejectionReason(payload);
+
+  const title = normalizedOrder
+    ? `Actualizacion de tu devolucion | Pedido #${normalizedOrder}`
+    : "Actualizacion de tu devolucion";
+
+  const parts = ["Estado: Rechazada."];
+  if (productName) {
+    parts.push(`Producto: ${productName}.`);
+  }
+  if (rejectionReason) {
+    parts.push(`Motivo: ${rejectionReason}.`);
+  }
+  parts.push("Ver opciones en detalle.");
+
+  return {
+    title,
+    message: parts.join(" "),
+    productName,
+    rejectionReason
+  };
+}
+
 function fallbackTemplateFor(templateCode, payload) {
   const base = defaultReturnTemplates[templateCode];
   if (!base) {
@@ -303,32 +398,42 @@ async function processReturnEvent({ shopDomain, payload }) {
     return { skipped: true, reason: "Template not found", eventId: eventInsert.rows[0].id };
   }
 
+  const rejectedPremium =
+    templateCode === "return_rejected"
+      ? buildRejectedPremiumTemplate({ orderNumber, payload })
+      : null;
+  const notificationTitle = rejectedPremium?.title || template.title;
+  const notificationMessage = rejectedPremium?.message || template.message;
+  const notificationData = {
+    returnReference: returnReference || "",
+    status: templateCode,
+    orderNumber: orderNumber || "",
+    customerEmail: eventEmail || "",
+    productName: rejectedPremium?.productName || "",
+    reason: rejectedPremium?.rejectionReason || "",
+    deepLinkType: "return",
+    deeplinkType: "return",
+    linkType: "return",
+    notificationType: "return_event",
+    eventType: "return_event",
+    route: "returns",
+    openScreen: "returns_portal"
+  };
+
   if (customer?.id) {
     const primaryResult = await sendToCustomerTokens({
       shopDomain,
       customerId: customer.id,
       type: "return_event",
-      title: template.title,
-      message: template.message,
+      title: notificationTitle,
+      message: notificationMessage,
       deepLink: buildReturnDeepLink({
         shopDomain,
         orderNumber,
         email: eventEmail,
         deepLink: template.deep_link
       }),
-      data: {
-        returnReference: returnReference || "",
-        status: templateCode,
-        orderNumber: orderNumber || "",
-        customerEmail: eventEmail || "",
-        deepLinkType: "return",
-        deeplinkType: "return",
-        linkType: "return",
-        notificationType: "return_event",
-        eventType: "return_event",
-        route: "returns",
-        openScreen: "returns_portal"
-      },
+      data: notificationData,
       eventId: eventInsert.rows[0].id
     });
 
@@ -342,27 +447,15 @@ async function processReturnEvent({ shopDomain, payload }) {
       shopDomain,
       email: eventEmail,
       type: "return_event",
-      title: template.title,
-      message: template.message,
+      title: notificationTitle,
+      message: notificationMessage,
       deepLink: buildReturnDeepLink({
         shopDomain,
         orderNumber,
         email: eventEmail,
         deepLink: template.deep_link
       }),
-      data: {
-        returnReference: returnReference || "",
-        status: templateCode,
-        orderNumber: orderNumber || "",
-        customerEmail: eventEmail || "",
-        deepLinkType: "return",
-        deeplinkType: "return",
-        linkType: "return",
-        notificationType: "return_event",
-        eventType: "return_event",
-        route: "returns",
-        openScreen: "returns_portal"
-      },
+      data: notificationData,
       eventId: eventInsert.rows[0].id
     });
   }
