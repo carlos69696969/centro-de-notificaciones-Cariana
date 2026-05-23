@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../db/pool");
+const env = require("../config/env");
 const { verifyAppProxySignature } = require("../services/shopifyAppProxyVerifier");
 
 const router = express.Router();
@@ -24,6 +25,47 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function safeTrim(value) {
+  return String(value || "").trim();
+}
+
+function normalizeShopDomain(value) {
+  return safeTrim(value).replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+}
+
+function appendQueryParams(urlString, params) {
+  const validEntries = Object.entries(params).filter(([, value]) => safeTrim(value));
+  if (!validEntries.length) {
+    return urlString;
+  }
+  try {
+    const parsed = new URL(urlString);
+    for (const [key, value] of validEntries) {
+      parsed.searchParams.set(key, safeTrim(value));
+    }
+    return parsed.toString();
+  } catch (_error) {
+    const query = validEntries
+      .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(safeTrim(value))}`)
+      .join("&");
+    const separator = urlString.includes("?") ? "&" : "?";
+    return `${urlString}${separator}${query}`;
+  }
+}
+
+function buildReturnsPortalUrl({ shopDomain, orderNumber, email }) {
+  const configuredPortal = safeTrim(process.env.RETURNS_PORTAL_URL || env.returnsPortalUrl || "");
+  const basePortalUrl = configuredPortal
+    ? configuredPortal.replace(/\/+$/, "")
+    : "https://gestion-devoluciones-pro.onrender.com/devoluciones";
+
+  return appendQueryParams(basePortalUrl, {
+    shop: normalizeShopDomain(shopDomain),
+    order: safeTrim(orderNumber).replace(/^#/, ""),
+    email: safeTrim(email).toLowerCase()
+  });
 }
 
 function renderItemsHtml(items) {
@@ -467,6 +509,35 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 })();`;
     res.setHeader("Content-Type", "text/javascript; charset=utf-8");
     return res.status(200).send(js);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/open-return", requireValidProxy, async (req, res, next) => {
+  try {
+    const shopDomain = resolveShopDomain(req);
+    const orderNumber = req.query.order || "";
+    const email = req.query.email || "";
+    const targetUrl = buildReturnsPortalUrl({ shopDomain, orderNumber, email });
+    const safeTarget = escapeHtml(targetUrl);
+
+    return res.status(200).send(`<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Abriendo devolucion...</title>
+    <meta http-equiv="refresh" content="0;url=${safeTarget}" />
+  </head>
+  <body>
+    <p>Abriendo portal de devoluciones...</p>
+    <p><a href="${safeTarget}">Continuar</a></p>
+    <script>
+      window.location.replace(${JSON.stringify(targetUrl)});
+    </script>
+  </body>
+</html>`);
   } catch (error) {
     return next(error);
   }
