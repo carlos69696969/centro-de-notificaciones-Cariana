@@ -360,7 +360,13 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
       payload.portal_status_message,
       payload.portalStatusMessage,
       payload.status_message,
-      payload.statusMessage
+      payload.statusMessage,
+      payload.current_status_message,
+      payload.currentStatusMessage,
+      payload.latest_status_message,
+      payload.latestStatusMessage,
+      payload.note,
+      payload.message
     ]),
     180
   );
