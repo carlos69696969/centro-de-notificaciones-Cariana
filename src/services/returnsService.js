@@ -365,14 +365,16 @@ function buildReturnPremiumTemplate({
       ? `Devolucion rechazada - Pedido #${normalizedOrder}`
       : "Devolucion rechazada";
     const formalParts = [];
+    if (normalizedOrder) {
+      formalParts.push(`Pedido #${normalizedOrder} ${statusLabel}.`);
+    } else {
+      formalParts.push(`${statusLabel}.`);
+    }
     if (productsInline) {
       formalParts.push(`${productsInline}.`);
     }
-    if (rejectionReason) {
-      formalParts.push(`Motivo: ${rejectionReason}.`);
-    }
     const fallbackDetail = truncateText(fallbackMessage, 80);
-    if (!formalParts.length && fallbackDetail) {
+    if (!productsInline && fallbackDetail) {
       formalParts.push(`${fallbackDetail}.`);
     }
     formalParts.push("Toca para ver el detalle.");
@@ -390,15 +392,16 @@ function buildReturnPremiumTemplate({
   const title = normalizedOrder ? `Pedido #${normalizedOrder} ${statusLabel}` : `${statusLabel} - Devolucion`;
 
   const parts = [];
+  if (normalizedOrder) {
+    parts.push(`Pedido #${normalizedOrder} ${statusLabel}.`);
+  } else {
+    parts.push(`${statusLabel}.`);
+  }
   if (productsInline) {
     parts.push(`${productsInline}.`);
   }
-  parts.push(`${statusLabel}.`);
-  if (rejectionReason) {
-    parts.push(`Motivo: ${rejectionReason}.`);
-  }
   const detail = truncateText(fallbackMessage, 70);
-  if (detail && !rejectionReason && templateCode !== "return_rejected") {
+  if (detail && !productsInline) {
     parts.push(`${detail}.`);
   }
   parts.push("Toca para ver el detalle.");

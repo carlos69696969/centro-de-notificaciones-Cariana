@@ -157,12 +157,15 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const productsInline = formatProductsInline(productNames);
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
   const parts = [];
+  if (normalizedOrder) {
+    parts.push(`Pedido #${normalizedOrder} ${statusLabel}.`);
+  } else {
+    parts.push(`${statusLabel}.`);
+  }
 
   if (productsInline) {
     parts.push(`${productsInline}.`);
   }
-
-  parts.push(`${statusLabel}.`);
 
   const detail = truncateText(fallbackMessage, 70);
   if (detail && !productsInline) {
@@ -186,7 +189,9 @@ function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessa
     ? `Reembolso procesado - Pedido #${normalizedOrder}`
     : "Reembolso procesado - Pedido";
   const detail = truncateText(fallbackMessage, 90);
-  const parts = ["Reembolso procesado."];
+  const parts = normalizedOrder
+    ? [`Pedido #${normalizedOrder} Reembolso procesado.`]
+    : ["Reembolso procesado."];
 
   if (detail) {
     parts.push(`${detail}.`);
