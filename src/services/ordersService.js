@@ -351,8 +351,8 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   if (templateCode === "order_preparing") {
     const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
     const message = orderRef
-      ? `Tu pedido ${orderRef} esta siendo preparado para ser enviado. Llegara manana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`
-      : `Tu pedido esta siendo preparado para ser enviado. Llegara manana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`;
+      ? `Tu pedido ${orderRef} está siendo preparado para ser enviado. Llegará mañana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`
+      : `Tu pedido está siendo preparado para ser enviado. Llegará mañana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`;
 
     return {
       title,
