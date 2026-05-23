@@ -86,6 +86,15 @@ function appendQueryParams(urlString, params) {
   }
 }
 
+function buildReturnsPortalBaseUrl() {
+  const configuredPortal = safeTrim(process.env.RETURNS_PORTAL_URL || env.returnsPortalUrl || "");
+  if (configuredPortal) {
+    return configuredPortal.replace(/\/+$/, "");
+  }
+
+  return "https://gestion-devoluciones-pro.onrender.com/devoluciones";
+}
+
 function buildOrderDeepLink({ shopDomain, orderNumber, deepLink }) {
   if (safeTrim(deepLink)) {
     return toAbsoluteStorefrontUrl(shopDomain, deepLink);
@@ -99,11 +108,13 @@ function buildOrderDeepLink({ shopDomain, orderNumber, deepLink }) {
 function buildReturnDeepLink({ shopDomain, orderNumber, email, deepLink }) {
   const normalizedOrder = normalizeOrderNumber(orderNumber);
   const normalizedEmail = safeTrim(email).toLowerCase();
-  const basePortalUrl = safeTrim(deepLink)
-    ? toAbsoluteShopDomainUrl(shopDomain, deepLink)
-    : toAbsoluteShopDomainUrl(shopDomain, "/apps/portal-devoluciones");
+  const normalizedShop = normalizeShopDomain(shopDomain);
+  const configuredOrFallbackPortal = buildReturnsPortalBaseUrl();
+  const templateAbsolutePortal = isAbsoluteUrl(safeTrim(deepLink)) ? safeTrim(deepLink) : "";
+  const basePortalUrl = templateAbsolutePortal || configuredOrFallbackPortal;
 
   return appendQueryParams(basePortalUrl, {
+    shop: normalizedShop,
     order: normalizedOrder,
     email: normalizedEmail
   });
