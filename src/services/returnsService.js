@@ -264,7 +264,7 @@ function truncateText(value, max = 90) {
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
-function extractProductName(payload) {
+function extractProductNames(payload) {
   const fromArrays = []
     .concat(Array.isArray(payload.items) ? payload.items : [])
     .concat(Array.isArray(payload.products) ? payload.products : [])
@@ -281,19 +281,24 @@ function extractProductName(payload) {
         item?.sku_name
       ])
     )
-    .find(Boolean);
+    .filter(Boolean);
 
-  return truncateText(
-    pickFirstString([
-      payload.product_name,
-      payload.productName,
-      payload.item_name,
-      payload.itemName,
-      payload.product?.name,
-      payload.product?.title,
-      fromArrayName
-    ])
-  );
+  const direct = pickFirstString([
+    payload.product_name,
+    payload.productName,
+    payload.item_name,
+    payload.itemName,
+    payload.product?.name,
+    payload.product?.title
+  ]);
+
+  const combined = []
+    .concat(direct ? [direct] : [])
+    .concat(fromArrayName)
+    .map((name) => truncateText(name, 42))
+    .filter(Boolean);
+
+  return Array.from(new Set(combined)).slice(0, 5);
 }
 
 function extractRejectionReason(payload, options = {}) {
@@ -318,6 +323,14 @@ function extractRejectionReason(payload, options = {}) {
   return truncateText(pickFirstString(candidates));
 }
 
+function formatProductsInline(productNames = []) {
+  const clean = (Array.isArray(productNames) ? productNames : []).filter(Boolean).slice(0, 5);
+  if (!clean.length) {
+    return "";
+  }
+  return clean.join(", ");
+}
+
 const returnStatusLabels = {
   return_requested: "Solicitud recibida",
   return_approved: "Aprobada",
@@ -328,9 +341,20 @@ const returnStatusLabels = {
   refund_completed: "Reembolso completado"
 };
 
-function buildReturnPremiumTemplate({ templateCode, orderNumber, payload, fallbackMessage }) {
+function buildReturnPremiumTemplate({
+  templateCode,
+  orderNumber,
+  payload,
+  fallbackMessage,
+  contextProductNames = []
+}) {
   const normalizedOrder = String(orderNumber || "").replace(/^#/, "").trim();
-  const productName = extractProductName(payload);
+  const payloadProductNames = extractProductNames(payload);
+  const mergedProductNames = Array.from(new Set([...(payloadProductNames || []), ...(contextProductNames || [])])).slice(
+    0,
+    5
+  );
+  const productsInline = formatProductsInline(mergedProductNames);
   const rejectionReason = extractRejectionReason(payload, {
     allowMessageFallback: templateCode === "return_rejected"
   });
@@ -341,52 +365,93 @@ function buildReturnPremiumTemplate({ templateCode, orderNumber, payload, fallba
       ? `Devolucion rechazada - Pedido #${normalizedOrder}`
       : "Devolucion rechazada";
     const formalParts = [];
-    if (productName) {
-      formalParts.push(`Producto: ${productName}.`);
+    if (productsInline) {
+      formalParts.push(`${productsInline}.`);
     }
     if (rejectionReason) {
       formalParts.push(`Motivo: ${rejectionReason}.`);
     }
     const fallbackDetail = truncateText(fallbackMessage, 80);
     if (!formalParts.length && fallbackDetail) {
-      formalParts.push(`Detalle: ${fallbackDetail}.`);
+      formalParts.push(`${fallbackDetail}.`);
     }
     formalParts.push("Toca para ver el detalle.");
 
     return {
       title: formalTitle,
       message: formalParts.join(" "),
-      productName,
+      productNames: mergedProductNames,
+      productsInline,
       rejectionReason,
       statusLabel
     };
   }
 
-  const title = normalizedOrder
-    ? `${statusLabel} - Pedido #${normalizedOrder}`
-    : `${statusLabel} - Devolucion`;
+  const title = normalizedOrder ? `Pedido #${normalizedOrder} ${statusLabel}` : `${statusLabel} - Devolucion`;
 
   const parts = [];
-  if (productName) {
-    parts.push(`Producto: ${productName}.`);
+  if (productsInline) {
+    parts.push(`${productsInline}.`);
   }
-  parts.push(`Estado: ${statusLabel}.`);
+  parts.push(`${statusLabel}.`);
   if (rejectionReason) {
     parts.push(`Motivo: ${rejectionReason}.`);
   }
   const detail = truncateText(fallbackMessage, 70);
   if (detail && !rejectionReason && templateCode !== "return_rejected") {
-    parts.push(`Detalle: ${detail}.`);
+    parts.push(`${detail}.`);
   }
   parts.push("Toca para ver el detalle.");
 
   return {
     title,
     message: parts.join(" "),
-    productName,
+    productNames: mergedProductNames,
+    productsInline,
     rejectionReason,
     statusLabel
   };
+}
+
+async function resolveOrderProductNamesFromContext(shopDomain, payload) {
+  const orderNumberRaw =
+    payload.order_number ||
+    payload.orderNumber ||
+    payload.return_reference ||
+    payload.returnReference ||
+    payload.return_id ||
+    payload.returnId ||
+    "";
+  const orderNumber = String(orderNumberRaw).replace(/^#/, "").trim();
+  if (!orderNumber) {
+    return [];
+  }
+
+  const email = String(
+    payload.email || payload.customer?.email || payload.customer_email || payload.customerEmail || ""
+  )
+    .trim()
+    .toLowerCase();
+
+  const result = await pool.query(
+    `
+    SELECT payload
+    FROM notification_events
+    WHERE shop_domain = $1
+      AND topic IN ('orders/create','orders/updated','orders/fulfilled')
+      AND (
+        payload->>'order_number' = $2
+        OR payload->>'name' = CONCAT('#', $2)
+        OR ($3 <> '' AND LOWER(COALESCE(payload->'customer'->>'email', '')) = $3)
+      )
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [shopDomain, orderNumber, email]
+  );
+
+  const orderPayload = result.rows[0]?.payload || {};
+  return extractProductNames(orderPayload);
 }
 
 function fallbackTemplateFor(templateCode, payload) {
@@ -439,6 +504,7 @@ async function processReturnEvent({ shopDomain, payload }) {
   const eventEmail = extractEventEmail(payload);
   const orderNumber = payload.order_number || payload.orderNumber || returnReference || "";
   const customer = await resolveCustomer(shopDomain, payload);
+  const contextProductNames = await resolveOrderProductNamesFromContext(shopDomain, payload);
 
   const dbTemplate = await getTemplate(shopDomain, templateCode);
   const template = dbTemplate || fallbackTemplateFor(templateCode, payload);
@@ -450,7 +516,8 @@ async function processReturnEvent({ shopDomain, payload }) {
     templateCode,
     orderNumber,
     payload,
-    fallbackMessage: template.message
+    fallbackMessage: template.message,
+    contextProductNames
   });
   const notificationTitle = premiumCopy.title || template.title;
   const notificationMessage = premiumCopy.message || template.message;
@@ -460,7 +527,8 @@ async function processReturnEvent({ shopDomain, payload }) {
     statusLabel: premiumCopy.statusLabel || "",
     orderNumber: orderNumber || "",
     customerEmail: eventEmail || "",
-    productName: premiumCopy.productName || "",
+    productName: premiumCopy.productsInline || "",
+    productNames: premiumCopy.productNames || [],
     reason: premiumCopy.rejectionReason || "",
     deepLinkType: "return",
     deeplinkType: "return",

@@ -56,13 +56,13 @@ function buildAbandonedCartCopy({ stage, payload, fallbackMessage }) {
   const parts = [];
 
   if (productName) {
-    parts.push(`Producto: ${productName}.`);
+    parts.push(`${productName}.`);
   }
-  parts.push(`Estado: ${stageLabel}.`);
+  parts.push(`${stageLabel}.`);
 
   const detail = truncateText(fallbackMessage, 70);
   if (detail) {
-    parts.push(`Detalle: ${detail}.`);
+    parts.push(`${detail}.`);
   }
 
   parts.push("Toca para ver el detalle.");

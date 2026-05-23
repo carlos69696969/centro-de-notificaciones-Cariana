@@ -98,7 +98,7 @@ function truncateText(value, max = 90) {
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
-function extractProductName(payload) {
+function extractProductNames(payload) {
   const lineItems = []
     .concat(Array.isArray(payload?.line_items) ? payload.line_items : [])
     .concat(Array.isArray(payload?.lineItems) ? payload.lineItems : [])
@@ -114,17 +114,30 @@ function extractProductName(payload) {
         item?.sku
       ])
     )
-    .find(Boolean);
+    .filter(Boolean);
 
-  return truncateText(
-    pickFirstString([
-      payload?.product_name,
-      payload?.productName,
-      payload?.item_name,
-      payload?.itemName,
-      fromLines
-    ])
-  );
+  const firstDirect = pickFirstString([
+    payload?.product_name,
+    payload?.productName,
+    payload?.item_name,
+    payload?.itemName
+  ]);
+
+  const combined = []
+    .concat(firstDirect ? [firstDirect] : [])
+    .concat(fromLines)
+    .map((name) => truncateText(name, 42))
+    .filter(Boolean);
+
+  return Array.from(new Set(combined)).slice(0, 4);
+}
+
+function formatProductsInline(productNames = []) {
+  const clean = (Array.isArray(productNames) ? productNames : []).filter(Boolean).slice(0, 4);
+  if (!clean.length) {
+    return "";
+  }
+  return clean.join(", ");
 }
 
 const orderStatusLabels = {
@@ -140,19 +153,20 @@ const orderStatusLabels = {
 function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallbackTitle, fallbackMessage }) {
   const normalizedOrder = normalizeOrderNumber(orderNumber);
   const statusLabel = orderStatusLabels[templateCode] || pickFirstString([fallbackTitle, "Actualizacion"]);
-  const productName = extractProductName(payload);
+  const productNames = extractProductNames(payload);
+  const productsInline = formatProductsInline(productNames);
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
   const parts = [];
 
-  if (productName) {
-    parts.push(`Producto: ${productName}.`);
+  if (productsInline) {
+    parts.push(`${productsInline}.`);
   }
 
-  parts.push(`Estado: ${statusLabel}.`);
+  parts.push(`${statusLabel}.`);
 
   const detail = truncateText(fallbackMessage, 70);
-  if (detail) {
-    parts.push(`Detalle: ${detail}.`);
+  if (detail && !productsInline) {
+    parts.push(`${detail}.`);
   }
 
   parts.push("Toca para ver el detalle.");
@@ -161,7 +175,8 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     title,
     message: parts.join(" "),
     statusLabel,
-    productName
+    productNames,
+    productsInline
   };
 }
 
@@ -171,10 +186,10 @@ function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessa
     ? `Reembolso procesado - Pedido #${normalizedOrder}`
     : "Reembolso procesado - Pedido";
   const detail = truncateText(fallbackMessage, 90);
-  const parts = ["Estado: Reembolso procesado."];
+  const parts = ["Reembolso procesado."];
 
   if (detail) {
-    parts.push(`Detalle: ${detail}.`);
+    parts.push(`${detail}.`);
   }
   parts.push("Toca para ver el detalle.");
 
@@ -182,7 +197,8 @@ function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessa
     title,
     message: parts.join(" "),
     statusLabel: fallbackTitle || "Reembolso procesado",
-    productName: ""
+    productNames: [],
+    productsInline: ""
   };
 }
 
@@ -292,7 +308,8 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     orderNumber: payload.order_number,
     status: templateCode,
     statusLabel: copy.statusLabel,
-    productName: copy.productName || "",
+    productName: copy.productsInline || "",
+    productNames: copy.productNames || [],
     deepLinkType: "order",
     customerEmail: payload.customer?.email || ""
   };
@@ -372,7 +389,8 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, o
       orderNumber,
       status: templateCode,
       statusLabel: copy.statusLabel,
-      productName: copy.productName || "",
+      productName: copy.productsInline || "",
+      productNames: copy.productNames || [],
       deepLinkType: "order"
     }
   });
@@ -453,6 +471,7 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
       refundId: payload.id || "",
       statusLabel: copy.statusLabel,
       productName: "",
+      productNames: [],
       deepLinkType: "order"
     },
     eventId
