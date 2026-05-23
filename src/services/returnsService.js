@@ -336,6 +336,32 @@ function buildReturnPremiumTemplate({ templateCode, orderNumber, payload, fallba
   });
   const statusLabel = returnStatusLabels[templateCode] || "Actualizacion";
 
+  if (templateCode === "return_rejected") {
+    const formalTitle = normalizedOrder
+      ? `Devolucion rechazada - Pedido #${normalizedOrder}`
+      : "Devolucion rechazada";
+    const formalParts = [];
+    if (productName) {
+      formalParts.push(`Producto: ${productName}.`);
+    }
+    if (rejectionReason) {
+      formalParts.push(`Motivo: ${rejectionReason}.`);
+    }
+    const fallbackDetail = truncateText(fallbackMessage, 80);
+    if (!formalParts.length && fallbackDetail) {
+      formalParts.push(`Detalle: ${fallbackDetail}.`);
+    }
+    formalParts.push("Toca para ver el detalle.");
+
+    return {
+      title: formalTitle,
+      message: formalParts.join(" "),
+      productName,
+      rejectionReason,
+      statusLabel
+    };
+  }
+
   const title = normalizedOrder
     ? `Actualizacion de tu devolucion | Pedido #${normalizedOrder}`
     : "Actualizacion de tu devolucion";
