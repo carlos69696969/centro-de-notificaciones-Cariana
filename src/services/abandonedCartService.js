@@ -4,6 +4,76 @@ const { getCustomerByShopifyId } = require("./customerService");
 const { sendToCustomerTokens } = require("./notificationService");
 const { toAbsoluteStorefrontUrl } = require("./deepLinkService");
 
+function pickFirstString(candidates) {
+  for (const value of candidates) {
+    const text = String(value || "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function truncateText(value, max = 90) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function extractCheckoutProductName(payload) {
+  const lines = []
+    .concat(Array.isArray(payload?.line_items) ? payload.line_items : [])
+    .concat(Array.isArray(payload?.lineItems) ? payload.lineItems : [])
+    .concat(Array.isArray(payload?.items) ? payload.items : []);
+
+  const firstName = lines
+    .map((item) =>
+      pickFirstString([
+        item?.name,
+        item?.title,
+        item?.product_name,
+        item?.productName,
+        item?.sku
+      ])
+    )
+    .find(Boolean);
+
+  return truncateText(firstName);
+}
+
+const abandonedStageLabel = {
+  "1h_sent": "Carrito pendiente",
+  "24h_sent": "Recordatorio de carrito",
+  "3d_sent": "Ultimo recordatorio"
+};
+
+function buildAbandonedCartCopy({ stage, payload, fallbackMessage }) {
+  const productName = extractCheckoutProductName(payload || {});
+  const stageLabel = abandonedStageLabel[stage] || "Carrito pendiente";
+  const title = `Actualizacion de tu carrito | ${stageLabel}`;
+  const parts = [`Estado: ${stageLabel}.`];
+
+  if (productName) {
+    parts.push(`Producto: ${productName}.`);
+  }
+
+  const detail = truncateText(fallbackMessage, 80);
+  if (detail && !productName) {
+    parts.push(`Detalle: ${detail}.`);
+  }
+
+  parts.push("Toca para finalizar tu compra.");
+
+  return {
+    title,
+    message: parts.join(" "),
+    productName,
+    stageLabel
+  };
+}
+
 async function upsertCheckoutEvent({ shopDomain, payload }) {
   const checkoutId = payload.id ? String(payload.id) : null;
   if (!checkoutId) {
@@ -39,7 +109,7 @@ async function upsertCheckoutEvent({ shopDomain, payload }) {
 async function runAbandonedCartSweep() {
   const rows = await pool.query(
     `
-    SELECT id, shop_domain, checkout_id, shopify_customer_id, created_at, abandoned_stage
+    SELECT id, shop_domain, checkout_id, shopify_customer_id, created_at, abandoned_stage, payload
     FROM checkout_events
     WHERE completed_at IS NULL
       AND (
@@ -79,18 +149,26 @@ async function runAbandonedCartSweep() {
       continue;
     }
 
+    const copy = buildAbandonedCartCopy({
+      stage: nextStage,
+      payload: row.payload || {},
+      fallbackMessage: template.message
+    });
+
     await sendToCustomerTokens({
       shopDomain: row.shop_domain,
       customerId: customer.id,
       type: "abandoned_cart",
-      title: template.title,
-      message: template.message,
+      title: copy.title,
+      message: copy.message,
       deepLink: template.deep_link
         ? toAbsoluteStorefrontUrl(row.shop_domain, template.deep_link)
         : toAbsoluteStorefrontUrl(row.shop_domain, "/cart"),
       data: {
         checkoutId: row.checkout_id,
         stage: nextStage,
+        statusLabel: copy.stageLabel,
+        productName: copy.productName || "",
         deepLinkType: "cart"
       }
     });

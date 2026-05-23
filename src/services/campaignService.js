@@ -2,6 +2,53 @@ const pool = require("../db/pool");
 const { sendToAudience } = require("./notificationService");
 const { buildCampaignDeepLink } = require("./deepLinkService");
 
+function pickFirstString(candidates) {
+  for (const value of candidates) {
+    const text = String(value || "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function truncateText(value, max = 90) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+const audienceLabelMap = {
+  all_customers: "Todos los clientes",
+  customers_with_previous_purchases: "Clientes con compras",
+  abandoned_cart: "Carrito abandonado",
+  inactive_customers: "Clientes inactivos"
+};
+
+function buildCampaignNotificationCopy(campaign) {
+  const headline = truncateText(
+    pickFirstString([campaign.name, campaign.title, "Nueva campana Cariana"]),
+    52
+  );
+  const audienceLabel = audienceLabelMap[campaign.audience_type] || "Clientes seleccionados";
+  const bodyMessage = truncateText(campaign.message, 90);
+
+  const title = `Campana Cariana | ${headline}`;
+  const parts = [`Segmento: ${audienceLabel}.`];
+  if (bodyMessage) {
+    parts.push(`Detalle: ${bodyMessage}.`);
+  }
+  parts.push("Toca para ver mas informacion.");
+
+  return {
+    title,
+    message: parts.join(" "),
+    audienceLabel
+  };
+}
+
 async function createCampaign({
   shopDomain,
   name,
@@ -61,11 +108,12 @@ async function sendCampaignNow(shopDomain, campaignId) {
   }
 
   const campaign = campaignResult.rows[0];
+  const copy = buildCampaignNotificationCopy(campaign);
   const sendResult = await sendToAudience({
     shopDomain,
     audienceType: campaign.audience_type,
-    title: campaign.title,
-    message: campaign.message,
+    title: copy.title,
+    message: copy.message,
     deepLink: buildCampaignDeepLink({
       shopDomain,
       deepLink: campaign.deep_link
@@ -73,6 +121,8 @@ async function sendCampaignNow(shopDomain, campaignId) {
     data: {
       campaignId: campaign.id,
       campaignName: campaign.name,
+      audienceType: campaign.audience_type,
+      audienceLabel: copy.audienceLabel,
       deepLinkType: "campaign"
     },
     campaignId: campaign.id

@@ -76,6 +76,117 @@ function resolveTemplateCodeFromOrder(topic, payload, existingMap) {
   return null;
 }
 
+function normalizeOrderNumber(value) {
+  return String(value || "").replace(/^#/, "").trim();
+}
+
+function pickFirstString(candidates) {
+  for (const value of candidates) {
+    const text = String(value || "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function truncateText(value, max = 90) {
+  const text = String(value || "").trim();
+  if (!text) {
+    return "";
+  }
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function extractProductName(payload) {
+  const lineItems = []
+    .concat(Array.isArray(payload?.line_items) ? payload.line_items : [])
+    .concat(Array.isArray(payload?.lineItems) ? payload.lineItems : [])
+    .concat(Array.isArray(payload?.items) ? payload.items : []);
+
+  const fromLines = lineItems
+    .map((item) =>
+      pickFirstString([
+        item?.name,
+        item?.title,
+        item?.product_name,
+        item?.productName,
+        item?.sku
+      ])
+    )
+    .find(Boolean);
+
+  return truncateText(
+    pickFirstString([
+      payload?.product_name,
+      payload?.productName,
+      payload?.item_name,
+      payload?.itemName,
+      fromLines
+    ])
+  );
+}
+
+const orderStatusLabels = {
+  order_confirmed: "Confirmado",
+  order_preparing: "En preparacion",
+  order_shipped: "Enviado",
+  order_in_transit: "En transito",
+  order_delivered: "Entregado",
+  order_cancelled: "Cancelado",
+  refund_processed: "Reembolso procesado"
+};
+
+function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallbackTitle, fallbackMessage }) {
+  const normalizedOrder = normalizeOrderNumber(orderNumber);
+  const statusLabel = orderStatusLabels[templateCode] || pickFirstString([fallbackTitle, "Actualizacion"]);
+  const productName = extractProductName(payload);
+
+  const title = normalizedOrder
+    ? `Actualizacion de tu pedido | #${normalizedOrder}`
+    : "Actualizacion de tu pedido";
+  const parts = [`Estado: ${statusLabel}.`];
+
+  if (productName) {
+    parts.push(`Producto: ${productName}.`);
+  }
+
+  const detail = truncateText(fallbackMessage, 80);
+  if (detail && !productName) {
+    parts.push(`Detalle: ${detail}.`);
+  }
+
+  parts.push("Ver detalle del pedido.");
+
+  return {
+    title,
+    message: parts.join(" "),
+    statusLabel,
+    productName
+  };
+}
+
+function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessage }) {
+  const normalizedOrder = normalizeOrderNumber(orderNumber);
+  const title = normalizedOrder
+    ? `Actualizacion de tu reembolso | Pedido #${normalizedOrder}`
+    : "Actualizacion de tu reembolso";
+  const detail = truncateText(fallbackMessage, 90);
+  const parts = ["Estado: Reembolso procesado."];
+
+  if (detail) {
+    parts.push(`Detalle: ${detail}.`);
+  }
+  parts.push("Ver detalle del pedido.");
+
+  return {
+    title,
+    message: parts.join(" "),
+    statusLabel: fallbackTitle || "Reembolso procesado",
+    productName: ""
+  };
+}
+
 async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   const eventResult = await pool.query(
     `
@@ -169,10 +280,20 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     return { skipped: true, reason: "Template not found" };
   }
 
+  const copy = buildOrderNotificationCopy({
+    templateCode,
+    orderNumber: payload.order_number,
+    payload,
+    fallbackTitle: template.title,
+    fallbackMessage: template.message
+  });
+
   const data = {
     orderId: payload.id,
     orderNumber: payload.order_number,
     status: templateCode,
+    statusLabel: copy.statusLabel,
+    productName: copy.productName || "",
     deepLinkType: "order",
     customerEmail: payload.customer?.email || ""
   };
@@ -181,8 +302,8 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     shopDomain,
     customerId: customer.id,
     type: "order_event",
-    title: template.title,
-    message: template.message,
+    title: copy.title,
+    message: copy.message,
     deepLink: buildOrderDeepLink({
       shopDomain,
       orderNumber: payload.order_number,
@@ -228,12 +349,20 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, o
     throw new Error(`Template not found for ${templateCode}`);
   }
 
+  const copy = buildOrderNotificationCopy({
+    templateCode,
+    orderNumber,
+    payload: {},
+    fallbackTitle: template.title,
+    fallbackMessage: template.message
+  });
+
   return sendToCustomerTokens({
     shopDomain,
     customerId: customer.id,
     type: "order_manual",
-    title: template.title,
-    message: template.message,
+    title: copy.title,
+    message: copy.message,
     deepLink: buildOrderDeepLink({
       shopDomain,
       orderNumber,
@@ -243,6 +372,8 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, o
       orderId,
       orderNumber,
       status: templateCode,
+      statusLabel: copy.statusLabel,
+      productName: copy.productName || "",
       deepLinkType: "order"
     }
   });
@@ -300,12 +431,18 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
     return { skipped: true };
   }
 
+  const copy = buildRefundNotificationCopy({
+    orderNumber: mapped.order_number,
+    fallbackTitle: template.title,
+    fallbackMessage: template.message
+  });
+
   const sendResult = await sendToCustomerTokens({
     shopDomain,
     customerId: customer.id,
     type: "refund_event",
-    title: template.title,
-    message: template.message,
+    title: copy.title,
+    message: copy.message,
     deepLink: buildOrderDeepLink({
       shopDomain,
       orderNumber: mapped.order_number,
@@ -315,6 +452,8 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
       orderId: payload.order_id,
       orderNumber: mapped.order_number || "",
       refundId: payload.id || "",
+      statusLabel: copy.statusLabel,
+      productName: "",
       deepLinkType: "order"
     },
     eventId

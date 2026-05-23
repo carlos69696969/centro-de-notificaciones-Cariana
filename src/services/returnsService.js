@@ -296,40 +296,60 @@ function extractProductName(payload) {
   );
 }
 
-function extractRejectionReason(payload) {
-  return truncateText(
-    pickFirstString([
-      payload.reason,
-      payload.rejection_reason,
-      payload.rejectionReason,
-      payload.reject_reason,
-      payload.rejectReason,
-      payload.denial_reason,
-      payload.denialReason,
-      payload.motivo,
-      payload.motivo_de_negacion,
-      payload.motivoNegacion,
-      payload.note,
-      payload.message
-    ])
-  );
+function extractRejectionReason(payload, options = {}) {
+  const allowMessageFallback = options.allowMessageFallback === true;
+  const candidates = [
+    payload.reason,
+    payload.rejection_reason,
+    payload.rejectionReason,
+    payload.reject_reason,
+    payload.rejectReason,
+    payload.denial_reason,
+    payload.denialReason,
+    payload.motivo,
+    payload.motivo_de_negacion,
+    payload.motivoNegacion
+  ];
+
+  if (allowMessageFallback) {
+    candidates.push(payload.note, payload.message);
+  }
+
+  return truncateText(pickFirstString(candidates));
 }
 
-function buildRejectedPremiumTemplate({ orderNumber, payload }) {
+const returnStatusLabels = {
+  return_requested: "Solicitud recibida",
+  return_approved: "Aprobada",
+  return_rejected: "Rechazada",
+  return_pickup_scheduled: "Recoleccion programada",
+  return_picked_up: "Producto recogido",
+  refund_processed: "Reembolso procesado",
+  refund_completed: "Reembolso completado"
+};
+
+function buildReturnPremiumTemplate({ templateCode, orderNumber, payload, fallbackMessage }) {
   const normalizedOrder = String(orderNumber || "").replace(/^#/, "").trim();
   const productName = extractProductName(payload);
-  const rejectionReason = extractRejectionReason(payload);
+  const rejectionReason = extractRejectionReason(payload, {
+    allowMessageFallback: templateCode === "return_rejected"
+  });
+  const statusLabel = returnStatusLabels[templateCode] || "Actualizacion";
 
   const title = normalizedOrder
     ? `Actualizacion de tu devolucion | Pedido #${normalizedOrder}`
     : "Actualizacion de tu devolucion";
 
-  const parts = ["Estado: Rechazada."];
+  const parts = [`Estado: ${statusLabel}.`];
   if (productName) {
     parts.push(`Producto: ${productName}.`);
   }
   if (rejectionReason) {
     parts.push(`Motivo: ${rejectionReason}.`);
+  }
+  const detail = truncateText(fallbackMessage, 80);
+  if (detail && !rejectionReason && templateCode !== "return_rejected") {
+    parts.push(`Detalle: ${detail}.`);
   }
   parts.push("Ver opciones en detalle.");
 
@@ -337,7 +357,8 @@ function buildRejectedPremiumTemplate({ orderNumber, payload }) {
     title,
     message: parts.join(" "),
     productName,
-    rejectionReason
+    rejectionReason,
+    statusLabel
   };
 }
 
@@ -398,19 +419,22 @@ async function processReturnEvent({ shopDomain, payload }) {
     return { skipped: true, reason: "Template not found", eventId: eventInsert.rows[0].id };
   }
 
-  const rejectedPremium =
-    templateCode === "return_rejected"
-      ? buildRejectedPremiumTemplate({ orderNumber, payload })
-      : null;
-  const notificationTitle = rejectedPremium?.title || template.title;
-  const notificationMessage = rejectedPremium?.message || template.message;
+  const premiumCopy = buildReturnPremiumTemplate({
+    templateCode,
+    orderNumber,
+    payload,
+    fallbackMessage: template.message
+  });
+  const notificationTitle = premiumCopy.title || template.title;
+  const notificationMessage = premiumCopy.message || template.message;
   const notificationData = {
     returnReference: returnReference || "",
     status: templateCode,
+    statusLabel: premiumCopy.statusLabel || "",
     orderNumber: orderNumber || "",
     customerEmail: eventEmail || "",
-    productName: rejectedPremium?.productName || "",
-    reason: rejectedPremium?.rejectionReason || "",
+    productName: premiumCopy.productName || "",
+    reason: premiumCopy.rejectionReason || "",
     deepLinkType: "return",
     deeplinkType: "return",
     linkType: "return",
