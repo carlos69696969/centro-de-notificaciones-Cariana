@@ -382,6 +382,44 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var customerHint = ${JSON.stringify(customerHint)};
   var url = "/apps/notificaciones" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
 
+  function normalizeCustomerId(value) {
+    var text = String(value == null ? "" : value).trim();
+    return /^\\d+$/.test(text) ? text : "";
+  }
+
+  function detectCustomerIdFromStorefront() {
+    try {
+      var fromAnalytics = window.ShopifyAnalytics &&
+        window.ShopifyAnalytics.meta &&
+        window.ShopifyAnalytics.meta.page &&
+        window.ShopifyAnalytics.meta.page.customerId;
+      var cid = normalizeCustomerId(fromAnalytics);
+      if (cid) return cid;
+    } catch (_err1) {}
+
+    try {
+      var fromSt = window.__st && window.__st.cid;
+      var cid2 = normalizeCustomerId(fromSt);
+      if (cid2) return cid2;
+    } catch (_err2) {}
+
+    return "";
+  }
+
+  function ensureCustomerHint() {
+    if (!customerHint) {
+      customerHint = detectCustomerIdFromStorefront();
+      if (customerHint) {
+        url = "/apps/notificaciones?cid=" + encodeURIComponent(customerHint);
+        var bell = document.getElementById("cariana-noti-bell");
+        if (bell) {
+          bell.href = url;
+        }
+      }
+    }
+    return customerHint;
+  }
+
   function updateBadge(count) {
     unread = Number(count) || 0;
     var bell = document.getElementById("cariana-noti-bell");
@@ -484,6 +522,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   }
 
   function scheduleEnsure() {
+    ensureCustomerHint();
     attachBell();
     setTimeout(attachBell, 250);
     setTimeout(attachBell, 900);
@@ -511,6 +550,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   }
 
   function refreshBadge() {
+    ensureCustomerHint();
     var badgeUrl = "/apps/notificaciones/badge" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
     fetch(badgeUrl)
       .then(function(r) { return r.ok ? r.json() : null; })
@@ -522,6 +562,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   }
 
   function init() {
+    ensureCustomerHint();
     scheduleEnsure();
     watchDomChanges();
     watchNavigation();
