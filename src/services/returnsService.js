@@ -345,7 +345,7 @@ function buildReturnStatusTitle(templateCode) {
   const map = {
     return_requested: "Devolucion en revision",
     return_approved: "Devolucion aprobada",
-    return_rejected: "Devolucion rechazada",
+    return_rejected: "Devolución rechazada ❌",
     return_pickup_scheduled: "Intento de recolección fallido ❌",
     return_picked_up: "Producto recogido",
     refund_processed: "Reembolso procesado",
