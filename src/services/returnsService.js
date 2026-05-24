@@ -410,7 +410,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
 
   const byStatus = {
     return_requested:
-      "Tu solicitud esta siendo revisada por nuestro equipo, regresa mas tarde para revisar el estado de tu solicitud.",
+      "✨Nuestro equipo ya comenzó el proceso de verificación de tu producto. Muy pronto recibirás una actualización sobre el estado de tu solicitud.📦",
     return_approved:
       "Tu solicitud fue aprobada y estamos coordinando el siguiente paso de tu devolucion.",
     return_rejected:
