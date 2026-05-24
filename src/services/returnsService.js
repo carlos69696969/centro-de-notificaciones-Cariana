@@ -346,7 +346,7 @@ function buildReturnStatusTitle(templateCode) {
     return_requested: "Devolucion en revision",
     return_approved: "Devolucion aprobada",
     return_rejected: "Devolucion rechazada",
-    return_pickup_scheduled: "Intento de recoleccion fallido",
+    return_pickup_scheduled: "Intento de recolección fallido ❌",
     return_picked_up: "Producto recogido",
     refund_processed: "Reembolso procesado",
     refund_completed: "Reembolso completado"
