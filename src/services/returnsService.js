@@ -412,7 +412,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return_requested:
       "✨Nuestro equipo ya comenzó el proceso de verificación de tu producto. Muy pronto recibirás una actualización sobre el estado de tu solicitud.📦",
     return_approved:
-      "Tu solicitud fue aprobada y estamos coordinando el siguiente paso de tu devolucion.",
+      "Tu solicitud fue aprobada exitosamente. Nuestro equipo recogerá tu producto en el domicilio y fecha indicados. 🚚✨ Gracias por ser parte de Cariana. 💙",
     return_rejected:
       "Tu solicitud fue rechazada. Revisa el detalle para conocer el motivo y las opciones disponibles.",
     return_pickup_scheduled:
