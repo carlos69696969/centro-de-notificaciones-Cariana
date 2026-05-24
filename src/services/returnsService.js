@@ -374,7 +374,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
   }
 
   if (templateCode === "return_picked_up") {
-    return "Recibimos tu producto con exito, lo revisaremos. Una vez finalicemos realizaremos tu reembolso.";
+    return "Producto recibido. 📦 Hemos recibido tu devolución y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificación, realizaremos tu reembolso correspondiente. 💰";
   }
   if (templateCode === "refund_processed") {
     return "Tu reembolso ya fue procesado correctamente. Dependiendo de tu banco, puede reflejarse en un plazo de 5 a 10 dias habiles.";
