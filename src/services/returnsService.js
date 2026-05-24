@@ -1,4 +1,4 @@
-const pool = require("../db/pool");
+﻿const pool = require("../db/pool");
 const {
   getCustomerByEmail,
   getCustomerByShopifyId,
@@ -345,20 +345,18 @@ function buildReturnStatusTitle(templateCode) {
   const map = {
     return_requested: "Devolucion en revision",
     return_approved: "Devolucion aprobada",
-    return_rejected: "Devolución rechazada ❌",
-    return_pickup_scheduled: "Intento de recolección fallido ❌",
+    return_rejected: "Devoluci\u00F3n rechazada \u274C",
+    return_pickup_scheduled: "Intento de recolecci\u00F3n fallido \u274C",
     return_picked_up: "Producto recogido",
     refund_processed: "Reembolso procesado",
     refund_completed: "Reembolso completado"
   };
   return map[templateCode] || "Actualizacion de devolucion";
 }
-
 function isReturnedToCustomerEvent(payload = {}) {
   const action = normalizeReturnStatus(payload.action || payload.event_action || payload.eventAction || "");
   return action === "mark_returned_to_customer";
 }
-
 function isBranchReturnMethod(payload = {}) {
   const method = normalizeReturnStatus(
     payload.return_method ||
@@ -369,26 +367,39 @@ function isBranchReturnMethod(payload = {}) {
       payload.metodo ||
       ""
   );
-
   return method === "branch" || method === "sucursal" || method === "store_dropoff";
 }
-
+function isPickupReturnMethod(payload = {}) {
+  const method = normalizeReturnStatus(
+    payload.return_method ||
+      payload.returnMethod ||
+      payload.method ||
+      payload.delivery_method ||
+      payload.deliveryMethod ||
+      payload.metodo ||
+      ""
+  );
+  return method === "pickup" || method === "recoleccion" || method === "home_pickup";
+}
 function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
   if (isReturnedToCustomerEvent(payload)) {
-    return "📦Tu devolucion ya fue recogida en nuestra sucursal de devoluciones. Gracias por recoger tu devolucion.";
+    return "\uD83D\uDCE6Tu devolucion ya fue recogida en nuestra sucursal de devoluciones. Gracias por recoger tu devolucion.";
   }
-
+  if (templateCode === "return_requested") {
+    return "\u2728Nuestro equipo ya comenz\u00F3 el proceso de verificaci\u00F3n de tu producto. Muy pronto recibir\u00E1s una actualizaci\u00F3n sobre el estado de tu solicitud.\uD83D\uDCE6";
+  }
   if (templateCode === "return_approved" && isBranchReturnMethod(payload)) {
-    return "Tu solicitud de devolución fue aprobada. 📦 Por favor, lleva tu producto a la sucursal de devoluciones siguiendo las instrucciones de entrega.";
+    return "Tu solicitud de devoluci\u00F3n fue aprobada. \uD83D\uDCE6 Por favor, lleva tu producto a la sucursal de devoluciones siguiendo las instrucciones de entrega.";
   }
-
+  if (templateCode === "return_approved" && isPickupReturnMethod(payload)) {
+    return "Tu solicitud fue aprobada exitosamente. Nuestro equipo recoger\u00E1 tu producto en el domicilio y fecha indicados. \uD83D\uDE9A\u2728 Gracias por ser parte de Cariana. \uD83D\uDC99";
+  }
   if (templateCode === "return_picked_up") {
-    return "Producto recibido. 📦 Hemos recibido tu devolución y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificación, realizaremos tu reembolso correspondiente. 💰";
+    return "Producto recibido. \uD83D\uDCE6 Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0";
   }
   if (templateCode === "refund_processed") {
     return "Tu reembolso ya fue procesado correctamente. Dependiendo de tu banco, puede reflejarse en un plazo de 5 a 10 dias habiles.";
   }
-
   const fromPayload = truncateText(
     pickFirstString([
       payload.portal_status_message,
@@ -407,12 +418,11 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
   if (fromPayload) {
     return fromPayload;
   }
-
   const byStatus = {
     return_requested:
-      "✨Nuestro equipo ya comenzó el proceso de verificación de tu producto. Muy pronto recibirás una actualización sobre el estado de tu solicitud.📦",
+      "\u2728Nuestro equipo ya comenz\u00F3 el proceso de verificaci\u00F3n de tu producto. Muy pronto recibir\u00E1s una actualizaci\u00F3n sobre el estado de tu solicitud.\uD83D\uDCE6",
     return_approved:
-      "Tu solicitud fue aprobada exitosamente. Nuestro equipo recogerá tu producto en el domicilio y fecha indicados. 🚚✨ Gracias por ser parte de Cariana. 💙",
+      "Tu solicitud fue aprobada exitosamente. Nuestro equipo recoger\u00E1 tu producto en el domicilio y fecha indicados. \uD83D\uDE9A\u2728 Gracias por ser parte de Cariana. \uD83D\uDC99",
     return_rejected:
       "Tu solicitud fue rechazada. Revisa el detalle para conocer el motivo y las opciones disponibles.",
     return_pickup_scheduled:
@@ -424,7 +434,6 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     refund_completed:
       "Tu reembolso fue completado correctamente."
   };
-
   return byStatus[templateCode] || truncateText(fallbackMessage, 180);
 }
 
@@ -681,3 +690,5 @@ async function processReturnEvent({ shopDomain, payload }) {
 module.exports = {
   processReturnEvent
 };
+
+
