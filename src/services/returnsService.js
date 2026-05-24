@@ -354,6 +354,11 @@ function buildReturnStatusTitle(templateCode) {
   return map[templateCode] || "Actualizacion de devolucion";
 }
 
+function isReturnedToCustomerEvent(payload = {}) {
+  const action = normalizeReturnStatus(payload.action || payload.event_action || payload.eventAction || "");
+  return action === "mark_returned_to_customer";
+}
+
 function isBranchReturnMethod(payload = {}) {
   const method = normalizeReturnStatus(
     payload.return_method ||
@@ -369,6 +374,10 @@ function isBranchReturnMethod(payload = {}) {
 }
 
 function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
+  if (isReturnedToCustomerEvent(payload)) {
+    return "📦Tu devolucion ya fue recogida en nuestra sucursal de devoluciones. Gracias por recoger tu devolucion.";
+  }
+
   if (templateCode === "return_approved" && isBranchReturnMethod(payload)) {
     return "Tu solicitud de devolución fue aprobada. 📦 Por favor, lleva tu producto a la sucursal de devoluciones siguiendo las instrucciones de entrega.";
   }
@@ -437,7 +446,9 @@ function buildReturnPremiumTemplate({
     allowMessageFallback: templateCode === "return_rejected"
   });
   const statusLabel = returnStatusLabels[templateCode] || "Actualizacion";
-  const statusTitle = buildReturnStatusTitle(templateCode);
+  const statusTitle = isReturnedToCustomerEvent(payload)
+    ? "Devolucion entregada"
+    : buildReturnStatusTitle(templateCode);
   const portalCurrentText = buildPortalCurrentStatusText(templateCode, payload, fallbackMessage);
 
   if (templateCode === "return_rejected") {
