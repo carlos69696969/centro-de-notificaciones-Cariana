@@ -251,14 +251,14 @@ async function inferOrderIdFromRecentLocalDeliveryContext({ shopDomain, eventId 
      AND (ne.payload->>'id')::BIGINT = ocm.order_id
     WHERE ocm.shop_domain = $1
       AND ocm.last_status = 'order_preparing'
-      AND ne.created_at BETWEEN ($2::timestamptz - interval '90 minutes') AND ($2::timestamptz + interval '5 minutes')
+      AND ne.created_at BETWEEN ($2::timestamptz - interval '36 hours') AND ($2::timestamptz + interval '5 minutes')
       AND EXISTS (
         SELECT 1
         FROM jsonb_array_elements(COALESCE(ne.payload->'shipping_lines', '[]'::jsonb)) AS line
         WHERE lower(COALESCE(line->>'code', '')) LIKE '%local%'
            OR lower(COALESCE(line->>'title', '')) LIKE '%local%'
       )
-    ORDER BY ABS(EXTRACT(EPOCH FROM ($2::timestamptz - ne.created_at))) ASC, ne.created_at DESC
+    ORDER BY ne.created_at DESC
     LIMIT 1
     `,
     [shopDomain, eventCreatedAt]
