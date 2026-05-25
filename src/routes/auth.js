@@ -19,6 +19,31 @@ function verifyOAuthHmac(query) {
   return digest === hmac;
 }
 
+async function exchangeAccessToken({ shop, code }) {
+  const response = await fetch(`https://${shop}/admin/oauth/access_token`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json"
+    },
+    body: JSON.stringify({
+      client_id: env.shopifyApiKey,
+      client_secret: env.shopifyApiSecret,
+      code
+    })
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  const token = String(payload.access_token || "").trim();
+
+  if (!response.ok || !token) {
+    const detail = payload.error_description || payload.error || `status ${response.status}`;
+    throw new Error(`OAuth token exchange failed: ${detail}`);
+  }
+
+  return token;
+}
+
 router.get("/start", async (req, res) => {
   const shop = req.query.shop;
   if (!shop) {
@@ -49,17 +74,23 @@ router.get("/callback", async (req, res, next) => {
       return res.status(400).send("Missing required OAuth params");
     }
 
+    if (!env.shopifyApiKey || !env.shopifyApiSecret) {
+      return res.status(500).send("Shopify credentials are missing");
+    }
+
+    const accessToken = await exchangeAccessToken({ shop, code });
+
     await pool.query(
       `
       INSERT INTO shops (shop_domain, access_token, updated_at)
       VALUES ($1, $2, NOW())
       ON CONFLICT (shop_domain)
-      DO UPDATE SET updated_at = NOW()
+      DO UPDATE SET access_token = EXCLUDED.access_token, updated_at = NOW()
       `,
-      [shop, null]
+      [shop, accessToken]
     );
 
-    return res.send("App installed. OAuth token exchange pending implementation.");
+    return res.send("App installed successfully.");
   } catch (error) {
     return next(error);
   }
