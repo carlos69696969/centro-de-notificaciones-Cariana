@@ -420,18 +420,14 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
 
 function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessage }) {
   const normalizedOrder = normalizeOrderNumber(orderNumber);
-  const title = normalizedOrder
-    ? `Reembolso procesado - Pedido #${normalizedOrder}`
-    : "Reembolso procesado - Pedido";
-  const detail = truncateText(fallbackMessage, 90);
-  const parts = normalizedOrder
-    ? [`Pedido #${normalizedOrder}.`]
-    : ["Reembolso procesado."];
-
-  if (detail) {
-    parts.push(`${detail}.`);
-  }
-  parts.push("Toca para ver el detalle.");
+  const title = "Reembolso procesado";
+  const orderLabel = normalizedOrder || "****";
+  const parts = [
+    `Pedido #${orderLabel}.`,
+    "\uD83D\uDCB8 Tu reembolso ya fue procesado correctamente.",
+    "Dependiendo de tu banco, el monto podr\u00E1 verse reflejado en tu cuenta dentro de 5 a 10 d\u00EDas h\u00E1biles.",
+    "Gracias por confiar en Cariana. \uD83D\uDC99"
+  ];
 
   return {
     title,
