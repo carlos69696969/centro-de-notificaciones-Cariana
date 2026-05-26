@@ -131,6 +131,42 @@ async function fetchOrderSnapshot({ shopDomain, orderId }) {
   return payload?.order || null;
 }
 
+async function fetchOrderSnapshotFromEvents({ shopDomain, orderId }) {
+  const normalizedOrderId = parseOrderId(orderId);
+  if (!normalizedOrderId) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT payload
+    FROM notification_events
+    WHERE shop_domain = $1
+      AND topic IN ('orders/create','orders/updated','orders/fulfilled','fulfillment_orders/line_items_prepared_for_local_delivery')
+      AND (
+        payload->>'id' = $2
+        OR payload->>'order_id' = $2
+        OR payload->'order'->>'id' = $2
+      )
+    ORDER BY created_at DESC
+    LIMIT 1
+    `,
+    [shopDomain, normalizedOrderId]
+  );
+
+  if (result.rowCount === 0) {
+    return null;
+  }
+
+  const payload = result.rows[0].payload || {};
+  return {
+    order_number: payload.order_number || payload.order?.order_number || "",
+    token: payload.token || payload.order_token || payload.order?.token || payload.order?.order_token || "",
+    order_status_url:
+      payload.order_status_url || payload.orderStatusUrl || payload.order?.order_status_url || payload.order?.orderStatusUrl || ""
+  };
+}
+
 function buildOrderTargetUrl({ shopDomain, orderId, orderNumber, orderToken, orderStatusUrl }) {
   const statusUrl = safeTrim(orderStatusUrl);
   if (statusUrl) {
@@ -734,6 +770,18 @@ router.get("/open-order", requireValidProxy, async (req, res, next) => {
     let orderNumber = req.query.order || req.query.order_number || req.query.orderNumber || "";
     let orderToken = req.query.token || req.query.order_token || req.query.orderToken || "";
     let orderStatusUrl = req.query.status_url || req.query.order_status_url || req.query.orderStatusUrl || "";
+
+    if ((!safeTrim(orderStatusUrl) || !safeTrim(orderToken)) && parseOrderId(orderId)) {
+      const fromEvents = await fetchOrderSnapshotFromEvents({
+        shopDomain,
+        orderId
+      });
+      if (fromEvents) {
+        orderNumber = orderNumber || String(fromEvents.order_number || "").trim();
+        orderToken = orderToken || String(fromEvents.token || "").trim();
+        orderStatusUrl = orderStatusUrl || String(fromEvents.order_status_url || "").trim();
+      }
+    }
 
     if ((!safeTrim(orderStatusUrl) || !safeTrim(orderToken)) && parseOrderId(orderId)) {
       const snapshot = await fetchOrderSnapshot({
