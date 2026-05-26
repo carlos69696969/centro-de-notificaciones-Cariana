@@ -2,6 +2,7 @@ const express = require("express");
 const pool = require("../db/pool");
 const env = require("../config/env");
 const { verifyAppProxySignature } = require("../services/shopifyAppProxyVerifier");
+const { buildOrderDeepLink, buildLegacyOrderFallbackDeepLink, toAbsoluteStorefrontUrl } = require("../services/deepLinkService");
 
 const router = express.Router();
 
@@ -66,6 +67,66 @@ function buildReturnsPortalUrl({ shopDomain, orderNumber, email }) {
     order: safeTrim(orderNumber).replace(/^#/, ""),
     email: safeTrim(email).toLowerCase()
   });
+}
+
+function isAbsoluteUrl(value) {
+  return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+function parseOrderId(value) {
+  const text = safeTrim(value);
+  if (!text) {
+    return "";
+  }
+  if (/^\d+$/.test(text)) {
+    return text;
+  }
+  const match = text.match(/(\d+)(?!.*\d)/);
+  return match ? match[1] : "";
+}
+
+function buildOrderTargetUrl({ shopDomain, orderId, orderNumber, orderToken, orderStatusUrl }) {
+  const statusUrl = safeTrim(orderStatusUrl);
+  if (statusUrl) {
+    return toAbsoluteStorefrontUrl(shopDomain, statusUrl);
+  }
+
+  const token = safeTrim(orderToken);
+  if (token) {
+    const normalizedShop = normalizeShopDomain(shopDomain);
+    const base = normalizedShop ? `https://${normalizedShop}` : "";
+    const path = `/orders/${encodeURIComponent(token)}`;
+    return base ? `${base}${path}` : path;
+  }
+
+  return buildLegacyOrderFallbackDeepLink({
+    shopDomain,
+    orderId: parseOrderId(orderId),
+    orderNumber
+  });
+}
+
+function resolveNotificationDeepLink({ shopDomain, item }) {
+  const rawData = item?.data && typeof item.data === "object" ? item.data : {};
+  const type = safeTrim(item?.type);
+  const deepLinkType = safeTrim(rawData.deepLinkType || rawData.deeplinkType || rawData.linkType);
+  const isOrderLike = ["order_event", "order_manual", "refund_event"].includes(type) || deepLinkType === "order";
+  const existing = safeTrim(item?.deep_link);
+
+  if (!isOrderLike) {
+    return existing;
+  }
+
+  const generated = buildOrderDeepLink({
+    shopDomain,
+    orderId: rawData.orderId || rawData.order_id || "",
+    orderNumber: rawData.orderNumber || rawData.order_number || "",
+    orderToken: rawData.orderToken || rawData.order_token || "",
+    orderStatusUrl: rawData.orderStatusUrl || rawData.order_status_url || "",
+    deepLink: ""
+  });
+
+  return safeTrim(generated) || existing;
 }
 
 function renderItemsHtml(items) {
@@ -309,7 +370,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
 async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
   const history = await pool.query(
     `
-    SELECT n.id, n.title, n.message, n.deep_link, n.status, n.created_at, n.opened_at
+    SELECT n.id, n.type, n.title, n.message, n.deep_link, n.data, n.status, n.created_at, n.opened_at
     FROM notifications n
     JOIN customers c ON c.id = n.customer_id
     WHERE c.shop_domain = $1
@@ -321,8 +382,16 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
     [shopDomain, Number(shopifyCustomerId)]
   );
 
-  const unread = history.rows.reduce((acc, row) => acc + (row.opened_at ? 0 : 1), 0);
-  return { history: history.rows, unread };
+  const rows = history.rows.map((row) => ({
+    ...row,
+    deep_link: resolveNotificationDeepLink({
+      shopDomain,
+      item: row
+    })
+  }));
+
+  const unread = rows.reduce((acc, row) => acc + (row.opened_at ? 0 : 1), 0);
+  return { history: rows, unread };
 }
 
 async function getUnreadCount(shopDomain, shopifyCustomerId) {
@@ -601,6 +670,47 @@ router.get("/open-return", requireValidProxy, async (req, res, next) => {
   </head>
   <body>
     <p>Abriendo portal de devoluciones...</p>
+    <p><a href="${safeTarget}">Continuar</a></p>
+    <script>
+      window.location.replace(${JSON.stringify(targetUrl)});
+    </script>
+  </body>
+</html>`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/open-order", requireValidProxy, async (req, res, next) => {
+  try {
+    const shopDomain = resolveShopDomain(req);
+    const orderId = req.query.oid || req.query.order_id || req.query.orderId || "";
+    const orderNumber = req.query.order || req.query.order_number || req.query.orderNumber || "";
+    const orderToken = req.query.token || req.query.order_token || req.query.orderToken || "";
+    const orderStatusUrl = req.query.status_url || req.query.order_status_url || req.query.orderStatusUrl || "";
+    const targetUrl = buildOrderTargetUrl({
+      shopDomain,
+      orderId,
+      orderNumber,
+      orderToken,
+      orderStatusUrl
+    });
+    const safeTarget = escapeHtml(targetUrl);
+
+    if (!targetUrl || !isAbsoluteUrl(targetUrl)) {
+      return res.status(400).send("Invalid order target");
+    }
+
+    return res.status(200).send(`<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Abriendo pedido...</title>
+    <meta http-equiv="refresh" content="0;url=${safeTarget}" />
+  </head>
+  <body>
+    <p>Abriendo detalle del pedido...</p>
     <p><a href="${safeTarget}">Continuar</a></p>
     <script>
       window.location.replace(${JSON.stringify(targetUrl)});

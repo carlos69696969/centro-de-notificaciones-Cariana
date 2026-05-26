@@ -24,6 +24,10 @@ function normalizeOrderId(value) {
   return match ? match[1] : "";
 }
 
+function normalizeOrderToken(value) {
+  return safeTrim(value);
+}
+
 function normalizeShopDomain(value) {
   return safeTrim(value).replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
@@ -98,11 +102,30 @@ function appendQueryParams(urlString, params) {
   }
 }
 
-function buildOrderDeepLink({ shopDomain, orderNumber, orderId, orderStatusUrl, deepLink }) {
+function buildOrderDeepLink({ shopDomain, orderNumber, orderId, orderToken, orderStatusUrl, deepLink }) {
   if (safeTrim(deepLink)) {
     return toAbsoluteStorefrontUrl(shopDomain, deepLink);
   }
 
+  const bridgeUrl = toAbsoluteShopDomainUrl(shopDomain, "/apps/notificaciones/open-order");
+  const normalizedStatusUrl = safeTrim(orderStatusUrl);
+  const normalizedOrderToken = normalizeOrderToken(orderToken);
+  const normalizedOrderId = normalizeOrderId(orderId);
+  const normalizedOrder = normalizeOrderNumber(orderNumber);
+
+  if (normalizedStatusUrl || normalizedOrderToken || normalizedOrderId || normalizedOrder) {
+    return appendQueryParams(bridgeUrl, {
+      status_url: normalizedStatusUrl,
+      token: normalizedOrderToken,
+      oid: normalizedOrderId,
+      order: normalizedOrder
+    });
+  }
+
+  return bridgeUrl;
+}
+
+function buildLegacyOrderFallbackDeepLink({ shopDomain, orderNumber, orderId, orderStatusUrl }) {
   const normalizedStatusUrl = safeTrim(orderStatusUrl);
   if (normalizedStatusUrl) {
     return toAbsoluteStorefrontUrl(shopDomain, normalizedStatusUrl);
@@ -139,6 +162,7 @@ function buildCampaignDeepLink({ shopDomain, deepLink }) {
 
 module.exports = {
   buildOrderDeepLink,
+  buildLegacyOrderFallbackDeepLink,
   buildReturnDeepLink,
   buildCampaignDeepLink,
   toAbsoluteStorefrontUrl

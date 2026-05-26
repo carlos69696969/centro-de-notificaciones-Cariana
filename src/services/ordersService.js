@@ -119,12 +119,14 @@ function extractOrderContext(topic, payload) {
   const orderIdCandidates = [];
   const orderNumberCandidates = [];
   const orderStatusUrlCandidates = [];
+  const orderTokenCandidates = [];
   const customerIdCandidates = [];
 
   if (topic.startsWith("orders/")) {
     orderIdCandidates.push(payload?.id);
     orderNumberCandidates.push(payload?.order_number, payload?.name);
     orderStatusUrlCandidates.push(payload?.order_status_url, payload?.orderStatusUrl);
+    orderTokenCandidates.push(payload?.token, payload?.order_token, payload?.orderToken);
     customerIdCandidates.push(payload?.customer?.id);
   }
 
@@ -144,15 +146,24 @@ function extractOrderContext(topic, payload) {
       payload?.order?.order_status_url,
       payload?.order?.orderStatusUrl
     );
+    orderTokenCandidates.push(
+      payload?.token,
+      payload?.order_token,
+      payload?.orderToken,
+      payload?.order?.token,
+      payload?.order?.order_token,
+      payload?.order?.orderToken
+    );
   }
 
   const orderId = orderIdCandidates.map(parseLegacyNumericId).find(Boolean) || null;
   const orderNumberRaw = orderNumberCandidates.map((value) => String(value || "").trim()).find(Boolean) || "";
   const orderStatusUrl = orderStatusUrlCandidates.map((value) => String(value || "").trim()).find(Boolean) || "";
+  const orderToken = orderTokenCandidates.map((value) => String(value || "").trim()).find(Boolean) || "";
   const orderNumber = normalizeOrderNumber(orderNumberRaw);
   const customerId = customerIdCandidates.map(parseLegacyNumericId).find(Boolean) || null;
 
-  return { orderId, orderNumber, orderStatusUrl, customerId };
+  return { orderId, orderNumber, orderStatusUrl, orderToken, customerId };
 }
 
 async function getShopAccessToken(shopDomain) {
@@ -184,6 +195,7 @@ async function fetchShopifyOrderById(shopDomain, orderId) {
     "name",
     "order_number",
     "order_status_url",
+    "token",
     "customer",
     "line_items",
     "shipping_lines",
@@ -598,6 +610,8 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     productName: copy.productsInline || "",
     productNames: copy.productNames || [],
     deepLinkType: "order",
+    orderToken: effectivePayload.token || context.orderToken || "",
+    orderStatusUrl: effectivePayload.order_status_url || context.orderStatusUrl || "",
     customerEmail: effectivePayload.customer?.email || ""
   };
 
@@ -611,6 +625,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
       shopDomain,
       orderId,
       orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
+      orderToken: effectivePayload.token || context.orderToken || "",
       orderStatusUrl: effectivePayload.order_status_url || context.orderStatusUrl || "",
       deepLink: template.deep_link
     }),
@@ -672,6 +687,8 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, o
       shopDomain,
       orderId,
       orderNumber,
+      orderToken: "",
+      orderStatusUrl: "",
       deepLink: template.deep_link
     }),
     data: {
@@ -744,6 +761,8 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
     fallbackMessage: template.message
   });
 
+  const refundOrder = payload.order_id ? await fetchShopifyOrderById(shopDomain, payload.order_id) : null;
+
   const sendResult = await sendToCustomerTokens({
     shopDomain,
     customerId: customer.id,
@@ -754,11 +773,15 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
       shopDomain,
       orderId: payload.order_id,
       orderNumber: mapped.order_number,
+      orderToken: refundOrder?.token || "",
+      orderStatusUrl: refundOrder?.order_status_url || "",
       deepLink: template.deep_link
     }),
     data: {
       orderId: payload.order_id,
       orderNumber: mapped.order_number || "",
+      orderToken: refundOrder?.token || "",
+      orderStatusUrl: refundOrder?.order_status_url || "",
       refundId: payload.id || "",
       statusLabel: copy.statusLabel,
       productName: "",
