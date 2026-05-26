@@ -98,9 +98,14 @@ function appendQueryParams(urlString, params) {
   }
 }
 
-function buildOrderDeepLink({ shopDomain, orderNumber, orderId, deepLink }) {
+function buildOrderDeepLink({ shopDomain, orderNumber, orderId, orderStatusUrl, deepLink }) {
   if (safeTrim(deepLink)) {
     return toAbsoluteStorefrontUrl(shopDomain, deepLink);
+  }
+
+  const normalizedStatusUrl = safeTrim(orderStatusUrl);
+  if (normalizedStatusUrl) {
+    return toAbsoluteStorefrontUrl(shopDomain, normalizedStatusUrl);
   }
 
   const normalizedOrderId = normalizeOrderId(orderId);

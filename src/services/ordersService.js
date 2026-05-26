@@ -118,11 +118,13 @@ function normalizeOrderNumber(value) {
 function extractOrderContext(topic, payload) {
   const orderIdCandidates = [];
   const orderNumberCandidates = [];
+  const orderStatusUrlCandidates = [];
   const customerIdCandidates = [];
 
   if (topic.startsWith("orders/")) {
     orderIdCandidates.push(payload?.id);
     orderNumberCandidates.push(payload?.order_number, payload?.name);
+    orderStatusUrlCandidates.push(payload?.order_status_url, payload?.orderStatusUrl);
     customerIdCandidates.push(payload?.customer?.id);
   }
 
@@ -136,14 +138,21 @@ function extractOrderContext(topic, payload) {
       payload?.order?.order_number,
       payload?.order?.name
     );
+    orderStatusUrlCandidates.push(
+      payload?.order_status_url,
+      payload?.orderStatusUrl,
+      payload?.order?.order_status_url,
+      payload?.order?.orderStatusUrl
+    );
   }
 
   const orderId = orderIdCandidates.map(parseLegacyNumericId).find(Boolean) || null;
   const orderNumberRaw = orderNumberCandidates.map((value) => String(value || "").trim()).find(Boolean) || "";
+  const orderStatusUrl = orderStatusUrlCandidates.map((value) => String(value || "").trim()).find(Boolean) || "";
   const orderNumber = normalizeOrderNumber(orderNumberRaw);
   const customerId = customerIdCandidates.map(parseLegacyNumericId).find(Boolean) || null;
 
-  return { orderId, orderNumber, customerId };
+  return { orderId, orderNumber, orderStatusUrl, customerId };
 }
 
 async function getShopAccessToken(shopDomain) {
@@ -174,6 +183,7 @@ async function fetchShopifyOrderById(shopDomain, orderId) {
     "id",
     "name",
     "order_number",
+    "order_status_url",
     "customer",
     "line_items",
     "shipping_lines",
@@ -601,6 +611,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
       shopDomain,
       orderId,
       orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
+      orderStatusUrl: effectivePayload.order_status_url || context.orderStatusUrl || "",
       deepLink: template.deep_link
     }),
     data,
