@@ -85,6 +85,52 @@ function parseOrderId(value) {
   return match ? match[1] : "";
 }
 
+async function getShopAccessToken(shopDomain) {
+  const result = await pool.query(
+    `
+    SELECT access_token
+    FROM shops
+    WHERE shop_domain = $1
+    LIMIT 1
+    `,
+    [shopDomain]
+  );
+  if (result.rowCount === 0) {
+    return "";
+  }
+  return safeTrim(result.rows[0].access_token || "");
+}
+
+async function fetchOrderSnapshot({ shopDomain, orderId }) {
+  const normalizedOrderId = parseOrderId(orderId);
+  if (!normalizedOrderId) {
+    return null;
+  }
+
+  const accessToken = await getShopAccessToken(shopDomain);
+  if (!accessToken) {
+    return null;
+  }
+
+  const apiVersion = "2026-04";
+  const fields = ["id", "order_number", "order_status_url", "token"].join(",");
+  const url = `https://${shopDomain}/admin/api/${apiVersion}/orders/${normalizedOrderId}.json?status=any&fields=${fields}`;
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "X-Shopify-Access-Token": accessToken,
+      Accept: "application/json"
+    }
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json();
+  return payload?.order || null;
+}
+
 function buildOrderTargetUrl({ shopDomain, orderId, orderNumber, orderToken, orderStatusUrl }) {
   const statusUrl = safeTrim(orderStatusUrl);
   if (statusUrl) {
@@ -685,9 +731,22 @@ router.get("/open-order", requireValidProxy, async (req, res, next) => {
   try {
     const shopDomain = resolveShopDomain(req);
     const orderId = req.query.oid || req.query.order_id || req.query.orderId || "";
-    const orderNumber = req.query.order || req.query.order_number || req.query.orderNumber || "";
-    const orderToken = req.query.token || req.query.order_token || req.query.orderToken || "";
-    const orderStatusUrl = req.query.status_url || req.query.order_status_url || req.query.orderStatusUrl || "";
+    let orderNumber = req.query.order || req.query.order_number || req.query.orderNumber || "";
+    let orderToken = req.query.token || req.query.order_token || req.query.orderToken || "";
+    let orderStatusUrl = req.query.status_url || req.query.order_status_url || req.query.orderStatusUrl || "";
+
+    if ((!safeTrim(orderStatusUrl) || !safeTrim(orderToken)) && parseOrderId(orderId)) {
+      const snapshot = await fetchOrderSnapshot({
+        shopDomain,
+        orderId
+      });
+      if (snapshot) {
+        orderNumber = orderNumber || String(snapshot.order_number || "").trim();
+        orderToken = orderToken || String(snapshot.token || "").trim();
+        orderStatusUrl = orderStatusUrl || String(snapshot.order_status_url || "").trim();
+      }
+    }
+
     const targetUrl = buildOrderTargetUrl({
       shopDomain,
       orderId,
