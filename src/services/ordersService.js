@@ -599,6 +599,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     message: copy.message,
     deepLink: buildOrderDeepLink({
       shopDomain,
+      orderId,
       orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
       deepLink: template.deep_link
     }),
@@ -658,6 +659,7 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, o
     message: copy.message,
     deepLink: buildOrderDeepLink({
       shopDomain,
+      orderId,
       orderNumber,
       deepLink: template.deep_link
     }),
@@ -739,6 +741,7 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
     message: copy.message,
     deepLink: buildOrderDeepLink({
       shopDomain,
+      orderId: payload.order_id,
       orderNumber: mapped.order_number,
       deepLink: template.deep_link
     }),

@@ -12,6 +12,18 @@ function normalizeOrderNumber(value) {
   return safeTrim(value).replace(/^#/, "");
 }
 
+function normalizeOrderId(value) {
+  const text = safeTrim(value);
+  if (!text) {
+    return "";
+  }
+  if (/^\d+$/.test(text)) {
+    return text;
+  }
+  const match = text.match(/(\d+)(?!.*\d)/);
+  return match ? match[1] : "";
+}
+
 function normalizeShopDomain(value) {
   return safeTrim(value).replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 }
@@ -86,14 +98,20 @@ function appendQueryParams(urlString, params) {
   }
 }
 
-function buildOrderDeepLink({ shopDomain, orderNumber, deepLink }) {
+function buildOrderDeepLink({ shopDomain, orderNumber, orderId, deepLink }) {
   if (safeTrim(deepLink)) {
     return toAbsoluteStorefrontUrl(shopDomain, deepLink);
   }
 
+  const normalizedOrderId = normalizeOrderId(orderId);
   const normalizedOrder = normalizeOrderNumber(orderNumber);
-  const query = normalizedOrder ? `?order=${encodeURIComponent(normalizedOrder)}` : "";
-  return toAbsoluteStorefrontUrl(shopDomain, `/account/orders${query}`);
+  if (normalizedOrderId) {
+    const query = normalizedOrder ? `?order=${encodeURIComponent(normalizedOrder)}` : "";
+    return toAbsoluteStorefrontUrl(shopDomain, `/account/orders/${normalizedOrderId}${query}`);
+  }
+
+  const fallbackQuery = normalizedOrder ? `?order=${encodeURIComponent(normalizedOrder)}` : "";
+  return toAbsoluteStorefrontUrl(shopDomain, `/account/orders${fallbackQuery}`);
 }
 
 function buildReturnDeepLink({ shopDomain, orderNumber, email, deepLink }) {
