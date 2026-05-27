@@ -64,6 +64,26 @@
         width: auto;
         margin: 0;
       }
+      .input-suffix {
+        display: flex;
+        align-items: center;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0 10px;
+        gap: 8px;
+        background: #fff;
+      }
+      .input-suffix input {
+        border: 0;
+        border-radius: 0;
+        padding: 10px 0;
+        width: 90px;
+      }
+      .input-suffix .suffix {
+        color: var(--muted);
+        font-size: 14px;
+        white-space: nowrap;
+      }
       input,
       select,
       textarea,
@@ -149,7 +169,10 @@
               <input id="cRecurring" type="checkbox" />
               Repetir
             </label>
-            <input id="cRepeatHours" type="number" min="1" step="1" placeholder="Horas (ej: 24)" style="max-width: 170px;" />
+            <label class="input-suffix" for="cRepeatHours" style="max-width: 170px;">
+              <input id="cRepeatHours" type="number" min="1" step="1" placeholder="24" />
+              <span class="suffix">horas</span>
+            </label>
           </div>
           <button onclick="createCampaign()">Crear campana</button>
         </div>
