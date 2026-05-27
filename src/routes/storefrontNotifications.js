@@ -274,7 +274,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
         --card: #ffffff;
         --text: #111827;
         --muted: #6b7280;
-        --brand: #0f766e;
+        --brand: #005bd3;
         --border: #e5e7eb;
       }
       body {
