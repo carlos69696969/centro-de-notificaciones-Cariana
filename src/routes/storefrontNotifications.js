@@ -862,6 +862,16 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     return "";
   }
 
+  function detectTrayUnreadFromAndroid() {
+    try {
+      if (window.Android && typeof window.Android.getTrayNotificationCount === "function") {
+        var value = Number(window.Android.getTrayNotificationCount());
+        if (!isNaN(value) && value >= 0) return value;
+      }
+    } catch (_err5) {}
+    return -1;
+  }
+
   function ensureCustomerHint() {
     if (!customerHint) {
       customerHint = detectCustomerIdFromStorefront();
@@ -1008,6 +1018,12 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
   function refreshBadge() {
     ensureCustomerHint();
+    var trayUnread = detectTrayUnreadFromAndroid();
+    if (trayUnread > 0) {
+      updateBadge(trayUnread);
+      writeBadgeCache();
+      return;
+    }
     if (!pushToken) {
       pushToken = detectPushTokenFromAndroid();
     }
