@@ -95,6 +95,11 @@
         border: 1px solid var(--border);
         font-size: 14px;
       }
+      input::placeholder,
+      textarea::placeholder {
+        color: #9ca3af;
+        opacity: 1;
+      }
       button {
         background: var(--primary);
         color: white;
@@ -149,7 +154,7 @@
       <div class="card">
         <h2>Centro de campanas</h2>
         <div class="row">
-          <input id="cName" placeholder="Nombre campana" />
+          <input id="cName" placeholder="Nombre de campana (opcional)" />
           <select id="cAudience">
             <option value="all_users">Todos los usuarios</option>
             <option value="customers_with_previous_purchases">Clientes con compras previas</option>
@@ -158,10 +163,10 @@
           </select>
         </div>
         <div class="row">
-          <input id="cTitle" placeholder="Titulo" />
+          <input id="cTitle" placeholder="Titulo (opcional)" />
           <input id="cDeepLink" placeholder="Deep link (opcional)" />
         </div>
-        <textarea id="cMessage" rows="3" placeholder="Mensaje"></textarea>
+        <textarea id="cMessage" rows="3" placeholder="Mensaje de la notificacion"></textarea>
         <div class="row">
           <div class="row" style="grid-template-columns: 1fr auto auto; gap: 8px;">
             <input id="cSchedule" type="datetime-local" />
@@ -181,10 +186,10 @@
       <div class="card">
         <h2>Plantillas</h2>
         <div class="row">
-          <input id="tCode" placeholder="Codigo (ej: order_confirmed)" />
-          <input id="tTitle" placeholder="Titulo" />
+          <input id="tCode" placeholder="Codigo de plantilla (ej: order_confirmed)" />
+          <input id="tTitle" placeholder="Titulo de plantilla" />
         </div>
-        <textarea id="tMessage" rows="2" placeholder="Mensaje"></textarea>
+        <textarea id="tMessage" rows="2" placeholder="Mensaje de plantilla"></textarea>
         <div class="row">
           <input id="tDeepLink" placeholder="Deep link (opcional)" />
           <button onclick="saveTemplate()">Guardar plantilla</button>
@@ -265,6 +270,14 @@
           if (!el) return;
           el.addEventListener("input", saveFormState);
           el.addEventListener("change", saveFormState);
+          if (el.type !== "checkbox") {
+            el.addEventListener("blur", () => {
+              if (typeof el.value === "string" && !el.value.trim()) {
+                el.value = "";
+                saveFormState();
+              }
+            });
+          }
         });
       }
 
