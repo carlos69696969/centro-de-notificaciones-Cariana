@@ -143,12 +143,13 @@
         </div>
         <textarea id="cMessage" rows="3" placeholder="Mensaje"></textarea>
         <div class="row">
-          <div class="row" style="grid-template-columns: 1fr auto; gap: 8px;">
+          <div class="row" style="grid-template-columns: 1fr auto auto; gap: 8px;">
             <input id="cSchedule" type="datetime-local" />
-            <label class="inline-check" for="cRecurringDaily">
-              <input id="cRecurringDaily" type="checkbox" />
-              Repetir cada 24h
+            <label class="inline-check" for="cRecurring">
+              <input id="cRecurring" type="checkbox" />
+              Repetir
             </label>
+            <input id="cRepeatHours" type="number" min="1" step="1" placeholder="Horas (ej: 24)" style="max-width: 170px;" />
           </div>
           <button onclick="createCampaign()">Crear campana</button>
         </div>
@@ -196,7 +197,8 @@
         "cDeepLink",
         "cMessage",
         "cSchedule",
-        "cRecurringDaily",
+        "cRecurring",
+        "cRepeatHours",
         "tCode",
         "tTitle",
         "tMessage",
@@ -282,7 +284,8 @@
           deepLink: document.getElementById("cDeepLink").value || null,
           audienceType: document.getElementById("cAudience").value,
           audienceFilters: {
-            recurringDaily: document.getElementById("cRecurringDaily").checked
+            recurring: document.getElementById("cRecurring").checked,
+            repeatEveryHours: Number(document.getElementById("cRepeatHours").value || 0)
           },
           scheduledAt: document.getElementById("cSchedule").value ? new Date(document.getElementById("cSchedule").value).toISOString() : null
         };

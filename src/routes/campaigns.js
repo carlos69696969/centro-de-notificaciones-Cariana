@@ -23,8 +23,13 @@ router.post("/", async (req, res, next) => {
     }
 
     const normalizedFilters = audienceFilters && typeof audienceFilters === "object" ? audienceFilters : {};
-    const recurringDaily = String(normalizedFilters.recurringDaily ?? "").toLowerCase() === "true" || normalizedFilters.recurringDaily === true;
-    const effectiveScheduledAt = scheduledAt || (recurringDaily ? new Date().toISOString() : null);
+    const recurring = String(normalizedFilters.recurring ?? "").toLowerCase() === "true" || normalizedFilters.recurring === true;
+    const repeatEveryHours = Number(normalizedFilters.repeatEveryHours || 0);
+    const validRepeatEveryHours = Number.isFinite(repeatEveryHours) ? Math.floor(repeatEveryHours) : 0;
+    const effectiveScheduledAt = scheduledAt || (recurring && validRepeatEveryHours > 0 ? new Date().toISOString() : null);
+
+    normalizedFilters.recurring = recurring;
+    normalizedFilters.repeatEveryHours = validRepeatEveryHours;
 
     const campaign = await createCampaign({
       shopDomain,
