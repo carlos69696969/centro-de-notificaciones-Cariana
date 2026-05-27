@@ -556,18 +556,10 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
     return { history: [], unread: 0 };
   }
 
-  const customerLookup = await pool.query(
-    `
-    SELECT id, LOWER(COALESCE(email, '')) AS email
-    FROM customers
-    WHERE shop_domain = $1
-      AND shopify_customer_id = $2
-    LIMIT 1
-    `,
-    [shopDomain, Number(shopifyCustomerId)]
-  );
-  const currentCustomerId = Number(customerLookup.rows[0]?.id || 0);
-  const currentCustomerEmail = String(customerLookup.rows[0]?.email || "").trim().toLowerCase();
+  const context = await resolveCustomerContext(shopDomain, shopifyCustomerId);
+  const currentCustomerId = context.customerId;
+  const currentCustomerEmail = context.customerEmail;
+  const effectiveShopDomain = context.effectiveShopDomain || safeTrim(shopDomain);
 
   if (!currentCustomerId && !currentCustomerEmail) {
     return { history: [], unread: 0 };
@@ -607,7 +599,7 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
     ORDER BY n.created_at DESC
     LIMIT 50
     `,
-    [shopDomain, currentCustomerId, currentCustomerEmail, Number(shopifyCustomerId)]
+    [effectiveShopDomain, currentCustomerId, currentCustomerEmail, Number(shopifyCustomerId)]
   );
 
   const rows = history.rows.map((row) => ({
@@ -627,18 +619,10 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
     return 0;
   }
 
-  const customerLookup = await pool.query(
-    `
-    SELECT id, LOWER(COALESCE(email, '')) AS email
-    FROM customers
-    WHERE shop_domain = $1
-      AND shopify_customer_id = $2
-    LIMIT 1
-    `,
-    [shopDomain, Number(shopifyCustomerId)]
-  );
-  const currentCustomerId = Number(customerLookup.rows[0]?.id || 0);
-  const currentCustomerEmail = String(customerLookup.rows[0]?.email || "").trim().toLowerCase();
+  const context = await resolveCustomerContext(shopDomain, shopifyCustomerId);
+  const currentCustomerId = context.customerId;
+  const currentCustomerEmail = context.customerEmail;
+  const effectiveShopDomain = context.effectiveShopDomain || safeTrim(shopDomain);
 
   if (!currentCustomerId && !currentCustomerEmail) {
     return 0;
@@ -677,7 +661,7 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
         )
       )
     `,
-    [shopDomain, currentCustomerId, currentCustomerEmail, Number(shopifyCustomerId)]
+    [effectiveShopDomain, currentCustomerId, currentCustomerEmail, Number(shopifyCustomerId)]
   );
   return result.rows[0]?.unread || 0;
 }
@@ -688,6 +672,63 @@ function resolveShopDomain(req) {
 
 function resolveCustomerId(req) {
   return req.query.logged_in_customer_id || req.query.cid || "";
+}
+
+async function resolveCustomerContext(shopDomain, shopifyCustomerId) {
+  const numericCustomerId = Number(shopifyCustomerId || 0);
+  const normalizedShop = safeTrim(shopDomain);
+  if (!numericCustomerId) {
+    return {
+      customerId: 0,
+      customerEmail: "",
+      effectiveShopDomain: normalizedShop
+    };
+  }
+
+  const exactMatch = await pool.query(
+    `
+    SELECT id, LOWER(COALESCE(email, '')) AS email, shop_domain
+    FROM customers
+    WHERE shop_domain = $1
+      AND shopify_customer_id = $2
+    LIMIT 1
+    `,
+    [normalizedShop, numericCustomerId]
+  );
+
+  if (exactMatch.rowCount > 0) {
+    return {
+      customerId: Number(exactMatch.rows[0].id || 0),
+      customerEmail: String(exactMatch.rows[0].email || "").trim().toLowerCase(),
+      effectiveShopDomain: normalizedShop || String(exactMatch.rows[0].shop_domain || "").trim().toLowerCase()
+    };
+  }
+
+  // Fallback when the store's myshopify alias changed.
+  const fallbackMatch = await pool.query(
+    `
+    SELECT id, LOWER(COALESCE(email, '')) AS email, shop_domain
+    FROM customers
+    WHERE shopify_customer_id = $1
+    ORDER BY updated_at DESC
+    LIMIT 1
+    `,
+    [numericCustomerId]
+  );
+
+  if (fallbackMatch.rowCount > 0) {
+    return {
+      customerId: Number(fallbackMatch.rows[0].id || 0),
+      customerEmail: String(fallbackMatch.rows[0].email || "").trim().toLowerCase(),
+      effectiveShopDomain: String(fallbackMatch.rows[0].shop_domain || "").trim().toLowerCase()
+    };
+  }
+
+  return {
+    customerId: 0,
+    customerEmail: "",
+    effectiveShopDomain: normalizedShop
+  };
 }
 
 router.get("/badge", requireValidProxy, async (req, res, next) => {
@@ -771,6 +812,13 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       var cid2 = normalizeCustomerId(fromSt);
       if (cid2) return cid2;
     } catch (_err2) {}
+
+    try {
+      if (window.Android && typeof window.Android.getPushCustomerId === "function") {
+        var fromAndroid = normalizeCustomerId(window.Android.getPushCustomerId());
+        if (fromAndroid) return fromAndroid;
+      }
+    } catch (_err3) {}
 
     return "";
   }
