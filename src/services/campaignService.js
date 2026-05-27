@@ -80,18 +80,13 @@ function buildCampaignNotificationCopy(campaign) {
     52
   );
   const audienceLabel = audienceLabelMap[campaign.audience_type] || "Clientes seleccionados";
-  const bodyMessage = truncateText(campaign.message, 90);
+  const bodyMessage = String(campaign.message || "").trim();
 
   const title = `Campana Cariana - ${headline}`;
-  const parts = [`Segmento: ${audienceLabel}.`];
-  if (bodyMessage) {
-    parts.push(`Detalle: ${bodyMessage}.`);
-  }
-  parts.push("Toca para ver el detalle.");
 
   return {
     title,
-    message: parts.join(" "),
+    message: bodyMessage || "Tienes una nueva campana de Cariana.",
     audienceLabel
   };
 }
