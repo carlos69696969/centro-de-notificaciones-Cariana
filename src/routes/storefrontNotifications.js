@@ -484,6 +484,13 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
             linkEl.addEventListener("click", async (event) => {
               event.preventDefault();
               event.stopPropagation();
+              try {
+                if (window.Android && typeof window.Android.dismissNotificationByUrl === "function") {
+                  window.Android.dismissNotificationByUrl(linkEl.href);
+                }
+              } catch (_nativeError) {
+                // Continue even if native bridge is unavailable.
+              }
               if (div.dataset.unread === "1") {
                 try {
                   await markOpened(item.id);
