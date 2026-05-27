@@ -188,6 +188,65 @@ function buildOrderTargetUrl({ shopDomain, orderId, orderNumber, orderToken, ord
   });
 }
 
+async function markOpenedByReturnContext({ shopDomain, orderNumber, email }) {
+  const normalizedOrder = safeTrim(orderNumber).replace(/^#/, "");
+  const normalizedEmail = safeTrim(email).toLowerCase();
+  if (!shopDomain || (!normalizedOrder && !normalizedEmail)) return;
+
+  await pool.query(
+    `
+    WITH candidates AS (
+      SELECT n.id
+      FROM notifications n
+      WHERE n.shop_domain = $1
+        AND n.status = 'sent'
+        AND n.opened_at IS NULL
+        AND n.type IN ('return_event', 'refund_event')
+        AND (
+          ($2 <> '' AND (
+            COALESCE(n.data->>'orderNumber', '') = $2
+            OR COALESCE(n.data->>'returnReference', '') = $2
+          ))
+          OR ($3 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', '')) = $3)
+        )
+      ORDER BY n.created_at DESC
+      LIMIT 20
+    )
+    UPDATE notifications n
+    SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+    FROM candidates c
+    WHERE n.id = c.id
+    `,
+    [shopDomain, normalizedOrder, normalizedEmail]
+  );
+}
+
+async function markOpenedByOrderContext({ shopDomain, orderNumber }) {
+  const normalizedOrder = safeTrim(orderNumber).replace(/^#/, "");
+  if (!shopDomain || !normalizedOrder) return;
+
+  await pool.query(
+    `
+    WITH candidates AS (
+      SELECT n.id
+      FROM notifications n
+      WHERE n.shop_domain = $1
+        AND n.status = 'sent'
+        AND n.opened_at IS NULL
+        AND n.type IN ('order_event', 'order_manual', 'refund_event')
+        AND COALESCE(n.data->>'orderNumber', '') = $2
+      ORDER BY n.created_at DESC
+      LIMIT 20
+    )
+    UPDATE notifications n
+    SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+    FROM candidates c
+    WHERE n.id = c.id
+    `,
+    [shopDomain, normalizedOrder]
+  );
+}
+
 function resolveNotificationDeepLink({ shopDomain, item }) {
   const rawData = item?.data && typeof item.data === "object" ? item.data : {};
   const type = safeTrim(item?.type);
@@ -244,7 +303,7 @@ function renderItemsHtml(items) {
       <div class="item" data-id="${Number(item.id)}" data-unread="${unread ? "1" : "0"}">
         <h3 class="title">
           ${escapeHtml(item.title)}
-          <span class="badge ${unread ? "new" : ""}">${unread ? "Nueva" : "Leida"}</span>
+          ${unread ? '<span class="badge new">Nueva</span>' : ""}
         </h3>
         <div class="meta">${escapeHtml(formatNotificationDate(item.created_at))}</div>
         <div class="msg">${escapeHtml(item.message || "")}</div>
@@ -413,12 +472,28 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
           div.innerHTML = \`
             <h3 class="title">
               \${escapeHtmlClient(item.title)}
-              <span class="badge \${unread ? "new" : ""}">\${unread ? "Nueva" : "Leida"}</span>
+              \${unread ? '<span class="badge new">Nueva</span>' : ""}
             </h3>
             <div class="meta">\${fmtDate(item.created_at)}</div>
             <div class="msg">\${escapeHtmlClient(item.message || "")}</div>
             \${item.deep_link ? '<div class="meta"><a class="link" href="' + escapeHtmlClient(item.deep_link) + '">Abrir</a></div>' : ""}
           \`;
+
+          const linkEl = div.querySelector("a.link");
+          if (linkEl) {
+            linkEl.addEventListener("click", async (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              if (div.dataset.unread === "1") {
+                try {
+                  await markOpened(item.id);
+                } catch (_error) {
+                  // Continue navigation even if mark-open request fails.
+                }
+              }
+              window.location.href = linkEl.href;
+            });
+          }
 
           div.addEventListener("click", async () => {
             if (div.dataset.unread === "1") {
@@ -844,6 +919,7 @@ router.get("/open-return", requireValidProxy, async (req, res, next) => {
     const shopDomain = resolveShopDomain(req);
     const orderNumber = req.query.order || "";
     const email = req.query.email || "";
+    await markOpenedByReturnContext({ shopDomain, orderNumber, email });
     const targetUrl = buildReturnsPortalUrl({ shopDomain, orderNumber, email });
     const safeTarget = escapeHtml(targetUrl);
 
@@ -907,6 +983,7 @@ router.get("/open-order", requireValidProxy, async (req, res, next) => {
       orderToken,
       orderStatusUrl
     });
+    await markOpenedByOrderContext({ shopDomain, orderNumber });
     const safeTarget = escapeHtml(targetUrl);
 
     if (!targetUrl || !isAbsoluteUrl(targetUrl)) {
