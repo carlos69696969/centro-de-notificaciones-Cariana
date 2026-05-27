@@ -46,6 +46,41 @@ function startScheduler() {
       logger.error("Token cleanup failed", { error: error.message });
     }
   });
+
+  cron.schedule("20 3 * * *", async () => {
+    try {
+      const retentionDays = Number.isFinite(env.notificationsFailedRetentionDays) && env.notificationsFailedRetentionDays > 0
+        ? Math.floor(env.notificationsFailedRetentionDays)
+        : 30;
+      const result = await pool.query(
+        `
+        DELETE FROM notifications
+        WHERE status <> 'sent'
+          AND created_at < NOW() - ($1::int * INTERVAL '1 day')
+        `,
+        [retentionDays]
+      );
+      logger.info("Non-sent notifications cleanup complete", {
+        deleted: result.rowCount || 0,
+        retentionDays
+      });
+    } catch (error) {
+      logger.error("Non-sent notifications cleanup failed", { error: error.message });
+    }
+  });
+
+  cron.schedule("35 3 * * *", async () => {
+    if (!env.notificationsVacuumEnabled) {
+      return;
+    }
+
+    try {
+      await pool.query("VACUUM (ANALYZE) notifications");
+      logger.info("Notifications vacuum analyze complete");
+    } catch (error) {
+      logger.warn("Notifications vacuum analyze failed", { error: error.message });
+    }
+  });
 }
 
 module.exports = {

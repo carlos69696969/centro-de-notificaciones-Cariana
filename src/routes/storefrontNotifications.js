@@ -598,7 +598,7 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
         )
       )
     ORDER BY n.created_at DESC
-    LIMIT 100
+    LIMIT 50
     `,
     [shopDomain, currentCustomerId, currentCustomerEmail, Number(shopifyCustomerId)]
   );

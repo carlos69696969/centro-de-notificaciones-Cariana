@@ -1,5 +1,11 @@
 const pool = require("../db/pool");
 const fcmService = require("./fcmService");
+const env = require("../config/env");
+const logger = require("../utils/logger");
+
+const MAX_STORED_NOTIFICATIONS_PER_CUSTOMER = Number.isFinite(env.notificationsMaxPerCustomer) && env.notificationsMaxPerCustomer > 0
+  ? Math.floor(env.notificationsMaxPerCustomer)
+  : 50;
 
 function normalizeData(input = {}) {
   const output = {};
@@ -18,6 +24,60 @@ async function markTokenInvalid(tokenId) {
     `,
     [tokenId]
   );
+}
+
+async function pruneSentNotificationHistory({ shopDomain, customerId, tokenId }) {
+  if (!shopDomain || MAX_STORED_NOTIFICATIONS_PER_CUSTOMER < 1) {
+    return 0;
+  }
+
+  const normalizedCustomerId = Number(customerId || 0);
+  const normalizedTokenId = Number(tokenId || 0);
+
+  if (normalizedCustomerId > 0) {
+    const result = await pool.query(
+      `
+      WITH stale AS (
+        SELECT n.id
+        FROM notifications n
+        WHERE n.shop_domain = $1
+          AND n.status = 'sent'
+          AND n.customer_id = $2
+        ORDER BY n.created_at DESC, n.id DESC
+        OFFSET $3
+      )
+      DELETE FROM notifications n
+      USING stale s
+      WHERE n.id = s.id
+      `,
+      [shopDomain, normalizedCustomerId, MAX_STORED_NOTIFICATIONS_PER_CUSTOMER]
+    );
+    return result.rowCount || 0;
+  }
+
+  if (normalizedTokenId > 0) {
+    const result = await pool.query(
+      `
+      WITH stale AS (
+        SELECT n.id
+        FROM notifications n
+        WHERE n.shop_domain = $1
+          AND n.status = 'sent'
+          AND n.customer_id IS NULL
+          AND n.fcm_token_id = $2
+        ORDER BY n.created_at DESC, n.id DESC
+        OFFSET $3
+      )
+      DELETE FROM notifications n
+      USING stale s
+      WHERE n.id = s.id
+      `,
+      [shopDomain, normalizedTokenId, MAX_STORED_NOTIFICATIONS_PER_CUSTOMER]
+    );
+    return result.rowCount || 0;
+  }
+
+  return 0;
 }
 
 async function insertNotificationRecord({
@@ -59,7 +119,26 @@ async function insertNotificationRecord({
       errorMessage || null
     ]
   );
-  return result.rows[0].id;
+  const notificationId = result.rows[0].id;
+
+  if (status === "sent") {
+    try {
+      await pruneSentNotificationHistory({
+        shopDomain,
+        customerId,
+        tokenId
+      });
+    } catch (error) {
+      logger.warn("Notification retention prune failed", {
+        shopDomain,
+        customerId: customerId || null,
+        tokenId: tokenId || null,
+        error: error.message
+      });
+    }
+  }
+
+  return notificationId;
 }
 
 async function sendToCustomerTokens({
