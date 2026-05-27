@@ -22,6 +22,10 @@ router.post("/", async (req, res, next) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    const normalizedFilters = audienceFilters && typeof audienceFilters === "object" ? audienceFilters : {};
+    const recurringDaily = String(normalizedFilters.recurringDaily ?? "").toLowerCase() === "true" || normalizedFilters.recurringDaily === true;
+    const effectiveScheduledAt = scheduledAt || (recurringDaily ? new Date().toISOString() : null);
+
     const campaign = await createCampaign({
       shopDomain,
       name,
@@ -29,8 +33,8 @@ router.post("/", async (req, res, next) => {
       message,
       deepLink,
       audienceType,
-      audienceFilters,
-      scheduledAt,
+      audienceFilters: normalizedFilters,
+      scheduledAt: effectiveScheduledAt,
       createdBy
     });
 

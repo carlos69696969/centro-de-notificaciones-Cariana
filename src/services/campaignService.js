@@ -27,6 +27,38 @@ const audienceLabelMap = {
   inactive_customers: "Clientes inactivos"
 };
 
+function parseBoolean(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = String(value == null ? "" : value).trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "si";
+}
+
+function normalizeAudienceFilters(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value;
+}
+
+function isRecurringDailyCampaign(campaign) {
+  const filters = normalizeAudienceFilters(campaign?.audience_filters);
+  return parseBoolean(filters.recurringDaily);
+}
+
+function computeNextDailySchedule(baseValue) {
+  const now = new Date();
+  let next = new Date(baseValue || now.toISOString());
+  if (Number.isNaN(next.getTime())) {
+    next = new Date(now);
+  }
+  while (next <= now) {
+    next = new Date(next.getTime() + 24 * 60 * 60 * 1000);
+  }
+  return next.toISOString();
+}
+
 function buildCampaignNotificationCopy(campaign) {
   const headline = truncateText(
     pickFirstString([campaign.name, campaign.title, "Nueva campana Cariana"]),
@@ -108,6 +140,7 @@ async function sendCampaignNow(shopDomain, campaignId) {
   }
 
   const campaign = campaignResult.rows[0];
+  const recurringDaily = isRecurringDailyCampaign(campaign);
   const copy = buildCampaignNotificationCopy(campaign);
   const sendResult = await sendToAudience({
     shopDomain,
@@ -128,14 +161,28 @@ async function sendCampaignNow(shopDomain, campaignId) {
     campaignId: campaign.id
   });
 
-  await pool.query(
-    `
-    UPDATE campaigns
-    SET status = 'sent', sent_at = NOW(), updated_at = NOW()
-    WHERE id = $1
-    `,
-    [campaign.id]
-  );
+  if (recurringDaily) {
+    await pool.query(
+      `
+      UPDATE campaigns
+      SET status = 'scheduled',
+          sent_at = NOW(),
+          scheduled_at = $2,
+          updated_at = NOW()
+      WHERE id = $1
+      `,
+      [campaign.id, computeNextDailySchedule(campaign.scheduled_at)]
+    );
+  } else {
+    await pool.query(
+      `
+      UPDATE campaigns
+      SET status = 'sent', sent_at = NOW(), updated_at = NOW()
+      WHERE id = $1
+      `,
+      [campaign.id]
+    );
+  }
 
   return sendResult;
 }
