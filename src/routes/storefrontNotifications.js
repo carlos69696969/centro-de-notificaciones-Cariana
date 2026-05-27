@@ -473,14 +473,24 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
 
   const history = await pool.query(
     `
-    SELECT n.id, n.type, n.title, n.message, n.deep_link, n.data, n.status, n.created_at, n.opened_at
+    SELECT DISTINCT ON (n.id)
+      n.id, n.type, n.title, n.message, n.deep_link, n.data, n.status, n.created_at, n.opened_at
     FROM notifications n
     LEFT JOIN customers c ON c.id = n.customer_id
-    WHERE n.shop_domain = $1
-      AND n.status = 'sent'
+    WHERE n.status = 'sent'
       AND (
-        ($2 > 0 AND n.customer_id = $2)
-        OR ($3 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3)
+        (
+          n.shop_domain = $1
+          AND (
+            ($2 > 0 AND n.customer_id = $2)
+            OR ($3 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3)
+          )
+        )
+        OR (
+          $3 <> ''
+          AND n.type = 'return_event'
+          AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3
+        )
       )
     ORDER BY n.created_at DESC
     LIMIT 100
@@ -525,15 +535,27 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
   const result = await pool.query(
     `
     SELECT COUNT(*)::int AS unread
-    FROM notifications n
-    LEFT JOIN customers c ON c.id = n.customer_id
-    WHERE n.shop_domain = $1
-      AND n.status = 'sent'
-      AND n.opened_at IS NULL
-      AND (
-        ($2 > 0 AND n.customer_id = $2)
-        OR ($3 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3)
-      )
+    FROM (
+      SELECT DISTINCT n.id
+      FROM notifications n
+      LEFT JOIN customers c ON c.id = n.customer_id
+      WHERE n.status = 'sent'
+        AND n.opened_at IS NULL
+        AND (
+          (
+            n.shop_domain = $1
+            AND (
+              ($2 > 0 AND n.customer_id = $2)
+              OR ($3 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3)
+            )
+          )
+          OR (
+            $3 <> ''
+            AND n.type = 'return_event'
+            AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3
+          )
+        )
+    ) q
     `,
     [shopDomain, currentCustomerId, currentCustomerEmail]
   );
