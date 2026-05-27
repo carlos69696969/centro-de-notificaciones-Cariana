@@ -450,18 +450,42 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
 }
 
 async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
+  if (!shopDomain || !shopifyCustomerId) {
+    return { history: [], unread: 0 };
+  }
+
+  const customerLookup = await pool.query(
+    `
+    SELECT id, LOWER(COALESCE(email, '')) AS email
+    FROM customers
+    WHERE shop_domain = $1
+      AND shopify_customer_id = $2
+    LIMIT 1
+    `,
+    [shopDomain, Number(shopifyCustomerId)]
+  );
+  const currentCustomerId = Number(customerLookup.rows[0]?.id || 0);
+  const currentCustomerEmail = String(customerLookup.rows[0]?.email || "").trim().toLowerCase();
+
+  if (!currentCustomerId && !currentCustomerEmail) {
+    return { history: [], unread: 0 };
+  }
+
   const history = await pool.query(
     `
     SELECT n.id, n.type, n.title, n.message, n.deep_link, n.data, n.status, n.created_at, n.opened_at
     FROM notifications n
-    JOIN customers c ON c.id = n.customer_id
-    WHERE c.shop_domain = $1
-      AND c.shopify_customer_id = $2
+    LEFT JOIN customers c ON c.id = n.customer_id
+    WHERE n.shop_domain = $1
       AND n.status = 'sent'
+      AND (
+        ($2 > 0 AND n.customer_id = $2)
+        OR ($3 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3)
+      )
     ORDER BY n.created_at DESC
     LIMIT 100
     `,
-    [shopDomain, Number(shopifyCustomerId)]
+    [shopDomain, currentCustomerId, currentCustomerEmail]
   );
 
   const rows = history.rows.map((row) => ({
@@ -480,17 +504,38 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
   if (!shopDomain || !shopifyCustomerId) {
     return 0;
   }
+
+  const customerLookup = await pool.query(
+    `
+    SELECT id, LOWER(COALESCE(email, '')) AS email
+    FROM customers
+    WHERE shop_domain = $1
+      AND shopify_customer_id = $2
+    LIMIT 1
+    `,
+    [shopDomain, Number(shopifyCustomerId)]
+  );
+  const currentCustomerId = Number(customerLookup.rows[0]?.id || 0);
+  const currentCustomerEmail = String(customerLookup.rows[0]?.email || "").trim().toLowerCase();
+
+  if (!currentCustomerId && !currentCustomerEmail) {
+    return 0;
+  }
+
   const result = await pool.query(
     `
     SELECT COUNT(*)::int AS unread
     FROM notifications n
-    JOIN customers c ON c.id = n.customer_id
-    WHERE c.shop_domain = $1
-      AND c.shopify_customer_id = $2
+    LEFT JOIN customers c ON c.id = n.customer_id
+    WHERE n.shop_domain = $1
       AND n.status = 'sent'
       AND n.opened_at IS NULL
+      AND (
+        ($2 > 0 AND n.customer_id = $2)
+        OR ($3 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3)
+      )
     `,
-    [shopDomain, Number(shopifyCustomerId)]
+    [shopDomain, currentCustomerId, currentCustomerEmail]
   );
   return result.rows[0]?.unread || 0;
 }
