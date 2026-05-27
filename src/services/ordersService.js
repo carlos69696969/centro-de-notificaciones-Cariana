@@ -2,7 +2,7 @@ const pool = require("../db/pool");
 const { upsertCustomerFromShopify, getCustomerByShopifyId } = require("./customerService");
 const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens } = require("./notificationService");
-const { buildOrderDeepLink } = require("./deepLinkService");
+const { buildOrderDeepLink, buildReturnDeepLink } = require("./deepLinkService");
 
 const LOCAL_DELIVERY_READY_TOPIC = "fulfillment_orders/line_items_prepared_for_local_delivery";
 
@@ -460,6 +460,26 @@ function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessa
   };
 }
 
+function isReturnPortalRefund(payload = {}) {
+  const noteText = pickFirstString([
+    payload?.note,
+    payload?.reason,
+    payload?.message
+  ])
+    .toLowerCase()
+    .trim();
+
+  if (!noteText) {
+    return false;
+  }
+
+  return (
+    noteText.includes("portal de devoluciones") ||
+    noteText.includes("devolucion #") ||
+    /devoluci[oó]n\s*#\d+/i.test(noteText)
+  );
+}
+
 async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   const eventResult = await pool.query(
     `
@@ -762,31 +782,55 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
   });
 
   const refundOrder = payload.order_id ? await fetchShopifyOrderById(shopDomain, payload.order_id) : null;
+  const orderNumber = mapped.order_number || "";
+  const customerEmail = pickFirstString([
+    customer?.email,
+    refundOrder?.email,
+    refundOrder?.customer?.email
+  ])
+    .toLowerCase()
+    .trim();
+  const refundFromReturnsPortal = isReturnPortalRefund(payload);
+  const notificationType = refundFromReturnsPortal ? "return_event" : "refund_event";
+  const deepLink = refundFromReturnsPortal
+    ? buildReturnDeepLink({
+        shopDomain,
+        orderNumber,
+        email: customerEmail,
+        deepLink: ""
+      })
+    : buildOrderDeepLink({
+        shopDomain,
+        orderId: payload.order_id,
+        orderNumber,
+        orderToken: refundOrder?.token || "",
+        orderStatusUrl: refundOrder?.order_status_url || "",
+        deepLink: template.deep_link
+      });
 
   const sendResult = await sendToCustomerTokens({
     shopDomain,
     customerId: customer.id,
-    type: "refund_event",
+    type: notificationType,
     title: copy.title,
     message: copy.message,
-    deepLink: buildOrderDeepLink({
-      shopDomain,
-      orderId: payload.order_id,
-      orderNumber: mapped.order_number,
-      orderToken: refundOrder?.token || "",
-      orderStatusUrl: refundOrder?.order_status_url || "",
-      deepLink: template.deep_link
-    }),
+    deepLink,
     data: {
       orderId: payload.order_id,
-      orderNumber: mapped.order_number || "",
+      orderNumber,
       orderToken: refundOrder?.token || "",
       orderStatusUrl: refundOrder?.order_status_url || "",
       refundId: payload.id || "",
       statusLabel: copy.statusLabel,
       productName: "",
       productNames: [],
-      deepLinkType: "order"
+      deepLinkType: refundFromReturnsPortal ? "return" : "order",
+      deeplinkType: refundFromReturnsPortal ? "return" : "order",
+      linkType: refundFromReturnsPortal ? "return" : "order",
+      notificationType: refundFromReturnsPortal ? "return_event" : "refund_event",
+      eventType: refundFromReturnsPortal ? "return_event" : "refund_event",
+      route: refundFromReturnsPortal ? "returns" : "orders",
+      openScreen: refundFromReturnsPortal ? "returns_portal" : "orders"
     },
     eventId
   });
