@@ -614,8 +614,30 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
   return { history: rows, unread };
 }
 
-async function getUnreadCount(shopDomain, shopifyCustomerId) {
-  if (!shopDomain || !shopifyCustomerId) {
+async function getUnreadCountByToken(shopDomain, pushToken) {
+  const normalizedToken = safeTrim(pushToken);
+  const normalizedShop = safeTrim(shopDomain);
+  if (!normalizedToken) {
+    return 0;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT COUNT(*)::int AS unread
+    FROM notifications n
+    JOIN fcm_tokens t ON t.id = n.fcm_token_id
+    WHERE n.status = 'sent'
+      AND n.opened_at IS NULL
+      AND t.token = $1
+      AND ($2 = '' OR n.shop_domain = $2)
+    `,
+    [normalizedToken, normalizedShop]
+  );
+  return result.rows[0]?.unread || 0;
+}
+
+async function getUnreadCount(shopDomain, shopifyCustomerId, pushToken) {
+  if (!shopDomain && !shopifyCustomerId && !pushToken) {
     return 0;
   }
 
@@ -625,7 +647,7 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
   const effectiveShopDomain = context.effectiveShopDomain || safeTrim(shopDomain);
 
   if (!currentCustomerId && !currentCustomerEmail) {
-    return 0;
+    return getUnreadCountByToken(effectiveShopDomain, pushToken);
   }
 
   const result = await pool.query(
@@ -663,7 +685,12 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
     `,
     [effectiveShopDomain, currentCustomerId, currentCustomerEmail, Number(shopifyCustomerId)]
   );
-  return result.rows[0]?.unread || 0;
+  const unread = result.rows[0]?.unread || 0;
+  if (unread > 0) {
+    return unread;
+  }
+
+  return getUnreadCountByToken(effectiveShopDomain, pushToken);
 }
 
 function resolveShopDomain(req) {
@@ -735,10 +762,12 @@ router.get("/badge", requireValidProxy, async (req, res, next) => {
   try {
     const shopDomain = resolveShopDomain(req);
     const shopifyCustomerId = resolveCustomerId(req);
-    const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
+    const pushToken = req.query.pt || req.query.push_token || "";
+    const unread = await getUnreadCount(shopDomain, shopifyCustomerId, pushToken);
     return res.json({
       unread,
       hasCustomerContext: Boolean(safeTrim(shopifyCustomerId)),
+      hasTokenContext: Boolean(safeTrim(pushToken)),
       notificationsUrl: "/apps/notificaciones"
     });
   } catch (error) {
@@ -763,6 +792,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var customerHint = ${JSON.stringify(customerHint)};
   var shopCacheKey = ${JSON.stringify(shopCacheKey)};
   var badgeCacheKey = "cariana_noti_badge_v1:" + shopCacheKey;
+  var pushToken = "";
   var url = "/apps/notificaciones" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
 
   function readBadgeCache() {
@@ -820,6 +850,16 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       }
     } catch (_err3) {}
 
+    return "";
+  }
+
+  function detectPushTokenFromAndroid() {
+    try {
+      if (window.Android && typeof window.Android.getPushToken === "function") {
+        var token = String(window.Android.getPushToken() || "").trim();
+        if (token) return token;
+      }
+    } catch (_err4) {}
     return "";
   }
 
@@ -969,16 +1009,23 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
   function refreshBadge() {
     ensureCustomerHint();
-    var badgeUrl = "/apps/notificaciones/badge" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
+    if (!pushToken) {
+      pushToken = detectPushTokenFromAndroid();
+    }
+    var query = [];
+    if (customerHint) query.push("cid=" + encodeURIComponent(customerHint));
+    if (pushToken) query.push("pt=" + encodeURIComponent(pushToken));
+    var badgeUrl = "/apps/notificaciones/badge" + (query.length ? ("?" + query.join("&")) : "");
     fetch(badgeUrl)
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(data) {
         if (!data) return;
         var nextUnread = Number(data.unread) || 0;
         var hasCustomerContext = !!data.hasCustomerContext;
+        var hasTokenContext = !!data.hasTokenContext;
 
         // Prevent accidental badge reset when storefront/proxy briefly omits customer context.
-        if (!hasCustomerContext && !customerHint && unread > 0 && nextUnread === 0) {
+        if (!hasCustomerContext && !hasTokenContext && !customerHint && unread > 0 && nextUnread === 0) {
           return;
         }
 
