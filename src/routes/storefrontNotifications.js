@@ -616,7 +616,6 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
 
 async function getUnreadCountByToken(shopDomain, pushToken) {
   const normalizedToken = safeTrim(pushToken);
-  const normalizedShop = safeTrim(shopDomain);
   if (!normalizedToken) {
     return 0;
   }
@@ -629,9 +628,8 @@ async function getUnreadCountByToken(shopDomain, pushToken) {
     WHERE n.status = 'sent'
       AND n.opened_at IS NULL
       AND t.token = $1
-      AND ($2 = '' OR n.shop_domain = $2)
     `,
-    [normalizedToken, normalizedShop]
+    [normalizedToken]
   );
   return result.rows[0]?.unread || 0;
 }
@@ -763,10 +761,11 @@ router.get("/badge", requireValidProxy, async (req, res, next) => {
     const shopDomain = resolveShopDomain(req);
     const shopifyCustomerId = resolveCustomerId(req);
     const pushToken = req.query.pt || req.query.push_token || "";
+    const customerContext = await resolveCustomerContext(shopDomain, shopifyCustomerId);
     const unread = await getUnreadCount(shopDomain, shopifyCustomerId, pushToken);
     return res.json({
       unread,
-      hasCustomerContext: Boolean(safeTrim(shopifyCustomerId)),
+      hasCustomerContext: Boolean(customerContext.customerId || customerContext.customerEmail),
       hasTokenContext: Boolean(safeTrim(pushToken)),
       notificationsUrl: "/apps/notificaciones"
     });
