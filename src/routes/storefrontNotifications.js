@@ -216,6 +216,23 @@ function renderItemsHtml(items) {
     return '<div class="item"><div class="msg">Aun no tienes notificaciones.</div></div>';
   }
 
+  const formatNotificationDate = (value) => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value || "");
+    return new Intl.DateTimeFormat("es-MX", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    })
+      .format(date)
+      .replace(".", "")
+      .replace(",", "")
+      .toLowerCase();
+  };
+
   return items
     .map((item) => {
       const unread = !item.opened_at;
@@ -229,7 +246,7 @@ function renderItemsHtml(items) {
           ${escapeHtml(item.title)}
           <span class="badge ${unread ? "new" : ""}">${unread ? "Nueva" : "Leida"}</span>
         </h3>
-        <div class="meta">${escapeHtml(item.created_at)}</div>
+        <div class="meta">${escapeHtml(formatNotificationDate(item.created_at))}</div>
         <div class="msg">${escapeHtml(item.message || "")}</div>
         ${deepLink}
       </div>`;
@@ -358,7 +375,19 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
 
       function fmtDate(value) {
         const d = new Date(value);
-        return isNaN(d.getTime()) ? value : d.toLocaleString();
+        if (isNaN(d.getTime())) return value;
+        return new Intl.DateTimeFormat("es-MX", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true
+        })
+          .format(d)
+          .replace(".", "")
+          .replace(",", "")
+          .toLowerCase();
       }
 
       function escapeHtmlClient(value) {
