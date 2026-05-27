@@ -356,10 +356,6 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
   <body>
     <div class="wrap">
       <h1>Notificaciones</h1>
-      <div class="muted" id="summary">${escapeHtml(serverSummary)}</div>
-      <div class="toolbar">
-        <button id="reloadBtn">Actualizar</button>
-      </div>
       <div class="list" id="list">${serverItems}</div>
     </div>
 
@@ -369,8 +365,6 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
       const INITIAL_HISTORY = ${safeInitialHistory};
 
       const listEl = document.getElementById("list");
-      const summaryEl = document.getElementById("summary");
-      const reloadBtn = document.getElementById("reloadBtn");
       const basePath = window.location.pathname.replace(/\/$/, "");
 
       function fmtDate(value) {
@@ -400,7 +394,6 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
       }
 
       function renderHistory(history, unreadCount) {
-        summaryEl.textContent = "Total: " + history.length + " | No leidas: " + (unreadCount || 0);
         listEl.innerHTML = "";
         if (!history.length) {
           const empty = document.createElement("div");
@@ -461,18 +454,16 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
           const history = data.history || [];
           renderHistory(history, data.unread || 0);
         } catch (error) {
-          summaryEl.textContent = "No se pudieron cargar las notificaciones";
           listEl.innerHTML = "";
           const err = document.createElement("div");
           err.className = "item";
-          err.innerHTML = '<div class="msg">Intenta de nuevo con el boton Actualizar.</div>';
+          err.innerHTML = '<div class="msg">Intenta de nuevo en unos segundos.</div>';
           listEl.appendChild(err);
           console.error(error);
         }
       }
 
       renderHistory(INITIAL_HISTORY, ${safeInitialUnread});
-      reloadBtn.addEventListener("click", load);
     </script>
   </body>
 </html>`;
