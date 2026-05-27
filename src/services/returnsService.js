@@ -466,9 +466,6 @@ function buildReturnPremiumTemplate({
     if (normalizedOrder) {
       formalParts.push(`Pedido #${normalizedOrder}.`);
     }
-    if (productsInline) {
-      formalParts.push(`${productsInline}.`);
-    }
     const fallbackDetail = truncateText(fallbackMessage, 80);
     if (!productsInline && fallbackDetail) {
       formalParts.push(`${fallbackDetail}.`);
@@ -492,9 +489,6 @@ function buildReturnPremiumTemplate({
   const parts = [];
   if (normalizedOrder) {
     parts.push(`Pedido #${normalizedOrder}.`);
-  }
-  if (productsInline) {
-    parts.push(`${productsInline}.`);
   }
   const detail = truncateText(fallbackMessage, 70);
   if (detail && !productsInline) {
@@ -632,8 +626,8 @@ async function processReturnEvent({ shopDomain, payload }) {
     statusLabel: premiumCopy.statusLabel || "",
     orderNumber: orderNumber || "",
     customerEmail: eventEmail || "",
-    productName: premiumCopy.productsInline || "",
-    productNames: premiumCopy.productNames || [],
+    productName: "",
+    productNames: [],
     reason: premiumCopy.rejectionReason || "",
     deepLinkType: "return",
     deeplinkType: "return",
