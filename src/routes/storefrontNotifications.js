@@ -490,11 +490,22 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
           AND n.type = 'return_event'
           AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3
         )
+        OR (
+          n.shop_domain = $1
+          AND n.type = 'return_event'
+          AND EXISTS (
+            SELECT 1
+            FROM order_customer_map ocm
+            WHERE ocm.shop_domain = $1
+              AND ocm.shopify_customer_id = $4
+              AND ocm.order_number = REPLACE(COALESCE(n.data->>'orderNumber', n.data->>'returnReference', ''), '#', '')
+          )
+        )
       )
     ORDER BY n.created_at DESC
     LIMIT 100
     `,
-    [shopDomain, currentCustomerId, currentCustomerEmail]
+    [shopDomain, currentCustomerId, currentCustomerEmail, Number(shopifyCustomerId)]
   );
 
   const rows = history.rows.map((row) => ({
@@ -551,9 +562,20 @@ async function getUnreadCount(shopDomain, shopifyCustomerId) {
           AND n.type = 'return_event'
           AND LOWER(COALESCE(n.data->>'customerEmail', c.email, '')) = $3
         )
+        OR (
+          n.shop_domain = $1
+          AND n.type = 'return_event'
+          AND EXISTS (
+            SELECT 1
+            FROM order_customer_map ocm
+            WHERE ocm.shop_domain = $1
+              AND ocm.shopify_customer_id = $4
+              AND ocm.order_number = REPLACE(COALESCE(n.data->>'orderNumber', n.data->>'returnReference', ''), '#', '')
+          )
+        )
       )
     `,
-    [shopDomain, currentCustomerId, currentCustomerEmail]
+    [shopDomain, currentCustomerId, currentCustomerEmail, Number(shopifyCustomerId)]
   );
   return result.rows[0]?.unread || 0;
 }
