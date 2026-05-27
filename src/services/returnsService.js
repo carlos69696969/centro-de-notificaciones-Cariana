@@ -652,7 +652,7 @@ async function processReturnEvent({ shopDomain, payload }) {
         deepLink: template.deep_link
       }),
       data: notificationData,
-      eventId: eventInsert.rows[0].id
+      eventId: null
     });
 
     if (primaryResult.total > 0 || !eventEmail) {
@@ -674,7 +674,7 @@ async function processReturnEvent({ shopDomain, payload }) {
         deepLink: template.deep_link
       }),
       data: notificationData,
-      eventId: eventInsert.rows[0].id
+      eventId: null
     });
   }
 
