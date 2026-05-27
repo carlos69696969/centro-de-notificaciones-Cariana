@@ -250,15 +250,17 @@ async function markOpenedByOrderContext({ shopDomain, orderNumber }) {
 async function markOpenedByCampaignContext({ shopDomain, campaignId, targetUrl, shopifyCustomerId }) {
   const normalizedCampaignId = Number(campaignId || 0);
   const normalizedTargetUrl = safeTrim(targetUrl);
-  if (!shopDomain || (!normalizedCampaignId && !normalizedTargetUrl)) return;
+  if (!normalizedCampaignId && !normalizedTargetUrl) return;
 
   const customerContext = await resolveCustomerContext(shopDomain, shopifyCustomerId);
   const currentCustomerId = Number(customerContext.customerId || 0);
   const currentCustomerEmail = safeTrim(customerContext.customerEmail).toLowerCase();
+  const effectiveShopDomain = safeTrim(customerContext.effectiveShopDomain || shopDomain);
 
   if (!currentCustomerId && !currentCustomerEmail) return;
 
-  await pool.query(
+  if (effectiveShopDomain) {
+    await pool.query(
     `
     WITH candidates AS (
       SELECT n.id
@@ -283,7 +285,36 @@ async function markOpenedByCampaignContext({ shopDomain, campaignId, targetUrl, 
     FROM candidates c
     WHERE n.id = c.id
     `,
-    [shopDomain, currentCustomerId, currentCustomerEmail, normalizedCampaignId, normalizedTargetUrl]
+      [effectiveShopDomain, currentCustomerId, currentCustomerEmail, normalizedCampaignId, normalizedTargetUrl]
+    );
+    return;
+  }
+
+  await pool.query(
+    `
+    WITH candidates AS (
+      SELECT n.id
+      FROM notifications n
+      WHERE n.status = 'sent'
+        AND n.opened_at IS NULL
+        AND n.type = 'campaign'
+        AND (
+          ($1 > 0 AND n.customer_id = $1)
+          OR ($2 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', '')) = $2)
+        )
+        AND (
+          ($3 > 0 AND (n.campaign_id = $3 OR COALESCE(n.data->>'campaignId', '') = $3::text))
+          OR ($4 <> '' AND COALESCE(n.deep_link, '') = $4)
+        )
+      ORDER BY n.created_at DESC
+      LIMIT 20
+    )
+    UPDATE notifications n
+    SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+    FROM candidates c
+    WHERE n.id = c.id
+    `,
+    [currentCustomerId, currentCustomerEmail, normalizedCampaignId, normalizedTargetUrl]
   );
 }
 
@@ -1317,20 +1348,35 @@ router.post("/open", requireValidProxy, async (req, res, next) => {
       return res.status(400).json({ error: "Missing required params" });
     }
 
+    const customerContext = await resolveCustomerContext(shopDomain, shopifyCustomerId);
+    const currentCustomerId = Number(customerContext.customerId || 0);
+    const currentCustomerEmail = safeTrim(customerContext.customerEmail).toLowerCase();
+    const effectiveShopDomain = safeTrim(customerContext.effectiveShopDomain || shopDomain);
+
     let result = { rowCount: 0 };
-    if (Number(shopifyCustomerId || 0) > 0) {
+    if (currentCustomerId > 0) {
       result = await pool.query(
         `
         UPDATE notifications n
         SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
-        FROM customers c
         WHERE n.id = $1
-          AND n.customer_id = c.id
-          AND c.shop_domain = $2
-          AND c.shopify_customer_id = $3
+          AND n.customer_id = $2
         RETURNING n.id
         `,
-        [notificationId, shopDomain, Number(shopifyCustomerId)]
+        [notificationId, currentCustomerId]
+      );
+    }
+
+    if (result.rowCount === 0 && currentCustomerEmail) {
+      result = await pool.query(
+        `
+        UPDATE notifications n
+        SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+        WHERE n.id = $1
+          AND LOWER(COALESCE(n.data->>'customerEmail', '')) = $2
+        RETURNING n.id
+        `,
+        [notificationId, currentCustomerEmail]
       );
     }
 
@@ -1343,7 +1389,7 @@ router.post("/open", requireValidProxy, async (req, res, next) => {
           AND n.shop_domain = $2
         RETURNING n.id
         `,
-        [notificationId, shopDomain]
+        [notificationId, effectiveShopDomain || shopDomain]
       );
     }
 
