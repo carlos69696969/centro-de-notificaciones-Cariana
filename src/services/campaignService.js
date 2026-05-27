@@ -76,13 +76,13 @@ function computeNextIntervalSchedule(baseValue, hours) {
 
 function buildCampaignNotificationCopy(campaign) {
   const headline = truncateText(
-    pickFirstString([campaign.name, campaign.title, "Nueva campana Cariana"]),
+    pickFirstString([campaign.title, campaign.name, "CARIANA"]),
     52
   );
   const audienceLabel = audienceLabelMap[campaign.audience_type] || "Clientes seleccionados";
   const bodyMessage = String(campaign.message || "").trim();
 
-  const title = `Campana Cariana - ${headline}`;
+  const title = headline;
 
   return {
     title,
