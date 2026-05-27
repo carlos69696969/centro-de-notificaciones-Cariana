@@ -371,13 +371,14 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
 
   if (templateCode === "order_preparing") {
+    const preparingTitle = normalizedOrder ? `Confirmado - Pedido #${normalizedOrder}` : "Confirmado - Pedido";
     const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
     const message = orderRef
       ? `Tu pedido ${orderRef} está siendo preparado para ser enviado. Llegará mañana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`
       : `Tu pedido está siendo preparado para ser enviado. Llegará mañana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`;
 
     return {
-      title,
+      title: preparingTitle,
       message,
       statusLabel,
       productNames,
@@ -604,6 +605,14 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
       templateCode
     ]
   );
+
+  if (templateCode === "order_confirmed") {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Order confirmed notifications disabled', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Order confirmed notifications disabled" };
+  }
 
   const template = await getTemplate(shopDomain, templateCode);
   if (!template) {
