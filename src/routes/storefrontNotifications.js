@@ -465,6 +465,13 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
 
       const listEl = document.getElementById("list");
       const basePath = window.location.pathname.replace(/\/$/, "");
+      const proxyQuery = window.location.search || "";
+
+      function withProxyQuery(path) {
+        if (!proxyQuery) return basePath + path;
+        const separator = path.includes("?") ? "&" : "?";
+        return basePath + path + separator + proxyQuery.replace(/^\?/, "");
+      }
 
       function fmtDate(value) {
         const d = new Date(value);
@@ -554,7 +561,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
       }
 
       async function markOpened(id) {
-        const response = await fetch(basePath + "/open", {
+        const response = await fetch(withProxyQuery("/open"), {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -568,7 +575,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
 
       async function load() {
         try {
-          const response = await fetch(basePath + "/list");
+          const response = await fetch(withProxyQuery("/list"));
           if (!response.ok) {
             throw new Error("No se pudo cargar el historial");
           }
