@@ -167,6 +167,58 @@
     </div>
 
     <script>
+      const STORAGE_KEY = "cariana_notifications_admin_form_v1";
+      const PERSISTED_FIELD_IDS = [
+        "shopDomain",
+        "apiKey",
+        "cName",
+        "cAudience",
+        "cTitle",
+        "cDeepLink",
+        "cMessage",
+        "cSchedule",
+        "tCode",
+        "tTitle",
+        "tMessage",
+        "tDeepLink"
+      ];
+
+      function saveFormState() {
+        try {
+          const state = {};
+          PERSISTED_FIELD_IDS.forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            state[id] = el.value;
+          });
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (_error) {}
+      }
+
+      function restoreFormState() {
+        try {
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if (!raw) return;
+          const state = JSON.parse(raw);
+          PERSISTED_FIELD_IDS.forEach((id) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const value = state && Object.prototype.hasOwnProperty.call(state, id) ? state[id] : undefined;
+            if (value == null) return;
+            el.value = String(value);
+          });
+        } catch (_error) {}
+      }
+
+      function bindFormPersistence() {
+        PERSISTED_FIELD_IDS.forEach((id) => {
+          const el = document.getElementById(id);
+          if (!el) return;
+          el.addEventListener("input", saveFormState);
+          el.addEventListener("change", saveFormState);
+        });
+      }
+
       function cfg() {
         return {
           shopDomain: document.getElementById("shopDomain").value.trim(),
@@ -233,6 +285,9 @@
           tbody.appendChild(tr);
         });
       }
+
+      restoreFormState();
+      bindFormPersistence();
     </script>
   </body>
 </html>
