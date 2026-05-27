@@ -697,6 +697,7 @@ router.get("/badge", requireValidProxy, async (req, res, next) => {
     const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
     return res.json({
       unread,
+      hasCustomerContext: Boolean(safeTrim(shopifyCustomerId)),
       notificationsUrl: "/apps/notificaciones"
     });
   } catch (error) {
@@ -710,6 +711,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     const shopifyCustomerId = req.query.logged_in_customer_id || "";
     const unread = await getUnreadCount(shopDomain, shopifyCustomerId);
     const customerHint = String(shopifyCustomerId || "");
+    const shopCacheKey = String(shopDomain || "").trim().toLowerCase() || "default";
 
     const js = `
 (function() {
@@ -718,7 +720,36 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
   var unread = ${Number(unread) || 0};
   var customerHint = ${JSON.stringify(customerHint)};
+  var shopCacheKey = ${JSON.stringify(shopCacheKey)};
+  var badgeCacheKey = "cariana_noti_badge_v1:" + shopCacheKey;
   var url = "/apps/notificaciones" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
+
+  function readBadgeCache() {
+    try {
+      var raw = window.localStorage ? window.localStorage.getItem(badgeCacheKey) : "";
+      if (!raw) return { unread: 0, customerHint: "" };
+      var parsed = JSON.parse(raw);
+      return {
+        unread: Number(parsed && parsed.unread) || 0,
+        customerHint: normalizeCustomerId(parsed && parsed.customerHint)
+      };
+    } catch (_err) {
+      return { unread: 0, customerHint: "" };
+    }
+  }
+
+  function writeBadgeCache() {
+    try {
+      if (!window.localStorage) return;
+      window.localStorage.setItem(
+        badgeCacheKey,
+        JSON.stringify({
+          unread: Number(unread) || 0,
+          customerHint: customerHint || ""
+        })
+      );
+    } catch (_err) {}
+  }
 
   function normalizeCustomerId(value) {
     var text = String(value == null ? "" : value).trim();
@@ -753,6 +784,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
         if (bell) {
           bell.href = url;
         }
+        writeBadgeCache();
       }
     }
     return customerHint;
@@ -894,12 +926,30 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(data) {
         if (!data) return;
-        updateBadge(data.unread || 0);
+        var nextUnread = Number(data.unread) || 0;
+        var hasCustomerContext = !!data.hasCustomerContext;
+
+        // Prevent accidental badge reset when storefront/proxy briefly omits customer context.
+        if (!hasCustomerContext && !customerHint && unread > 0 && nextUnread === 0) {
+          return;
+        }
+
+        updateBadge(nextUnread);
+        writeBadgeCache();
       })
       .catch(function() {});
   }
 
   function init() {
+    var cached = readBadgeCache();
+    if (!customerHint && cached.customerHint) {
+      customerHint = cached.customerHint;
+      url = "/apps/notificaciones?cid=" + encodeURIComponent(customerHint);
+    }
+    if (unread <= 0 && cached.unread > 0) {
+      unread = cached.unread;
+    }
+
     ensureCustomerHint();
     scheduleEnsure();
     watchDomChanges();
