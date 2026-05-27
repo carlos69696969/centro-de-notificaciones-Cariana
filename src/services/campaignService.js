@@ -159,7 +159,8 @@ async function sendCampaignNow(shopDomain, campaignId) {
     message: copy.message,
     deepLink: buildCampaignDeepLink({
       shopDomain,
-      deepLink: campaign.deep_link
+      deepLink: campaign.deep_link,
+      campaignId: campaign.id
     }),
     data: {
       campaignId: campaign.id,

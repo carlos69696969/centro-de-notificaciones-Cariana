@@ -247,6 +247,46 @@ async function markOpenedByOrderContext({ shopDomain, orderNumber }) {
   );
 }
 
+async function markOpenedByCampaignContext({ shopDomain, campaignId, targetUrl, shopifyCustomerId }) {
+  const normalizedCampaignId = Number(campaignId || 0);
+  const normalizedTargetUrl = safeTrim(targetUrl);
+  if (!shopDomain || (!normalizedCampaignId && !normalizedTargetUrl)) return;
+
+  const customerContext = await resolveCustomerContext(shopDomain, shopifyCustomerId);
+  const currentCustomerId = Number(customerContext.customerId || 0);
+  const currentCustomerEmail = safeTrim(customerContext.customerEmail).toLowerCase();
+
+  if (!currentCustomerId && !currentCustomerEmail) return;
+
+  await pool.query(
+    `
+    WITH candidates AS (
+      SELECT n.id
+      FROM notifications n
+      WHERE n.shop_domain = $1
+        AND n.status = 'sent'
+        AND n.opened_at IS NULL
+        AND n.type = 'campaign'
+        AND (
+          ($2 > 0 AND n.customer_id = $2)
+          OR ($3 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', '')) = $3)
+        )
+        AND (
+          ($4 > 0 AND (n.campaign_id = $4 OR COALESCE(n.data->>'campaignId', '') = $4::text))
+          OR ($5 <> '' AND COALESCE(n.deep_link, '') = $5)
+        )
+      ORDER BY n.created_at DESC
+      LIMIT 20
+    )
+    UPDATE notifications n
+    SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+    FROM candidates c
+    WHERE n.id = c.id
+    `,
+    [shopDomain, currentCustomerId, currentCustomerEmail, normalizedCampaignId, normalizedTargetUrl]
+  );
+}
+
 function resolveNotificationDeepLink({ shopDomain, item }) {
   const rawData = item?.data && typeof item.data === "object" ? item.data : {};
   const type = safeTrim(item?.type);
@@ -1178,6 +1218,47 @@ router.get("/open-order", requireValidProxy, async (req, res, next) => {
   }
 });
 
+router.get("/open-campaign", requireValidProxy, async (req, res, next) => {
+  try {
+    const shopDomain = resolveShopDomain(req);
+    const shopifyCustomerId = resolveCustomerId(req);
+    const campaignId = Number(req.query.campaign || req.query.campaign_id || req.query.campaignId || 0);
+    const targetRaw = req.query.target || req.query.url || "";
+    const targetUrl = toAbsoluteStorefrontUrl(shopDomain, safeTrim(targetRaw) || "/");
+
+    await markOpenedByCampaignContext({
+      shopDomain,
+      campaignId,
+      targetUrl,
+      shopifyCustomerId
+    });
+
+    const safeTarget = escapeHtml(targetUrl);
+    if (!targetUrl || !isAbsoluteUrl(targetUrl)) {
+      return res.status(400).send("Invalid campaign target");
+    }
+
+    return res.status(200).send(`<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Abriendo...</title>
+    <meta http-equiv="refresh" content="0;url=${safeTarget}" />
+  </head>
+  <body>
+    <p>Abriendo contenido...</p>
+    <p><a href="${safeTarget}">Continuar</a></p>
+    <script>
+      window.location.replace(${JSON.stringify(targetUrl)});
+    </script>
+  </body>
+</html>`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/", requireValidProxy, async (req, res) => {
   const shopDomain = resolveShopDomain(req);
   const shopifyCustomerId = resolveCustomerId(req);
@@ -1225,23 +1306,39 @@ router.post("/open", requireValidProxy, async (req, res, next) => {
     const shopDomain = resolveShopDomain(req);
     const shopifyCustomerId = resolveCustomerId(req);
     const notificationId = Number(req.query.id || req.body?.id || 0);
-    if (!shopDomain || !shopifyCustomerId || !notificationId) {
+    if (!shopDomain || !notificationId) {
       return res.status(400).json({ error: "Missing required params" });
     }
 
-    const result = await pool.query(
-      `
-      UPDATE notifications n
-      SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
-      FROM customers c
-      WHERE n.id = $1
-        AND n.customer_id = c.id
-        AND c.shop_domain = $2
-        AND c.shopify_customer_id = $3
-      RETURNING n.id
-      `,
-      [notificationId, shopDomain, Number(shopifyCustomerId)]
-    );
+    let result = { rowCount: 0 };
+    if (Number(shopifyCustomerId || 0) > 0) {
+      result = await pool.query(
+        `
+        UPDATE notifications n
+        SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+        FROM customers c
+        WHERE n.id = $1
+          AND n.customer_id = c.id
+          AND c.shop_domain = $2
+          AND c.shopify_customer_id = $3
+        RETURNING n.id
+        `,
+        [notificationId, shopDomain, Number(shopifyCustomerId)]
+      );
+    }
+
+    if (result.rowCount === 0) {
+      result = await pool.query(
+        `
+        UPDATE notifications n
+        SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+        WHERE n.id = $1
+          AND n.shop_domain = $2
+        RETURNING n.id
+        `,
+        [notificationId, shopDomain]
+      );
+    }
 
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Notification not found" });

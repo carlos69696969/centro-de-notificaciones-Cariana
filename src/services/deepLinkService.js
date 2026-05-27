@@ -153,11 +153,16 @@ function buildReturnDeepLink({ shopDomain, orderNumber, email, deepLink }) {
   });
 }
 
-function buildCampaignDeepLink({ shopDomain, deepLink }) {
-  if (safeTrim(deepLink)) {
-    return toAbsoluteStorefrontUrl(shopDomain, deepLink);
-  }
-  return toAbsoluteStorefrontUrl(shopDomain, "/");
+function buildCampaignDeepLink({ shopDomain, deepLink, campaignId }) {
+  const targetUrl = safeTrim(deepLink)
+    ? toAbsoluteStorefrontUrl(shopDomain, deepLink)
+    : toAbsoluteStorefrontUrl(shopDomain, "/");
+  const bridgeUrl = toAbsoluteShopDomainUrl(shopDomain, "/apps/notificaciones/open-campaign");
+
+  return appendQueryParams(bridgeUrl, {
+    campaign: String(Number(campaignId) || ""),
+    target: targetUrl
+  });
 }
 
 module.exports = {
