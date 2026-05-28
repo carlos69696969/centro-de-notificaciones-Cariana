@@ -296,7 +296,6 @@
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
-          <button id="acLoadBtn" class="btn-secondary" style="width: auto;" onclick="loadAbandonedCartSettings()">Cargar</button>
           <button id="acSaveBtn" style="width: auto;" onclick="saveAbandonedCartSettings()">Guardar configuracion</button>
         </div>
         <p id="acSettingsStatus" class="status-text"></p>
@@ -404,18 +403,16 @@
       function validateAbandonedCartConfig() {
         const { shopDomain, apiKey } = cfg();
         if (!shopDomain) {
-          throw new Error("Falta shopDomain para cargar/guardar configuracion.");
+          throw new Error("Falta shopDomain para gestionar configuracion.");
         }
         if (!apiKey) {
-          throw new Error("Falta x-api-key para cargar/guardar configuracion.");
+          throw new Error("Falta x-api-key para gestionar configuracion.");
         }
         return { shopDomain, apiKey };
       }
 
       function setAbandonedCartButtonsBusy(isBusy) {
-        const loadBtn = document.getElementById("acLoadBtn");
         const saveBtn = document.getElementById("acSaveBtn");
-        if (loadBtn) loadBtn.disabled = Boolean(isBusy);
         if (saveBtn) saveBtn.disabled = Boolean(isBusy);
       }
 
@@ -639,6 +636,28 @@
         };
       }
 
+      function formatDuration(totalMinutes) {
+        const parts = toDurationParts(totalMinutes);
+        return `${parts.hours}h ${parts.minutes}m`;
+      }
+
+      function describeAbandonedCartSchedule(settings = {}) {
+        const stage1 = Math.max(0, Math.floor(Number(settings.stage1DelayMinutes || 0)));
+        const stage2 = Math.max(0, Math.floor(Number(settings.stage2DelayMinutes || 0)));
+        const stage3 = Math.max(0, Math.floor(Number(settings.stage3DelayMinutes || 0)));
+        const allOff = stage1 === 0 && stage2 === 0 && stage3 === 0;
+        if (allOff) {
+          return {
+            tone: "error",
+            message: "Horario desactivado: todas las etapas están en 0h 0m."
+          };
+        }
+        return {
+          tone: "success",
+          message: `Horario activo: 1er recordatorio ${formatDuration(stage1)}, 2do ${formatDuration(stage2)}, 3ro ${formatDuration(stage3)}.`
+        };
+      }
+
       function readDurationMinutes(hoursId, minutesId) {
         const hours = readIntInput(hoursId);
         const minutes = readIntInput(minutesId, 59);
@@ -664,8 +683,10 @@
           setAbandonedCartButtonsBusy(true);
           setAbandonedCartStatus("Cargando configuracion...", "loading");
           const data = await api("/api/abandoned-cart/settings");
-          applyAbandonedCartSettings(data.settings || {});
-          setAbandonedCartStatus("Configuracion cargada correctamente.", "success");
+          const settings = data.settings || {};
+          applyAbandonedCartSettings(settings);
+          const status = describeAbandonedCartSchedule(settings);
+          setAbandonedCartStatus(status.message, status.tone);
         } catch (error) {
           setAbandonedCartStatus(error.message || "No se pudo cargar la configuracion.", "error");
           if (!silent) {
@@ -691,8 +712,10 @@
             method: "POST",
             body: JSON.stringify(payload)
           });
-          applyAbandonedCartSettings(data.settings || payload);
-          setAbandonedCartStatus("Configuracion guardada correctamente.", "success");
+          const settings = data.settings || payload;
+          applyAbandonedCartSettings(settings);
+          const status = describeAbandonedCartSchedule(settings);
+          setAbandonedCartStatus(status.message, status.tone);
           alert("Configuracion de carrito abandonado guardada");
         } catch (error) {
           setAbandonedCartStatus(error.message || "No se pudo guardar la configuracion.", "error");
