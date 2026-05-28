@@ -51,6 +51,58 @@
         grid-template-columns: 1fr 1fr;
         gap: 16px;
       }
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .card-head h2 {
+        margin: 0;
+      }
+      .campaigns-stack {
+        display: grid;
+        gap: 14px;
+        margin-top: 12px;
+      }
+      .campaign-block {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fff;
+      }
+      .campaign-top {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .campaign-title {
+        font-weight: 700;
+      }
+      .campaign-status {
+        font-size: 12px;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-weight: 700;
+      }
+      .campaign-status.active {
+        color: #065f46;
+        background: #d1fae5;
+      }
+      .campaign-status.sent {
+        color: #1e40af;
+        background: #dbeafe;
+      }
+      .campaign-status.draft {
+        color: #92400e;
+        background: #fef3c7;
+      }
+      .campaign-status.new {
+        color: #475569;
+        background: #e2e8f0;
+      }
       .inline-check {
         display: flex;
         align-items: center;
@@ -118,6 +170,11 @@
         padding: 8px 10px;
         font-size: 12px;
       }
+      button.btn-plus {
+        width: auto;
+        max-width: 240px;
+        font-weight: 700;
+      }
       button:hover {
         transform: translateY(-1px);
       }
@@ -163,41 +220,11 @@
       </div>
 
       <div class="card">
-        <h2>Centro de campanas</h2>
-        <div class="row" style="grid-template-columns: 1fr auto; margin-bottom: 12px;">
-          <select id="cDeleteCampaignId">
-            <option value="">Selecciona campana para borrar</option>
-          </select>
-          <button class="btn-danger" style="max-width: 220px;" onclick="deleteSelectedCampaign()">Borrar campana</button>
+        <div class="card-head">
+          <h2>Centro de campanas</h2>
+          <button class="btn-plus" onclick="addCampaignBlock()">+ Crear campana</button>
         </div>
-        <div class="row">
-          <input id="cName" placeholder="Nombre de campana (opcional)" />
-          <select id="cAudience">
-            <option value="all_users">Todos los usuarios</option>
-            <option value="customers_with_previous_purchases">Clientes con compras previas</option>
-            <option value="abandoned_cart">Clientes con carrito abandonado</option>
-            <option value="inactive_customers">Clientes inactivos</option>
-          </select>
-        </div>
-        <div class="row">
-          <input id="cTitle" placeholder="Titulo (opcional)" />
-          <input id="cDeepLink" placeholder="Deep link (opcional)" />
-        </div>
-        <textarea id="cMessage" rows="3" placeholder="Mensaje de la notificacion"></textarea>
-        <div class="row">
-          <div class="row" style="grid-template-columns: 1fr auto auto; gap: 8px;">
-            <input id="cSchedule" type="datetime-local" />
-            <label class="inline-check" for="cRecurring">
-              <input id="cRecurring" type="checkbox" />
-              Repetir
-            </label>
-            <label class="input-suffix" for="cRepeatHours" style="max-width: 170px;">
-              <input id="cRepeatHours" type="number" min="1" step="1" placeholder="24" />
-              <span class="suffix">horas</span>
-            </label>
-          </div>
-          <button onclick="createCampaign()">Crear campana</button>
-        </div>
+        <div id="campaignBlocks" class="campaigns-stack"></div>
       </div>
 
       <div class="card">
@@ -236,18 +263,16 @@
       const PERSISTED_FIELD_IDS = [
         "shopDomain",
         "apiKey",
-        "cName",
-        "cAudience",
-        "cTitle",
-        "cDeepLink",
-        "cMessage",
-        "cSchedule",
-        "cRecurring",
-        "cRepeatHours",
         "tCode",
         "tTitle",
         "tMessage",
         "tDeepLink"
+      ];
+      const CAMPAIGN_AUDIENCE_OPTIONS = [
+        { value: "all_users", label: "Todos los usuarios" },
+        { value: "customers_with_previous_purchases", label: "Clientes con compras previas" },
+        { value: "abandoned_cart", label: "Clientes con carrito abandonado" },
+        { value: "inactive_customers", label: "Clientes inactivos" }
       ];
 
       function saveFormState() {
@@ -328,63 +353,166 @@
         document.getElementById("mConv").textContent = data.conversions;
       }
 
-      async function createCampaign() {
+      function toDateTimeLocal(isoValue) {
+        if (!isoValue) return "";
+        const date = new Date(isoValue);
+        if (Number.isNaN(date.getTime())) return "";
+        const pad = (n) => String(n).padStart(2, "0");
+        const yyyy = date.getFullYear();
+        const mm = pad(date.getMonth() + 1);
+        const dd = pad(date.getDate());
+        const hh = pad(date.getHours());
+        const mi = pad(date.getMinutes());
+        return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+      }
+
+      function getCampaignStatusMeta(status) {
+        const map = {
+          scheduled: { label: "Campana activa", cls: "active", button: "Campana activa" },
+          sent: { label: "Enviada", cls: "sent", button: "Enviada" },
+          draft: { label: "Borrador", cls: "draft", button: "Borrador" }
+        };
+        return map[status] || { label: "Sin iniciar", cls: "new", button: "Crear campana" };
+      }
+
+      function createAudienceOptions(selected) {
+        return CAMPAIGN_AUDIENCE_OPTIONS.map((item) => {
+          const isSelected = item.value === selected ? "selected" : "";
+          return `<option value="${item.value}" ${isSelected}>${item.label}</option>`;
+        }).join("");
+      }
+
+      function buildCampaignBlock(campaign = null) {
+        const block = document.createElement("div");
+        block.className = "campaign-block";
+
+        const campaignId = Number(campaign?.id || 0);
+        if (campaignId > 0) {
+          block.dataset.campaignId = String(campaignId);
+        }
+
+        const meta = getCampaignStatusMeta(campaign?.status);
+        const title = campaignId > 0
+          ? `Campana #${campaignId} - ${String(campaign?.name || campaign?.title || "Sin nombre").trim()}`
+          : "Nueva campana";
+        const deleteLabel = campaignId > 0 ? "Borrar campana" : "Quitar bloque";
+        const createDisabled = campaignId > 0 ? "disabled" : "";
+        const createLabel = campaignId > 0 ? meta.button : "Crear campana";
+
+        block.innerHTML = `
+          <div class="campaign-top">
+            <div class="campaign-title">${title}</div>
+            <span class="campaign-status ${meta.cls}">${meta.label}</span>
+            <button class="btn-danger btn-inline campaign-delete-btn">${deleteLabel}</button>
+          </div>
+          <div class="row">
+            <input class="c-name" placeholder="Nombre de campana (opcional)" value="${String(campaign?.name || "").replace(/"/g, "&quot;")}" />
+            <select class="c-audience">${createAudienceOptions(campaign?.audience_type || "all_users")}</select>
+          </div>
+          <div class="row">
+            <input class="c-title" placeholder="Titulo (opcional)" value="${String(campaign?.title || "").replace(/"/g, "&quot;")}" />
+            <input class="c-deeplink" placeholder="Deep link (opcional)" value="${String(campaign?.deep_link || "").replace(/"/g, "&quot;")}" />
+          </div>
+          <textarea class="c-message" rows="3" placeholder="Mensaje de la notificacion">${String(campaign?.message || "")}</textarea>
+          <div class="row">
+            <div class="row" style="grid-template-columns: 1fr auto auto; gap: 8px;">
+              <input class="c-schedule" type="datetime-local" value="${toDateTimeLocal(campaign?.scheduled_at)}" />
+              <label class="inline-check">
+                <input class="c-recurring" type="checkbox" ${campaign?.audience_filters?.recurring ? "checked" : ""} />
+                Repetir
+              </label>
+              <label class="input-suffix" style="max-width: 170px;">
+                <input class="c-repeat-hours" type="number" min="1" step="1" placeholder="24" value="${Number(campaign?.audience_filters?.repeatEveryHours || 0) || ""}" />
+                <span class="suffix">horas</span>
+              </label>
+            </div>
+            <button class="campaign-create-btn" ${createDisabled}>${createLabel}</button>
+          </div>
+        `;
+
+        const deleteBtn = block.querySelector(".campaign-delete-btn");
+        const createBtn = block.querySelector(".campaign-create-btn");
+
+        deleteBtn.addEventListener("click", async () => {
+          const existingId = Number(block.dataset.campaignId || 0);
+          if (!existingId) {
+            block.remove();
+            return;
+          }
+          const ok = window.confirm("Seguro que deseas borrar esta campana?");
+          if (!ok) return;
+          await deleteCampaignById(existingId);
+          block.remove();
+          if (!document.querySelector(".campaign-block")) {
+            addCampaignBlock();
+          }
+        });
+
+        createBtn.addEventListener("click", async () => {
+          await createCampaignFromBlock(block);
+        });
+
+        return block;
+      }
+
+      function addCampaignBlock() {
+        const container = document.getElementById("campaignBlocks");
+        const block = buildCampaignBlock(null);
+        container.appendChild(block);
+      }
+
+      function getBlockPayload(block) {
+        const schedule = block.querySelector(".c-schedule")?.value || "";
+        return {
+          shopDomain: cfg().shopDomain,
+          name: block.querySelector(".c-name")?.value || "",
+          title: block.querySelector(".c-title")?.value || "",
+          message: block.querySelector(".c-message")?.value || "",
+          deepLink: block.querySelector(".c-deeplink")?.value || null,
+          audienceType: block.querySelector(".c-audience")?.value || "all_users",
+          audienceFilters: {
+            recurring: Boolean(block.querySelector(".c-recurring")?.checked),
+            repeatEveryHours: Number(block.querySelector(".c-repeat-hours")?.value || 0)
+          },
+          scheduledAt: schedule ? new Date(schedule).toISOString() : null
+        };
+      }
+
+      async function createCampaignFromBlock(block) {
+        const createBtn = block.querySelector(".campaign-create-btn");
+        if (!createBtn || createBtn.disabled) return;
         try {
-          const payload = {
-            shopDomain: cfg().shopDomain,
-            name: document.getElementById("cName").value,
-            title: document.getElementById("cTitle").value,
-            message: document.getElementById("cMessage").value,
-            deepLink: document.getElementById("cDeepLink").value || null,
-            audienceType: document.getElementById("cAudience").value,
-            audienceFilters: {
-              recurring: document.getElementById("cRecurring").checked,
-              repeatEveryHours: Number(document.getElementById("cRepeatHours").value || 0)
-            },
-            scheduledAt: document.getElementById("cSchedule").value ? new Date(document.getElementById("cSchedule").value).toISOString() : null
-          };
-          await api("/api/campaigns", { method: "POST", body: JSON.stringify(payload) });
+          createBtn.disabled = true;
+          createBtn.textContent = "Creando...";
+          const payload = getBlockPayload(block);
+          const result = await api("/api/campaigns", { method: "POST", body: JSON.stringify(payload) });
+          const newCampaign = result?.campaign || null;
+          const newBlock = buildCampaignBlock(newCampaign);
+          block.replaceWith(newBlock);
           alert("Campana creada");
-          await loadCampaignOptions();
         } catch (error) {
+          createBtn.disabled = false;
+          createBtn.textContent = "Crear campana";
           alert(error.message || "No se pudo crear la campana");
         }
       }
 
-      async function loadCampaignOptions() {
-        const data = await api("/api/campaigns");
-        const select = document.getElementById("cDeleteCampaignId");
-        select.innerHTML = '<option value="">Selecciona campana para borrar</option>';
-        const campaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
-
-        campaigns.forEach((item) => {
-          const option = document.createElement("option");
-          const name = String(item.name || item.title || "Sin nombre").trim();
-          option.value = String(item.id);
-          option.textContent = `#${item.id} - ${name}`;
-          select.appendChild(option);
+      async function deleteCampaignById(id) {
+        await api("/api/campaigns/" + encodeURIComponent(String(id)), {
+          method: "DELETE"
         });
       }
 
-      async function deleteSelectedCampaign() {
-        const select = document.getElementById("cDeleteCampaignId");
-        const id = Number(select.value || 0);
-        if (!id) {
-          alert("Selecciona una campana para borrar");
-          return;
-        }
-
-        const ok = window.confirm("Seguro que deseas borrar esta campana?");
-        if (!ok) return;
-
-        try {
-          await api("/api/campaigns/" + encodeURIComponent(String(id)), {
-            method: "DELETE"
-          });
-          alert("Campana borrada");
-          await loadCampaignOptions();
-        } catch (error) {
-          alert(error.message || "No se pudo borrar la campana");
+      async function loadCampaignBlocks() {
+        const container = document.getElementById("campaignBlocks");
+        container.innerHTML = "";
+        const data = await api("/api/campaigns");
+        const campaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
+        campaigns.forEach((campaign) => {
+          container.appendChild(buildCampaignBlock(campaign));
+        });
+        if (!campaigns.length) {
+          addCampaignBlock();
         }
       }
 
@@ -413,7 +541,9 @@
 
       restoreFormState();
       bindFormPersistence();
-      loadCampaignOptions().catch(() => {});
+      loadCampaignBlocks().catch(() => {
+        addCampaignBlock();
+      });
     </script>
   </body>
 </html>
