@@ -156,6 +156,19 @@
         width: 56px;
         text-align: center;
       }
+      .status-text {
+        margin-top: 8px;
+        font-size: 13px;
+      }
+      .status-text.success {
+        color: #166534;
+      }
+      .status-text.error {
+        color: #991b1b;
+      }
+      .status-text.loading {
+        color: #1e3a8a;
+      }
       input,
       select,
       textarea,
@@ -283,9 +296,10 @@
           </div>
         </div>
         <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
-          <button class="btn-secondary" style="width: auto;" onclick="loadAbandonedCartSettings()">Cargar</button>
-          <button style="width: auto;" onclick="saveAbandonedCartSettings()">Guardar configuracion</button>
+          <button id="acLoadBtn" class="btn-secondary" style="width: auto;" onclick="loadAbandonedCartSettings()">Cargar</button>
+          <button id="acSaveBtn" style="width: auto;" onclick="saveAbandonedCartSettings()">Guardar configuracion</button>
         </div>
+        <p id="acSettingsStatus" class="status-text"></p>
         <p class="label">Tip: usa 0h y 0m para desactivar una etapa.</p>
       </div>
 
@@ -359,7 +373,7 @@
           el.addEventListener("change", saveFormState);
           if (id === "shopDomain") {
             el.addEventListener("change", () => {
-              loadAbandonedCartSettings().catch(() => {});
+              loadAbandonedCartSettings({ silent: true });
             });
           }
           if (el.type !== "checkbox") {
@@ -378,6 +392,31 @@
           shopDomain: document.getElementById("shopDomain").value.trim(),
           apiKey: document.getElementById("apiKey").value.trim()
         };
+      }
+
+      function setAbandonedCartStatus(message, tone = "") {
+        const el = document.getElementById("acSettingsStatus");
+        if (!el) return;
+        el.textContent = String(message || "").trim();
+        el.className = `status-text${tone ? " " + tone : ""}`;
+      }
+
+      function validateAbandonedCartConfig() {
+        const { shopDomain, apiKey } = cfg();
+        if (!shopDomain) {
+          throw new Error("Falta shopDomain para cargar/guardar configuracion.");
+        }
+        if (!apiKey) {
+          throw new Error("Falta x-api-key para cargar/guardar configuracion.");
+        }
+        return { shopDomain, apiKey };
+      }
+
+      function setAbandonedCartButtonsBusy(isBusy) {
+        const loadBtn = document.getElementById("acLoadBtn");
+        const saveBtn = document.getElementById("acSaveBtn");
+        if (loadBtn) loadBtn.disabled = Boolean(isBusy);
+        if (saveBtn) saveBtn.disabled = Boolean(isBusy);
       }
 
       async function api(path, options = {}) {
@@ -617,24 +656,49 @@
         document.getElementById("acStage3Minutes").value = stage3.minutes;
       }
 
-      async function loadAbandonedCartSettings() {
-        const data = await api("/api/abandoned-cart/settings");
-        applyAbandonedCartSettings(data.settings || {});
+      async function loadAbandonedCartSettings(options = {}) {
+        const silent = Boolean(options?.silent);
+        try {
+          validateAbandonedCartConfig();
+          setAbandonedCartButtonsBusy(true);
+          setAbandonedCartStatus("Cargando configuracion...", "loading");
+          const data = await api("/api/abandoned-cart/settings");
+          applyAbandonedCartSettings(data.settings || {});
+          setAbandonedCartStatus("Configuracion cargada correctamente.", "success");
+        } catch (error) {
+          setAbandonedCartStatus(error.message || "No se pudo cargar la configuracion.", "error");
+          if (!silent) {
+            alert(error.message || "No se pudo cargar la configuracion.");
+          }
+        } finally {
+          setAbandonedCartButtonsBusy(false);
+        }
       }
 
       async function saveAbandonedCartSettings() {
-        const payload = {
-          shopDomain: cfg().shopDomain,
-          stage1DelayMinutes: readDurationMinutes("acStage1Hours", "acStage1Minutes"),
-          stage2DelayMinutes: readDurationMinutes("acStage2Hours", "acStage2Minutes"),
-          stage3DelayMinutes: readDurationMinutes("acStage3Hours", "acStage3Minutes")
-        };
-        const data = await api("/api/abandoned-cart/settings", {
-          method: "POST",
-          body: JSON.stringify(payload)
-        });
-        applyAbandonedCartSettings(data.settings || payload);
-        alert("Configuracion de carrito abandonado guardada");
+        try {
+          const { shopDomain } = validateAbandonedCartConfig();
+          setAbandonedCartButtonsBusy(true);
+          setAbandonedCartStatus("Guardando configuracion...", "loading");
+          const payload = {
+            shopDomain,
+            stage1DelayMinutes: readDurationMinutes("acStage1Hours", "acStage1Minutes"),
+            stage2DelayMinutes: readDurationMinutes("acStage2Hours", "acStage2Minutes"),
+            stage3DelayMinutes: readDurationMinutes("acStage3Hours", "acStage3Minutes")
+          };
+          const data = await api("/api/abandoned-cart/settings", {
+            method: "POST",
+            body: JSON.stringify(payload)
+          });
+          applyAbandonedCartSettings(data.settings || payload);
+          setAbandonedCartStatus("Configuracion guardada correctamente.", "success");
+          alert("Configuracion de carrito abandonado guardada");
+        } catch (error) {
+          setAbandonedCartStatus(error.message || "No se pudo guardar la configuracion.", "error");
+          alert(error.message || "No se pudo guardar la configuracion.");
+        } finally {
+          setAbandonedCartButtonsBusy(false);
+        }
       }
 
       async function loadHistory() {
@@ -650,7 +714,7 @@
 
       restoreFormState();
       bindFormPersistence();
-      loadAbandonedCartSettings().catch(() => {});
+      loadAbandonedCartSettings({ silent: true });
       loadCampaignBlocks().catch(() => {
         addCampaignBlock();
       });
