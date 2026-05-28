@@ -70,7 +70,7 @@ const templates = [
   {
     code: "abandoned_cart_1h",
     title: "🛒 Carrito pendiente",
-    message: "🔥 Tu carrito te están esperando. “Aún tienes productos en tu carrito. Finaliza tu compra antes de que se agoten.”"
+    message: "🔥 Tu carrito te está esperando. “Aún tienes productos en tu carrito. Finaliza tu compra antes de que se agoten.”"
   },
   {
     code: "abandoned_cart_24h",

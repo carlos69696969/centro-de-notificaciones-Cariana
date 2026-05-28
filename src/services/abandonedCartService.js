@@ -93,7 +93,7 @@ async function ensureAbandonedCartSettingsTable() {
 const abandonedStageCopyMap = {
   "1h_sent": {
     title: "🛒 Carrito pendiente",
-    message: "🔥 Tu carrito te están esperando. “Aún tienes productos en tu carrito. Finaliza tu compra antes de que se agoten.”"
+    message: "🔥 Tu carrito te está esperando. “Aún tienes productos en tu carrito. Finaliza tu compra antes de que se agoten.”"
   },
   "24h_sent": {
     title: "🔥 Tu carrito te está esperando",
