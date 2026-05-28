@@ -25,12 +25,16 @@ router.post("/", async (req, res, next) => {
 
     const normalizedFilters = audienceFilters && typeof audienceFilters === "object" ? audienceFilters : {};
     const recurring = String(normalizedFilters.recurring ?? "").toLowerCase() === "true" || normalizedFilters.recurring === true;
-    const repeatEveryHours = Number(normalizedFilters.repeatEveryHours || 0);
-    const validRepeatEveryHours = Number.isFinite(repeatEveryHours) ? Math.floor(repeatEveryHours) : 0;
-    const effectiveScheduledAt = scheduledAt || (recurring && validRepeatEveryHours > 0 ? new Date().toISOString() : null);
+    const repeatEveryUnitRaw = String(normalizedFilters.repeatEveryUnit || "").toLowerCase();
+    const repeatEveryUnit = repeatEveryUnitRaw === "minutes" ? "minutes" : "hours";
+    const repeatEveryValue = Number(normalizedFilters.repeatEveryValue || normalizedFilters.repeatEveryHours || 0);
+    const validRepeatEveryValue = Number.isFinite(repeatEveryValue) ? Math.floor(repeatEveryValue) : 0;
+    const effectiveScheduledAt = scheduledAt || (recurring && validRepeatEveryValue > 0 ? new Date().toISOString() : null);
 
     normalizedFilters.recurring = recurring;
-    normalizedFilters.repeatEveryHours = validRepeatEveryHours;
+    normalizedFilters.repeatEveryUnit = repeatEveryUnit;
+    normalizedFilters.repeatEveryValue = validRepeatEveryValue;
+    normalizedFilters.repeatEveryHours = repeatEveryUnit === "hours" ? validRepeatEveryValue : 0;
 
     const campaign = await createCampaign({
       shopDomain,

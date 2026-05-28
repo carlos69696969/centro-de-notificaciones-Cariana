@@ -51,25 +51,28 @@ function normalizeAudienceFilters(value) {
   return value;
 }
 
-function getRecurringHours(campaign) {
+function getRecurringInterval(campaign) {
   const filters = normalizeAudienceFilters(campaign?.audience_filters);
   const recurring = parseBoolean(filters.recurring);
-  const hours = parsePositiveInt(filters.repeatEveryHours);
-  if (!recurring || hours < 1) {
-    return 0;
+  const unitRaw = String(filters.repeatEveryUnit || "").toLowerCase();
+  const unit = unitRaw === "minutes" ? "minutes" : "hours";
+  const value = parsePositiveInt(filters.repeatEveryValue || filters.repeatEveryHours);
+  if (!recurring || value < 1) {
+    return null;
   }
-  return hours;
+  const stepMs = unit === "minutes" ? value * 60 * 1000 : value * 60 * 60 * 1000;
+  return { unit, value, stepMs };
 }
 
-function computeNextIntervalSchedule(baseValue, hours) {
+function computeNextIntervalSchedule(baseValue, stepMs) {
   const now = new Date();
   let next = new Date(baseValue || now.toISOString());
   if (Number.isNaN(next.getTime())) {
     next = new Date(now);
   }
-  const stepMs = Math.max(1, parsePositiveInt(hours)) * 60 * 60 * 1000;
+  const safeStepMs = Math.max(60 * 1000, parsePositiveInt(stepMs));
   while (next <= now) {
-    next = new Date(next.getTime() + stepMs);
+    next = new Date(next.getTime() + safeStepMs);
   }
   return next.toISOString();
 }
@@ -150,7 +153,7 @@ async function sendCampaignNow(shopDomain, campaignId) {
   }
 
   const campaign = campaignResult.rows[0];
-  const recurringHours = getRecurringHours(campaign);
+  const recurringInterval = getRecurringInterval(campaign);
   const copy = buildCampaignNotificationCopy(campaign);
   const sendResult = await sendToAudience({
     shopDomain,
@@ -172,7 +175,7 @@ async function sendCampaignNow(shopDomain, campaignId) {
     campaignId: campaign.id
   });
 
-  if (recurringHours > 0) {
+  if (recurringInterval && recurringInterval.stepMs > 0) {
     await pool.query(
       `
       UPDATE campaigns
@@ -182,7 +185,7 @@ async function sendCampaignNow(shopDomain, campaignId) {
           updated_at = NOW()
       WHERE id = $1
       `,
-      [campaign.id, computeNextIntervalSchedule(campaign.scheduled_at, recurringHours)]
+      [campaign.id, computeNextIntervalSchedule(campaign.scheduled_at, recurringInterval.stepMs)]
     );
   } else {
     await pool.query(

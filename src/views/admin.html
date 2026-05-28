@@ -131,6 +131,13 @@
         padding: 10px 0;
         width: 90px;
       }
+      .input-suffix select {
+        border: 0;
+        border-radius: 0;
+        padding: 10px 0;
+        width: 90px;
+        background: transparent;
+      }
       .input-suffix .suffix {
         color: var(--muted);
         font-size: 14px;
@@ -382,6 +389,14 @@
         }).join("");
       }
 
+      function getRepeatConfig(filters) {
+        const safeFilters = filters && typeof filters === "object" ? filters : {};
+        const unitRaw = String(safeFilters.repeatEveryUnit || "").toLowerCase();
+        const unit = unitRaw === "minutes" ? "minutes" : "hours";
+        const value = Number(safeFilters.repeatEveryValue || safeFilters.repeatEveryHours || 0) || 0;
+        return { unit, value };
+      }
+
       function buildCampaignBlock(campaign = null) {
         const block = document.createElement("div");
         block.className = "campaign-block";
@@ -398,6 +413,7 @@
         const deleteLabel = campaignId > 0 ? "Borrar campana" : "Quitar bloque";
         const createDisabled = campaignId > 0 ? "disabled" : "";
         const createLabel = campaignId > 0 ? meta.button : "Crear campana";
+        const repeatConfig = getRepeatConfig(campaign?.audience_filters);
 
         block.innerHTML = `
           <div class="campaign-top">
@@ -422,8 +438,11 @@
                 Repetir
               </label>
               <label class="input-suffix" style="max-width: 170px;">
-                <input class="c-repeat-hours" type="number" min="1" step="1" placeholder="24" value="${Number(campaign?.audience_filters?.repeatEveryHours || 0) || ""}" />
-                <span class="suffix">horas</span>
+                <input class="c-repeat-value" type="number" min="1" step="1" placeholder="24" value="${repeatConfig.value || ""}" />
+                <select class="c-repeat-unit" aria-label="Unidad de repeticion">
+                  <option value="hours" ${repeatConfig.unit === "hours" ? "selected" : ""}>horas</option>
+                  <option value="minutes" ${repeatConfig.unit === "minutes" ? "selected" : ""}>minutos</option>
+                </select>
               </label>
             </div>
             <button class="campaign-create-btn" ${createDisabled}>${createLabel}</button>
@@ -472,7 +491,8 @@
           audienceType: block.querySelector(".c-audience")?.value || "all_users",
           audienceFilters: {
             recurring: Boolean(block.querySelector(".c-recurring")?.checked),
-            repeatEveryHours: Number(block.querySelector(".c-repeat-hours")?.value || 0)
+            repeatEveryValue: Number(block.querySelector(".c-repeat-value")?.value || 0),
+            repeatEveryUnit: block.querySelector(".c-repeat-unit")?.value || "hours"
           },
           scheduledAt: schedule ? new Date(schedule).toISOString() : null
         };
