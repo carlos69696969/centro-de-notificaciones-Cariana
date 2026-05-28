@@ -257,8 +257,8 @@
 
       <div class="card">
         <div class="card-head">
-          <h2>Centro de campanas</h2>
-          <button class="btn-plus" onclick="addCampaignBlock()">+ Crear campana</button>
+          <h2>Centro de campañas</h2>
+          <button class="btn-plus" onclick="addCampaignBlock()">+ Crear campaña</button>
         </div>
         <div id="campaignBlocks" class="campaigns-stack"></div>
       </div>
@@ -455,11 +455,11 @@
 
       function getCampaignStatusMeta(status) {
         const map = {
-          scheduled: { label: "Campana activa", cls: "active", button: "Campana activa" },
+          scheduled: { label: "Campaña activa", cls: "active", button: "Campaña activa" },
           sent: { label: "Enviada", cls: "sent", button: "Enviada" },
           draft: { label: "Borrador", cls: "draft", button: "Borrador" }
         };
-        return map[status] || { label: "Sin iniciar", cls: "new", button: "Crear campana" };
+        return map[status] || { label: "Sin iniciar", cls: "new", button: "Crear campaña" };
       }
 
       function createAudienceOptions(selected) {
@@ -488,11 +488,11 @@
 
         const meta = getCampaignStatusMeta(campaign?.status);
         const title = campaignId > 0
-          ? `Campana #${campaignId} - ${String(campaign?.name || campaign?.title || "Sin nombre").trim()}`
-          : "Nueva campana";
-        const deleteLabel = campaignId > 0 ? "Borrar campana" : "Quitar bloque";
+          ? `Campaña #${campaignId} - ${String(campaign?.name || campaign?.title || "Sin nombre").trim()}`
+          : "Nueva campaña";
+        const deleteLabel = campaignId > 0 ? "Borrar campaña" : "Quitar bloque";
         const createDisabled = campaignId > 0 ? "disabled" : "";
-        const createLabel = campaignId > 0 ? meta.button : "Crear campana";
+        const createLabel = campaignId > 0 ? meta.button : "Crear campaña";
         const repeatConfig = getRepeatConfig(campaign?.audience_filters);
 
         block.innerHTML = `
@@ -502,7 +502,7 @@
             <button class="btn-danger btn-inline campaign-delete-btn">${deleteLabel}</button>
           </div>
           <div class="row">
-            <input class="c-name" placeholder="Nombre de campana (opcional)" value="${String(campaign?.name || "").replace(/"/g, "&quot;")}" />
+            <input class="c-name" placeholder="Nombre de campaña (opcional)" value="${String(campaign?.name || "").replace(/"/g, "&quot;")}" />
             <select class="c-audience">${createAudienceOptions(campaign?.audience_type || "all_users")}</select>
           </div>
           <div class="row">
@@ -538,7 +538,7 @@
             block.remove();
             return;
           }
-          const ok = window.confirm("Seguro que deseas borrar esta campana?");
+          const ok = window.confirm("Seguro que deseas borrar esta campaña?");
           if (!ok) return;
           await deleteCampaignById(existingId);
           block.remove();
@@ -589,11 +589,11 @@
           const newCampaign = result?.campaign || null;
           const newBlock = buildCampaignBlock(newCampaign);
           block.replaceWith(newBlock);
-          alert("Campana creada");
+          alert("Campaña creada");
         } catch (error) {
           createBtn.disabled = false;
-          createBtn.textContent = "Crear campana";
-          alert(error.message || "No se pudo crear la campana");
+          createBtn.textContent = "Crear campaña";
+          alert(error.message || "No se pudo crear la campaña");
         }
       }
 

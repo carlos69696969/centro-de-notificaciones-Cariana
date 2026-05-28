@@ -89,7 +89,7 @@ function buildCampaignNotificationCopy(campaign) {
 
   return {
     title,
-    message: bodyMessage || "Tienes una nueva campana de Cariana.",
+    message: bodyMessage || "Tienes una nueva campaña de Cariana.",
     audienceLabel
   };
 }
