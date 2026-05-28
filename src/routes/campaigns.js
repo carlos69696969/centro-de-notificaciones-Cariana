@@ -1,5 +1,6 @@
 const express = require("express");
 const { createCampaign, getCampaigns, sendCampaignNow } = require("../services/campaignService");
+const pool = require("../db/pool");
 
 const router = express.Router();
 
@@ -58,6 +59,34 @@ router.post("/:id/send", async (req, res, next) => {
 
     const result = await sendCampaignNow(shopDomain, Number(req.params.id));
     return res.json({ ok: true, result });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const shopDomain = req.shopDomain || req.body?.shopDomain || req.query.shop;
+    const campaignId = Number(req.params.id || 0);
+    if (!shopDomain || !campaignId) {
+      return res.status(400).json({ error: "Missing required params" });
+    }
+
+    const result = await pool.query(
+      `
+      DELETE FROM campaigns
+      WHERE id = $1
+        AND shop_domain = $2
+      RETURNING id
+      `,
+      [campaignId, shopDomain]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Campaign not found" });
+    }
+
+    return res.json({ ok: true, deletedId: campaignId });
   } catch (error) {
     return next(error);
   }
