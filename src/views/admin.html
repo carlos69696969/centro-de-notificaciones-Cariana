@@ -164,6 +164,12 @@
 
       <div class="card">
         <h2>Centro de campanas</h2>
+        <div class="row" style="grid-template-columns: 1fr auto; margin-bottom: 12px;">
+          <select id="cDeleteCampaignId">
+            <option value="">Selecciona campana para borrar</option>
+          </select>
+          <button class="btn-danger" style="max-width: 220px;" onclick="deleteSelectedCampaign()">Borrar campana</button>
+        </div>
         <div class="row">
           <input id="cName" placeholder="Nombre de campana (opcional)" />
           <select id="cAudience">
@@ -192,25 +198,6 @@
           </div>
           <button onclick="createCampaign()">Crear campana</button>
         </div>
-      </div>
-
-      <div class="card">
-        <h2>Campanas creadas</h2>
-        <button class="btn-secondary" onclick="loadCampaigns()">Cargar campanas</button>
-        <table style="margin-top: 10px;">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Nombre</th>
-              <th>Titulo</th>
-              <th>Audiencia</th>
-              <th>Estado</th>
-              <th>Programada</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="campaignsBody"></tbody>
-        </table>
       </div>
 
       <div class="card">
@@ -358,68 +345,44 @@
           };
           await api("/api/campaigns", { method: "POST", body: JSON.stringify(payload) });
           alert("Campana creada");
-          await loadCampaigns();
+          await loadCampaignOptions();
         } catch (error) {
           alert(error.message || "No se pudo crear la campana");
         }
       }
 
-      function fmtDate(value) {
-        if (!value) return "-";
-        const d = new Date(value);
-        if (Number.isNaN(d.getTime())) return String(value);
-        return d.toLocaleString("es-MX");
-      }
-
-      async function loadCampaigns() {
+      async function loadCampaignOptions() {
         const data = await api("/api/campaigns");
-        const tbody = document.getElementById("campaignsBody");
-        tbody.innerHTML = "";
+        const select = document.getElementById("cDeleteCampaignId");
+        select.innerHTML = '<option value="">Selecciona campana para borrar</option>';
         const campaigns = Array.isArray(data.campaigns) ? data.campaigns : [];
 
-        if (!campaigns.length) {
-          const tr = document.createElement("tr");
-          tr.innerHTML = '<td colspan="7" class="label">Aun no hay campanas creadas.</td>';
-          tbody.appendChild(tr);
+        campaigns.forEach((item) => {
+          const option = document.createElement("option");
+          const name = String(item.name || item.title || "Sin nombre").trim();
+          option.value = String(item.id);
+          option.textContent = `#${item.id} - ${name}`;
+          select.appendChild(option);
+        });
+      }
+
+      async function deleteSelectedCampaign() {
+        const select = document.getElementById("cDeleteCampaignId");
+        const id = Number(select.value || 0);
+        if (!id) {
+          alert("Selecciona una campana para borrar");
           return;
         }
 
-        campaigns.forEach((item) => {
-          const tr = document.createElement("tr");
-          const title = item.title || "-";
-          const name = item.name || "-";
-          tr.innerHTML = `
-            <td>${item.id}</td>
-            <td>${name}</td>
-            <td>${title}</td>
-            <td>${item.audience_type || "-"}</td>
-            <td>${item.status || "-"}</td>
-            <td>${fmtDate(item.scheduled_at)}</td>
-            <td>
-              <button class="btn-danger btn-inline" data-delete-id="${item.id}">Borrar campana</button>
-            </td>
-          `;
-          tbody.appendChild(tr);
-        });
+        const ok = window.confirm("Seguro que deseas borrar esta campana?");
+        if (!ok) return;
 
-        tbody.querySelectorAll("button[data-delete-id]").forEach((btn) => {
-          btn.addEventListener("click", async () => {
-            const id = Number(btn.getAttribute("data-delete-id") || 0);
-            if (!id) return;
-            const ok = window.confirm("Seguro que deseas borrar esta campana?");
-            if (!ok) return;
-            await deleteCampaign(id);
-          });
-        });
-      }
-
-      async function deleteCampaign(id) {
         try {
           await api("/api/campaigns/" + encodeURIComponent(String(id)), {
             method: "DELETE"
           });
           alert("Campana borrada");
-          await loadCampaigns();
+          await loadCampaignOptions();
         } catch (error) {
           alert(error.message || "No se pudo borrar la campana");
         }
@@ -450,7 +413,7 @@
 
       restoreFormState();
       bindFormPersistence();
-      loadCampaigns().catch(() => {});
+      loadCampaignOptions().catch(() => {});
     </script>
   </body>
 </html>
