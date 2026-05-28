@@ -3,6 +3,7 @@ const pool = require("../db/pool");
 const env = require("../config/env");
 const { verifyAppProxySignature } = require("../services/shopifyAppProxyVerifier");
 const { buildOrderDeepLink, buildLegacyOrderFallbackDeepLink, toAbsoluteStorefrontUrl } = require("../services/deepLinkService");
+const { recordAbandonedCartActivity } = require("../services/abandonedCartService");
 
 const router = express.Router();
 const DISPLAY_TIME_ZONE = env.notificationsDisplayTimezone || "America/Mexico_City";
@@ -857,6 +858,30 @@ router.get("/badge", requireValidProxy, async (req, res, next) => {
   }
 });
 
+router.post("/cart-event", requireValidProxy, async (req, res, next) => {
+  try {
+    const shopDomain = resolveShopDomain(req);
+    if (!shopDomain) {
+      return res.status(400).json({ error: "Missing shop" });
+    }
+
+    const queryCustomerId = resolveCustomerId(req);
+    const bodyCustomerId = req.body?.customerId || req.body?.shopifyCustomerId || "";
+    const payload = req.body && typeof req.body === "object" ? req.body : {};
+    const result = await recordAbandonedCartActivity({
+      shopDomain,
+      cartToken: payload.cartToken || payload.cart?.token || payload.cart?.cart_token || "",
+      shopifyCustomerId: queryCustomerId || bodyCustomerId,
+      email: payload.email || payload.cart?.email || "",
+      payload
+    });
+
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   try {
     const shopDomain = req.query.shop || "";
@@ -876,6 +901,8 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var badgeCacheKey = "cariana_noti_badge_v1:" + shopCacheKey;
   var pushToken = "";
   var url = "/apps/notificaciones" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
+  var lastCartEventHash = "";
+  var lastCartEventAt = 0;
 
   function readBadgeCache() {
     try {
@@ -1099,6 +1126,89 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     }, 500);
   }
 
+  function hashCartSnapshot(snapshot) {
+    var items = Array.isArray(snapshot && snapshot.items) ? snapshot.items : [];
+    var signature = [
+      String(snapshot && (snapshot.token || snapshot.cart_token) || ""),
+      Number(snapshot && snapshot.item_count || 0),
+      Number(snapshot && snapshot.total_price || 0),
+      items.slice(0, 8).map(function(item) {
+        return [Number(item && (item.id || item.variant_id) || 0), Number(item && item.quantity || 0)].join("x");
+      }).join("|")
+    ].join("#");
+    return signature;
+  }
+
+  function sendCartEvent(snapshot, source) {
+    ensureCustomerHint();
+    var eventBody = {
+      source: source || "storefront_add_to_cart",
+      customerId: customerHint || "",
+      cartToken: String(snapshot && (snapshot.token || snapshot.cart_token) || ""),
+      email: String(snapshot && (snapshot.email || snapshot.customer_email) || ""),
+      cart: snapshot || {}
+    };
+    if (!eventBody.cartToken && !eventBody.customerId) {
+      return;
+    }
+
+    var hash = hashCartSnapshot(snapshot || {});
+    var now = Date.now();
+    if (hash && hash === lastCartEventHash && now - lastCartEventAt < 15000) {
+      return;
+    }
+    lastCartEventHash = hash;
+    lastCartEventAt = now;
+
+    fetch("/apps/notificaciones/cart-event", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(eventBody),
+      keepalive: true
+    }).catch(function() {});
+  }
+
+  function fetchCartAndTrack(source) {
+    fetch("/cart.js", { credentials: "same-origin" })
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(snapshot) {
+        if (!snapshot) return;
+        if (Number(snapshot.item_count || 0) < 1) return;
+        sendCartEvent(snapshot, source);
+      })
+      .catch(function() {});
+  }
+
+  function hookAddToCartActions() {
+    document.addEventListener("submit", function(event) {
+      var form = event && event.target;
+      if (!form || !form.action || form.action.indexOf("/cart/add") === -1) return;
+      setTimeout(function() { fetchCartAndTrack("form_submit"); }, 850);
+    }, true);
+
+    document.addEventListener("click", function(event) {
+      if (!event || !event.target || !event.target.closest) return;
+      var addButton = event.target.closest('button[name="add"],input[name="add"],button[data-add-to-cart],button[data-action="add-to-cart"]');
+      if (!addButton) return;
+      setTimeout(function() { fetchCartAndTrack("button_click"); }, 900);
+    }, true);
+
+    if (window.fetch) {
+      var originalFetch = window.fetch;
+      window.fetch = function(input, init) {
+        var requestUrl = typeof input === "string" ? input : (input && input.url) || "";
+        var responsePromise = originalFetch.apply(this, arguments);
+        if (/\\/cart\\/add(\\.js)?(\\?|$)/i.test(requestUrl)) {
+          responsePromise.then(function() {
+            setTimeout(function() { fetchCartAndTrack("fetch_add"); }, 650);
+          }).catch(function() {});
+        }
+        return responsePromise;
+      };
+    }
+  }
+
   function refreshBadge() {
     ensureCustomerHint();
     var trayUnread = detectTrayUnreadFromAndroid();
@@ -1145,6 +1255,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
     ensureCustomerHint();
     scheduleEnsure();
+    hookAddToCartActions();
     watchDomChanges();
     watchNavigation();
     refreshBadge();

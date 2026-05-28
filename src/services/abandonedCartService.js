@@ -160,6 +160,88 @@ async function upsertCheckoutEvent({ shopDomain, payload }) {
   );
 }
 
+function buildCartEventPayload(payload) {
+  const source = payload && typeof payload === "object" ? payload : {};
+  const cart = source.cart && typeof source.cart === "object" ? source.cart : {};
+  const items = Array.isArray(cart.items) ? cart.items : [];
+  return {
+    source: String(source.source || "storefront_add_to_cart"),
+    token: String(source.cartToken || cart.token || cart.cart_token || "").trim(),
+    item_count: Number(cart.item_count || items.length || 0),
+    total_price: Number(cart.total_price || 0),
+    currency: String(cart.currency || "").trim(),
+    email: String(source.email || cart.email || cart.customer_email || "").trim().toLowerCase(),
+    items: items.slice(0, 20).map((item) => ({
+      id: Number(item.id || item.variant_id || 0) || 0,
+      quantity: Number(item.quantity || 0) || 0,
+      title: String(item.title || item.product_title || item.name || "").trim()
+    }))
+  };
+}
+
+async function recordAbandonedCartActivity({
+  shopDomain,
+  cartToken,
+  shopifyCustomerId,
+  email,
+  payload
+}) {
+  const normalizedShopDomain = String(shopDomain || "").trim();
+  if (!normalizedShopDomain) {
+    return { tracked: false, reason: "missing_shop_domain" };
+  }
+
+  const cartEvent = buildCartEventPayload({
+    ...(payload && typeof payload === "object" ? payload : {}),
+    cartToken,
+    email
+  });
+  const normalizedToken = String(cartToken || cartEvent.token || "").trim();
+  const normalizedCustomerId = Number(shopifyCustomerId || 0);
+  const syntheticCheckoutId = normalizedToken
+    ? `cart:${normalizedToken}`
+    : normalizedCustomerId > 0
+      ? `cart:customer:${normalizedCustomerId}`
+      : "";
+
+  if (!syntheticCheckoutId) {
+    return { tracked: false, reason: "missing_cart_identity" };
+  }
+
+  const effectiveEmail = String(email || cartEvent.email || "").trim().toLowerCase() || null;
+
+  await pool.query(
+    `
+    INSERT INTO checkout_events
+      (shop_domain, checkout_id, cart_token, shopify_customer_id, email, completed_at, abandoned_stage, payload, created_at)
+    VALUES
+      ($1,$2,$3,$4,$5,NULL,NULL,$6::jsonb,NOW())
+    ON CONFLICT (shop_domain, checkout_id)
+    DO UPDATE SET
+      cart_token = COALESCE(EXCLUDED.cart_token, checkout_events.cart_token),
+      shopify_customer_id = COALESCE(EXCLUDED.shopify_customer_id, checkout_events.shopify_customer_id),
+      email = COALESCE(EXCLUDED.email, checkout_events.email),
+      completed_at = NULL,
+      abandoned_stage = NULL,
+      payload = EXCLUDED.payload,
+      created_at = NOW()
+    `,
+    [
+      normalizedShopDomain,
+      syntheticCheckoutId,
+      normalizedToken || null,
+      normalizedCustomerId > 0 ? normalizedCustomerId : null,
+      effectiveEmail,
+      JSON.stringify(cartEvent)
+    ]
+  );
+
+  return {
+    tracked: true,
+    checkoutId: syntheticCheckoutId
+  };
+}
+
 async function getAbandonedCartSettings(shopDomain) {
   await ensureAbandonedCartSettingsTable();
   const normalizedShopDomain = String(shopDomain || "").trim();
@@ -328,6 +410,7 @@ async function runAbandonedCartSweep() {
 module.exports = {
   DEFAULT_ABANDONED_CART_SETTINGS,
   getAbandonedCartSettings,
+  recordAbandonedCartActivity,
   saveAbandonedCartSettings,
   upsertCheckoutEvent,
   runAbandonedCartSweep

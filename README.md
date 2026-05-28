@@ -4,7 +4,7 @@ Aplicacion embebida de Shopify para notificaciones push con:
 
 - Eventos automaticos de pedidos y reembolsos.
 - Integracion de devoluciones.
-- Deteccion de carritos abandonados (1h, 24h, 3d).
+- Deteccion de carritos abandonados por checkout y add-to-cart (configurable por minutos/horas).
 - Campanas manuales segmentadas.
 - Integracion FCM para Android.
 - Dashboard administrativo con metricas e historial.
