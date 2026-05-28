@@ -4,6 +4,12 @@ const { getCustomerByShopifyId } = require("./customerService");
 const { sendToCustomerTokens } = require("./notificationService");
 const { toAbsoluteStorefrontUrl } = require("./deepLinkService");
 
+const DEFAULT_ABANDONED_CART_SETTINGS = {
+  stage1DelayMinutes: 60,
+  stage2DelayMinutes: 24 * 60,
+  stage3DelayMinutes: 3 * 24 * 60
+};
+
 function pickFirstString(candidates) {
   for (const value of candidates) {
     const text = String(value || "").trim();
@@ -41,6 +47,27 @@ function extractCheckoutProductName(payload) {
     .find(Boolean);
 
   return truncateText(firstName);
+}
+
+function toSafeMinutes(value, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  const normalized = Math.floor(parsed);
+  if (normalized < 0) {
+    return fallback;
+  }
+  return Math.min(normalized, 90 * 24 * 60);
+}
+
+function normalizeAbandonedCartSettings(value = {}) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    stage1DelayMinutes: toSafeMinutes(source.stage1DelayMinutes, DEFAULT_ABANDONED_CART_SETTINGS.stage1DelayMinutes),
+    stage2DelayMinutes: toSafeMinutes(source.stage2DelayMinutes, DEFAULT_ABANDONED_CART_SETTINGS.stage2DelayMinutes),
+    stage3DelayMinutes: toSafeMinutes(source.stage3DelayMinutes, DEFAULT_ABANDONED_CART_SETTINGS.stage3DelayMinutes)
+  };
 }
 
 const abandonedStageLabel = {
@@ -107,6 +134,64 @@ async function upsertCheckoutEvent({ shopDomain, payload }) {
   );
 }
 
+async function getAbandonedCartSettings(shopDomain) {
+  const normalizedShopDomain = String(shopDomain || "").trim();
+  if (!normalizedShopDomain) {
+    return { ...DEFAULT_ABANDONED_CART_SETTINGS };
+  }
+
+  const result = await pool.query(
+    `
+    SELECT stage1_delay_minutes, stage2_delay_minutes, stage3_delay_minutes
+    FROM abandoned_cart_settings
+    WHERE shop_domain = $1
+    `,
+    [normalizedShopDomain]
+  );
+
+  if (!result.rows.length) {
+    return { ...DEFAULT_ABANDONED_CART_SETTINGS };
+  }
+
+  return normalizeAbandonedCartSettings({
+    stage1DelayMinutes: result.rows[0].stage1_delay_minutes,
+    stage2DelayMinutes: result.rows[0].stage2_delay_minutes,
+    stage3DelayMinutes: result.rows[0].stage3_delay_minutes
+  });
+}
+
+async function saveAbandonedCartSettings(shopDomain, settings) {
+  const normalizedShopDomain = String(shopDomain || "").trim();
+  if (!normalizedShopDomain) {
+    throw new Error("shopDomain is required");
+  }
+
+  const normalized = normalizeAbandonedCartSettings(settings);
+
+  await pool.query(
+    `
+    INSERT INTO abandoned_cart_settings
+      (shop_domain, stage1_delay_minutes, stage2_delay_minutes, stage3_delay_minutes, updated_at)
+    VALUES
+      ($1,$2,$3,$4,NOW())
+    ON CONFLICT (shop_domain)
+    DO UPDATE SET
+      stage1_delay_minutes = EXCLUDED.stage1_delay_minutes,
+      stage2_delay_minutes = EXCLUDED.stage2_delay_minutes,
+      stage3_delay_minutes = EXCLUDED.stage3_delay_minutes,
+      updated_at = NOW()
+    `,
+    [
+      normalizedShopDomain,
+      normalized.stage1DelayMinutes,
+      normalized.stage2DelayMinutes,
+      normalized.stage3DelayMinutes
+    ]
+  );
+
+  return normalized;
+}
+
 async function runAbandonedCartSweep() {
   const rows = await pool.query(
     `
@@ -119,15 +204,24 @@ async function runAbandonedCartSweep() {
       )
     `
   );
+  const settingsCache = new Map();
 
   for (const row of rows.rows) {
+    if (!settingsCache.has(row.shop_domain)) {
+      const settings = await getAbandonedCartSettings(row.shop_domain);
+      settingsCache.set(row.shop_domain, settings);
+    }
+    const settings = settingsCache.get(row.shop_domain);
+    const stage1Ms = settings.stage1DelayMinutes * 60 * 1000;
+    const stage2Ms = settings.stage2DelayMinutes * 60 * 1000;
+    const stage3Ms = settings.stage3DelayMinutes * 60 * 1000;
     const ageMs = Date.now() - new Date(row.created_at).getTime();
     let nextStage = null;
-    if (!row.abandoned_stage && ageMs >= 60 * 60 * 1000) {
+    if (!row.abandoned_stage && stage1Ms > 0 && ageMs >= stage1Ms) {
       nextStage = "1h_sent";
-    } else if (row.abandoned_stage === "1h_sent" && ageMs >= 24 * 60 * 60 * 1000) {
+    } else if (row.abandoned_stage === "1h_sent" && stage2Ms > 0 && ageMs >= stage2Ms) {
       nextStage = "24h_sent";
-    } else if (row.abandoned_stage === "24h_sent" && ageMs >= 3 * 24 * 60 * 60 * 1000) {
+    } else if (row.abandoned_stage === "24h_sent" && stage3Ms > 0 && ageMs >= stage3Ms) {
       nextStage = "3d_sent";
     }
 
@@ -182,6 +276,9 @@ async function runAbandonedCartSweep() {
 }
 
 module.exports = {
+  DEFAULT_ABANDONED_CART_SETTINGS,
+  getAbandonedCartSettings,
+  saveAbandonedCartSettings,
   upsertCheckoutEvent,
   runAbandonedCartSweep
 };

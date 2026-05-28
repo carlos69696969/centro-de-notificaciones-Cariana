@@ -235,6 +235,21 @@
       </div>
 
       <div class="card">
+        <h2>Configuracion carrito abandonado</h2>
+        <p class="label">Define en cuantos minutos se envia cada recordatorio desde que se detecta el checkout sin completar.</p>
+        <div class="row">
+          <input id="acStage1Minutes" type="number" min="0" step="1" placeholder="Primer recordatorio (minutos)" />
+          <input id="acStage2Minutes" type="number" min="0" step="1" placeholder="Segundo recordatorio (minutos)" />
+        </div>
+        <div class="row" style="grid-template-columns: 1fr auto auto; gap: 8px;">
+          <input id="acStage3Minutes" type="number" min="0" step="1" placeholder="Tercer recordatorio (minutos)" />
+          <button class="btn-secondary" style="width: auto;" onclick="loadAbandonedCartSettings()">Cargar</button>
+          <button style="width: auto;" onclick="saveAbandonedCartSettings()">Guardar configuracion</button>
+        </div>
+        <p class="label">Tip: usa 0 para desactivar una etapa.</p>
+      </div>
+
+      <div class="card">
         <h2>Plantillas</h2>
         <div class="row">
           <input id="tCode" placeholder="Codigo de plantilla (ej: order_confirmed)" />
@@ -319,6 +334,11 @@
           if (!el) return;
           el.addEventListener("input", saveFormState);
           el.addEventListener("change", saveFormState);
+          if (id === "shopDomain") {
+            el.addEventListener("change", () => {
+              loadAbandonedCartSettings().catch(() => {});
+            });
+          }
           if (el.type !== "checkbox") {
             el.addEventListener("blur", () => {
               if (typeof el.value === "string" && !el.value.trim()) {
@@ -536,6 +556,40 @@
         }
       }
 
+      function readMinutesInput(id) {
+        const el = document.getElementById(id);
+        const value = Number(el?.value || 0);
+        if (!Number.isFinite(value)) return 0;
+        const parsed = Math.floor(value);
+        return parsed < 0 ? 0 : parsed;
+      }
+
+      function applyAbandonedCartSettings(settings = {}) {
+        document.getElementById("acStage1Minutes").value = Number(settings.stage1DelayMinutes || 0);
+        document.getElementById("acStage2Minutes").value = Number(settings.stage2DelayMinutes || 0);
+        document.getElementById("acStage3Minutes").value = Number(settings.stage3DelayMinutes || 0);
+      }
+
+      async function loadAbandonedCartSettings() {
+        const data = await api("/api/abandoned-cart/settings");
+        applyAbandonedCartSettings(data.settings || {});
+      }
+
+      async function saveAbandonedCartSettings() {
+        const payload = {
+          shopDomain: cfg().shopDomain,
+          stage1DelayMinutes: readMinutesInput("acStage1Minutes"),
+          stage2DelayMinutes: readMinutesInput("acStage2Minutes"),
+          stage3DelayMinutes: readMinutesInput("acStage3Minutes")
+        };
+        const data = await api("/api/abandoned-cart/settings", {
+          method: "POST",
+          body: JSON.stringify(payload)
+        });
+        applyAbandonedCartSettings(data.settings || payload);
+        alert("Configuracion de carrito abandonado guardada");
+      }
+
       async function saveTemplate() {
         const payload = {
           shopDomain: cfg().shopDomain,
@@ -561,6 +615,7 @@
 
       restoreFormState();
       bindFormPersistence();
+      loadAbandonedCartSettings().catch(() => {});
       loadCampaignBlocks().catch(() => {
         addCampaignBlock();
       });
