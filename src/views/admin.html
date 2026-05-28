@@ -290,19 +290,6 @@
       </div>
 
       <div class="card">
-        <h2>Plantillas</h2>
-        <div class="row">
-          <input id="tCode" placeholder="Codigo de plantilla (ej: order_confirmed)" />
-          <input id="tTitle" placeholder="Titulo de plantilla" />
-        </div>
-        <textarea id="tMessage" rows="2" placeholder="Mensaje de plantilla"></textarea>
-        <div class="row">
-          <input id="tDeepLink" placeholder="Deep link (opcional)" />
-          <button onclick="saveTemplate()">Guardar plantilla</button>
-        </div>
-      </div>
-
-      <div class="card">
         <h2>Historial de notificaciones</h2>
         <button onclick="loadHistory()">Cargar historial</button>
         <table>
@@ -324,11 +311,7 @@
       const STORAGE_KEY = "cariana_notifications_admin_form_v1";
       const PERSISTED_FIELD_IDS = [
         "shopDomain",
-        "apiKey",
-        "tCode",
-        "tTitle",
-        "tMessage",
-        "tDeepLink"
+        "apiKey"
       ];
       const CAMPAIGN_AUDIENCE_OPTIONS = [
         { value: "all_users", label: "Todos los usuarios" },
@@ -652,18 +635,6 @@
         });
         applyAbandonedCartSettings(data.settings || payload);
         alert("Configuracion de carrito abandonado guardada");
-      }
-
-      async function saveTemplate() {
-        const payload = {
-          shopDomain: cfg().shopDomain,
-          code: document.getElementById("tCode").value,
-          title: document.getElementById("tTitle").value,
-          message: document.getElementById("tMessage").value,
-          deepLink: document.getElementById("tDeepLink").value || null
-        };
-        await api("/api/templates", { method: "POST", body: JSON.stringify(payload) });
-        alert("Plantilla guardada");
       }
 
       async function loadHistory() {
