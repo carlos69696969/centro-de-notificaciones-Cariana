@@ -18,7 +18,7 @@ router.get("/", async (req, res, next) => {
 router.post("/", async (req, res, next) => {
   try {
     const { shopDomain, name, title, message, deepLink, audienceType, audienceFilters, scheduledAt, createdBy } = req.body;
-    if (!shopDomain || !title || !message || !audienceType) {
+    if (!shopDomain || !message || !audienceType) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
