@@ -5,6 +5,7 @@ const { verifyAppProxySignature } = require("../services/shopifyAppProxyVerifier
 const { buildOrderDeepLink, buildLegacyOrderFallbackDeepLink, toAbsoluteStorefrontUrl } = require("../services/deepLinkService");
 
 const router = express.Router();
+const DISPLAY_TIME_ZONE = env.notificationsDisplayTimezone || "America/Mexico_City";
 
 function extractQueryString(req) {
   const parts = req.originalUrl.split("?");
@@ -355,7 +356,8 @@ function renderItemsHtml(items) {
       year: "numeric",
       hour: "numeric",
       minute: "2-digit",
-      hour12: true
+      hour12: true,
+      timeZone: DISPLAY_TIME_ZONE
     })
       .format(date)
       .replace(".", "")
@@ -389,6 +391,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
   const safeCustomerId = JSON.stringify(customerId || "");
   const safeInitialHistory = JSON.stringify(initialHistory || []);
   const safeInitialUnread = Number(initialUnread) || 0;
+  const safeDisplayTimeZone = JSON.stringify(DISPLAY_TIME_ZONE);
   const serverSummary = `Total: ${initialHistory.length} | No leidas: ${safeInitialUnread}`;
   const serverItems = renderItemsHtml(initialHistory);
 
@@ -496,6 +499,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
 
       const listEl = document.getElementById("list");
       const basePath = window.location.pathname.replace(/\/$/, "");
+      const DISPLAY_TIME_ZONE = ${safeDisplayTimeZone};
       const proxyQuery = window.location.search || "";
 
       function withProxyQuery(path) {
@@ -513,7 +517,8 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
           year: "numeric",
           hour: "numeric",
           minute: "2-digit",
-          hour12: true
+          hour12: true,
+          timeZone: DISPLAY_TIME_ZONE
         })
           .format(d)
           .replace(".", "")

@@ -27,7 +27,8 @@ const env = {
   cronEnabled: String(process.env.CRON_ENABLED || "true").toLowerCase() === "true",
   notificationsMaxPerCustomer: Number(process.env.NOTIFICATIONS_MAX_PER_CUSTOMER || 50),
   notificationsFailedRetentionDays: Number(process.env.NOTIFICATIONS_FAILED_RETENTION_DAYS || 30),
-  notificationsVacuumEnabled: String(process.env.NOTIFICATIONS_VACUUM_ENABLED || "true").toLowerCase() === "true"
+  notificationsVacuumEnabled: String(process.env.NOTIFICATIONS_VACUUM_ENABLED || "true").toLowerCase() === "true",
+  notificationsDisplayTimezone: process.env.NOTIFICATIONS_DISPLAY_TIMEZONE || "America/Mexico_City"
 };
 
 module.exports = env;
