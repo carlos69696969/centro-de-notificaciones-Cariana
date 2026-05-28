@@ -84,6 +84,7 @@ shopify app dev --config shopify.app.centro-de-notificaciones.toml --reset --sto
   - `orders/fulfilled`
   - `orders/cancelled`
   - `refunds/create`
+  - `checkouts/create`
   - `checkouts/update`
 
 Prueba local de webhook firmado:
@@ -162,6 +163,6 @@ Notas de automatizacion en pedidos:
 
 ## Scheduler (cron)
 
-- Cada 10 min: carritos abandonados.
+- Cada 1 min (configurable con `ABANDONED_CART_SWEEP_CRON`): carritos abandonados.
 - Cada 1 min: campanas programadas.
 - Diario 03:00: limpieza de tokens invalidados.

@@ -26,6 +26,7 @@ const env = {
   firebaseServiceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "",
   cronEnabled: String(process.env.CRON_ENABLED || "true").toLowerCase() === "true",
   notificationsMaxPerCustomer: Number(process.env.NOTIFICATIONS_MAX_PER_CUSTOMER || 50),
+  abandonedCartSweepCron: process.env.ABANDONED_CART_SWEEP_CRON || "* * * * *",
   notificationsFailedRetentionDays: Number(process.env.NOTIFICATIONS_FAILED_RETENTION_DAYS || 30),
   notificationsVacuumEnabled: String(process.env.NOTIFICATIONS_VACUUM_ENABLED || "true").toLowerCase() === "true",
   notificationsDisplayTimezone: process.env.NOTIFICATIONS_DISPLAY_TIMEZONE || "America/Mexico_City"

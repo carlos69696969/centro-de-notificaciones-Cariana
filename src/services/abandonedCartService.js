@@ -1,7 +1,7 @@
 const pool = require("../db/pool");
 const { getTemplate } = require("./templateService");
 const { getCustomerByShopifyId } = require("./customerService");
-const { sendToCustomerTokens } = require("./notificationService");
+const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
 const { toAbsoluteStorefrontUrl } = require("./deepLinkService");
 
 const DEFAULT_ABANDONED_CART_SETTINGS = {
@@ -94,6 +94,12 @@ const abandonedStageLabel = {
   "1h_sent": "Carrito pendiente",
   "24h_sent": "Recordatorio de carrito",
   "3d_sent": "Ultimo recordatorio"
+};
+
+const abandonedStageTemplateFallback = {
+  "1h_sent": "Olvidaste articulos en tu carrito. Finaliza tu compra ahora.",
+  "24h_sent": "Completa tu pedido y aprovecha nuestras promociones.",
+  "3d_sent": "Aun tienes productos en tu carrito."
 };
 
 function buildAbandonedCartCopy({ stage, payload, fallbackMessage }) {
@@ -217,7 +223,7 @@ async function saveAbandonedCartSettings(shopDomain, settings) {
 async function runAbandonedCartSweep() {
   const rows = await pool.query(
     `
-    SELECT id, shop_domain, checkout_id, shopify_customer_id, created_at, abandoned_stage, payload
+    SELECT id, shop_domain, checkout_id, shopify_customer_id, email, created_at, abandoned_stage, payload
     FROM checkout_events
     WHERE completed_at IS NULL
       AND (
@@ -247,14 +253,13 @@ async function runAbandonedCartSweep() {
       nextStage = "3d_sent";
     }
 
-    if (!nextStage || !row.shopify_customer_id) {
+    if (!nextStage) {
       continue;
     }
 
-    const customer = await getCustomerByShopifyId(row.shop_domain, row.shopify_customer_id);
-    if (!customer) {
-      continue;
-    }
+    const customer = row.shopify_customer_id
+      ? await getCustomerByShopifyId(row.shop_domain, row.shopify_customer_id)
+      : null;
 
     const codeMap = {
       "1h_sent": "abandoned_cart_1h",
@@ -262,33 +267,56 @@ async function runAbandonedCartSweep() {
       "3d_sent": "abandoned_cart_3d"
     };
     const template = await getTemplate(row.shop_domain, codeMap[nextStage]);
-    if (!template) {
-      continue;
-    }
 
     const copy = buildAbandonedCartCopy({
       stage: nextStage,
       payload: row.payload || {},
-      fallbackMessage: template.message
+      fallbackMessage: template?.message || abandonedStageTemplateFallback[nextStage] || ""
     });
 
-    await sendToCustomerTokens({
-      shopDomain: row.shop_domain,
-      customerId: customer.id,
-      type: "abandoned_cart",
-      title: copy.title,
-      message: copy.message,
-      deepLink: template.deep_link
-        ? toAbsoluteStorefrontUrl(row.shop_domain, template.deep_link)
-        : toAbsoluteStorefrontUrl(row.shop_domain, "/cart"),
-      data: {
-        checkoutId: row.checkout_id,
-        stage: nextStage,
-        statusLabel: copy.stageLabel,
-        productName: copy.productName || "",
-        deepLinkType: "cart"
+    const deepLink = template?.deep_link
+      ? toAbsoluteStorefrontUrl(row.shop_domain, template.deep_link)
+      : toAbsoluteStorefrontUrl(row.shop_domain, "/cart");
+
+    const payloadData = {
+      checkoutId: row.checkout_id,
+      stage: nextStage,
+      statusLabel: copy.stageLabel,
+      productName: copy.productName || "",
+      deepLinkType: "cart"
+    };
+
+    let delivery = { sent: 0, failed: 0, total: 0 };
+    if (customer) {
+      delivery = await sendToCustomerTokens({
+        shopDomain: row.shop_domain,
+        customerId: customer.id,
+        type: "abandoned_cart",
+        title: copy.title,
+        message: copy.message,
+        deepLink,
+        data: payloadData
+      });
+    }
+
+    if (delivery.total < 1) {
+      const checkoutEmail = String(row.email || row.payload?.email || "").trim();
+      if (checkoutEmail) {
+        delivery = await sendToEmailTokens({
+          shopDomain: row.shop_domain,
+          email: checkoutEmail,
+          type: "abandoned_cart",
+          title: copy.title,
+          message: copy.message,
+          deepLink,
+          data: payloadData
+        });
       }
-    });
+    }
+
+    if (delivery.total < 1) {
+      continue;
+    }
 
     await pool.query(
       `UPDATE checkout_events SET abandoned_stage = $2 WHERE id = $1`,

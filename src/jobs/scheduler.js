@@ -11,7 +11,11 @@ function startScheduler() {
     return;
   }
 
-  cron.schedule("*/10 * * * *", async () => {
+  const abandonedCartSweepCron = cron.validate(env.abandonedCartSweepCron)
+    ? env.abandonedCartSweepCron
+    : "* * * * *";
+
+  cron.schedule(abandonedCartSweepCron, async () => {
     try {
       await runAbandonedCartSweep();
       logger.info("Abandoned cart sweep complete");

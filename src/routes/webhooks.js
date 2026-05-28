@@ -29,7 +29,7 @@ router.post("/shopify", express.raw({ type: "*/*" }), async (req, res, next) => 
       ].includes(topic)
     ) {
       await processOrderWebhook({ topic, shopDomain, payload, webhookId });
-    } else if (topic === "checkouts/update") {
+    } else if (topic === "checkouts/update" || topic === "checkouts/create") {
       await upsertCheckoutEvent({ shopDomain, payload });
     } else if (topic === "refunds/create") {
       await processRefundWebhook({ shopDomain, payload, webhookId });
