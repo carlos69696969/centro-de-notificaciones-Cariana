@@ -3,6 +3,7 @@ const { upsertCustomerFromShopify, getCustomerByShopifyId } = require("./custome
 const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens } = require("./notificationService");
 const { buildOrderDeepLink, buildReturnDeepLink } = require("./deepLinkService");
+const { closeAbandonedCartsFromOrder } = require("./abandonedCartService");
 
 const LOCAL_DELIVERY_READY_TOPIC = "fulfillment_orders/line_items_prepared_for_local_delivery";
 
@@ -538,6 +539,13 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     if (hydratedOrder) {
       effectivePayload = hydratedOrder;
     }
+  }
+
+  if (topic.startsWith("orders/")) {
+    await closeAbandonedCartsFromOrder({
+      shopDomain,
+      payload: effectivePayload
+    });
   }
 
   const templateCode = resolveTemplateCodeFromOrder(topic, effectivePayload, existingMap);

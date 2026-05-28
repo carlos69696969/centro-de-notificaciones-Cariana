@@ -242,6 +242,75 @@ async function recordAbandonedCartActivity({
   };
 }
 
+function collectOrderMatchKeys(payload = {}) {
+  const order = payload && typeof payload === "object" ? payload : {};
+  const customerId = Number(order?.customer?.id || 0) || 0;
+  const email = String(order?.email || order?.customer?.email || "").trim().toLowerCase();
+
+  const tokenCandidates = []
+    .concat(order?.cart_token)
+    .concat(order?.cartToken)
+    .concat(order?.checkout_token)
+    .concat(order?.checkoutToken)
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const uniqueTokens = Array.from(new Set(tokenCandidates));
+
+  const checkoutIdCandidates = []
+    .concat(order?.checkout_id)
+    .concat(order?.checkoutId)
+    .concat(order?.checkout_token)
+    .concat(order?.checkoutToken)
+    .concat(uniqueTokens.map((token) => `cart:${token}`))
+    .concat(customerId > 0 ? [`cart:customer:${customerId}`] : [])
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const uniqueCheckoutIds = Array.from(new Set(checkoutIdCandidates));
+
+  return {
+    customerId,
+    email,
+    tokenCandidates: uniqueTokens,
+    checkoutIdCandidates: uniqueCheckoutIds
+  };
+}
+
+async function closeAbandonedCartsFromOrder({ shopDomain, payload }) {
+  const normalizedShopDomain = String(shopDomain || "").trim();
+  if (!normalizedShopDomain) {
+    return { closed: 0 };
+  }
+
+  const match = collectOrderMatchKeys(payload || {});
+  if (!match.customerId && !match.email && !match.tokenCandidates.length && !match.checkoutIdCandidates.length) {
+    return { closed: 0 };
+  }
+
+  const result = await pool.query(
+    `
+    UPDATE checkout_events
+    SET completed_at = NOW()
+    WHERE shop_domain = $1
+      AND completed_at IS NULL
+      AND (
+        ($2::bigint > 0 AND shopify_customer_id = $2)
+        OR ($3 <> '' AND LOWER(COALESCE(email, '')) = $3)
+        OR (COALESCE(array_length($4::text[], 1), 0) > 0 AND COALESCE(cart_token, '') = ANY($4::text[]))
+        OR (COALESCE(array_length($5::text[], 1), 0) > 0 AND COALESCE(checkout_id, '') = ANY($5::text[]))
+      )
+    `,
+    [
+      normalizedShopDomain,
+      match.customerId,
+      match.email,
+      match.tokenCandidates,
+      match.checkoutIdCandidates
+    ]
+  );
+
+  return { closed: result.rowCount || 0 };
+}
+
 async function getAbandonedCartSettings(shopDomain) {
   await ensureAbandonedCartSettingsTable();
   const normalizedShopDomain = String(shopDomain || "").trim();
@@ -409,6 +478,7 @@ async function runAbandonedCartSweep() {
 
 module.exports = {
   DEFAULT_ABANDONED_CART_SETTINGS,
+  closeAbandonedCartsFromOrder,
   getAbandonedCartSettings,
   recordAbandonedCartActivity,
   saveAbandonedCartSettings,
