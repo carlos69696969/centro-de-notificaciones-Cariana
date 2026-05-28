@@ -69,18 +69,18 @@ const templates = [
   },
   {
     code: "abandoned_cart_1h",
-    title: "Carrito pendiente",
-    message: "Olvidaste articulos en tu carrito. Finaliza tu compra ahora."
+    title: "🛒 Carrito pendiente",
+    message: "🔥 Tu carrito te están esperando. “Aún tienes productos en tu carrito. Finaliza tu compra antes de que se agoten.”"
   },
   {
     code: "abandoned_cart_24h",
-    title: "Completa tu compra",
-    message: "Completa tu pedido y aprovecha nuestras promociones."
+    title: "🔥 Tu carrito te está esperando",
+    message: "🛒 Algunos productos tienen alta demanda. Completa tu compra antes de que tus favoritos desaparezcan."
   },
   {
     code: "abandoned_cart_3d",
-    title: "Tu carrito te espera",
-    message: "Aun tienes productos en tu carrito."
+    title: "🔥 No pierdas lo que elegiste",
+    message: "🛒 Tu carrito sigue disponible, pero algunos productos podrían agotarse pronto. Finaliza tu pedido ahora."
   }
 ];
 

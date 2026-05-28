@@ -90,41 +90,29 @@ async function ensureAbandonedCartSettingsTable() {
   await ensureSettingsTablePromise;
 }
 
-const abandonedStageLabel = {
-  "1h_sent": "Carrito pendiente",
-  "24h_sent": "Recordatorio de carrito",
-  "3d_sent": "Ultimo recordatorio"
+const abandonedStageCopyMap = {
+  "1h_sent": {
+    title: "🛒 Carrito pendiente",
+    message: "🔥 Tu carrito te están esperando. “Aún tienes productos en tu carrito. Finaliza tu compra antes de que se agoten.”"
+  },
+  "24h_sent": {
+    title: "🔥 Tu carrito te está esperando",
+    message: "🛒 Algunos productos tienen alta demanda. Completa tu compra antes de que tus favoritos desaparezcan."
+  },
+  "3d_sent": {
+    title: "🔥 No pierdas lo que elegiste",
+    message: "🛒 Tu carrito sigue disponible, pero algunos productos podrían agotarse pronto. Finaliza tu pedido ahora."
+  }
 };
 
-const abandonedStageTemplateFallback = {
-  "1h_sent": "Olvidaste articulos en tu carrito. Finaliza tu compra ahora.",
-  "24h_sent": "Completa tu pedido y aprovecha nuestras promociones.",
-  "3d_sent": "Aun tienes productos en tu carrito."
-};
-
-function buildAbandonedCartCopy({ stage, payload, fallbackMessage }) {
+function buildAbandonedCartCopy({ stage, payload }) {
   const productName = extractCheckoutProductName(payload || {});
-  const stageLabel = abandonedStageLabel[stage] || "Carrito pendiente";
-  const title = `${stageLabel} - Carrito`;
-  const parts = [];
-
-  if (productName) {
-    parts.push(`${productName}.`);
-  }
-  parts.push(`${stageLabel}.`);
-
-  const detail = truncateText(fallbackMessage, 70);
-  if (detail) {
-    parts.push(`${detail}.`);
-  }
-
-  parts.push("Toca para ver el detalle.");
-
+  const stageCopy = abandonedStageCopyMap[stage] || abandonedStageCopyMap["1h_sent"];
   return {
-    title,
-    message: parts.join(" "),
+    title: stageCopy.title,
+    message: stageCopy.message,
     productName,
-    stageLabel
+    stageLabel: stageCopy.title
   };
 }
 
@@ -421,8 +409,7 @@ async function runAbandonedCartSweep() {
 
     const copy = buildAbandonedCartCopy({
       stage: nextStage,
-      payload: row.payload || {},
-      fallbackMessage: template?.message || abandonedStageTemplateFallback[nextStage] || ""
+      payload: row.payload || {}
     });
 
     const deepLink = template?.deep_link
