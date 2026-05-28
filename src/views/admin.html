@@ -143,6 +143,19 @@
         font-size: 14px;
         white-space: nowrap;
       }
+      .duration-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .duration-group {
+        display: grid;
+        gap: 6px;
+      }
+      .duration-group .input-suffix input {
+        width: 56px;
+        text-align: center;
+      }
       input,
       select,
       textarea,
@@ -201,6 +214,9 @@
         .row {
           grid-template-columns: 1fr;
         }
+        .duration-grid {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
@@ -236,17 +252,41 @@
 
       <div class="card">
         <h2>Configuracion carrito abandonado</h2>
-        <p class="label">Define en cuantos minutos se envia cada recordatorio desde que se detecta el checkout sin completar.</p>
-        <div class="row">
-          <input id="acStage1Minutes" type="number" min="0" step="1" placeholder="Primer recordatorio (minutos)" />
-          <input id="acStage2Minutes" type="number" min="0" step="1" placeholder="Segundo recordatorio (minutos)" />
+        <p class="label">Define en cuantas horas y minutos se envia cada recordatorio desde que se detecta el checkout sin completar.</p>
+        <div class="duration-grid">
+          <div class="duration-group">
+            <div class="label">Primer recordatorio</div>
+            <label class="input-suffix">
+              <input id="acStage1Hours" type="number" min="0" step="1" placeholder="0" aria-label="Horas primer recordatorio" />
+              <span class="suffix">h</span>
+              <input id="acStage1Minutes" type="number" min="0" max="59" step="1" placeholder="0" aria-label="Minutos primer recordatorio" />
+              <span class="suffix">m</span>
+            </label>
+          </div>
+          <div class="duration-group">
+            <div class="label">Segundo recordatorio</div>
+            <label class="input-suffix">
+              <input id="acStage2Hours" type="number" min="0" step="1" placeholder="0" aria-label="Horas segundo recordatorio" />
+              <span class="suffix">h</span>
+              <input id="acStage2Minutes" type="number" min="0" max="59" step="1" placeholder="0" aria-label="Minutos segundo recordatorio" />
+              <span class="suffix">m</span>
+            </label>
+          </div>
+          <div class="duration-group">
+            <div class="label">Tercer recordatorio</div>
+            <label class="input-suffix">
+              <input id="acStage3Hours" type="number" min="0" step="1" placeholder="0" aria-label="Horas tercer recordatorio" />
+              <span class="suffix">h</span>
+              <input id="acStage3Minutes" type="number" min="0" max="59" step="1" placeholder="0" aria-label="Minutos tercer recordatorio" />
+              <span class="suffix">m</span>
+            </label>
+          </div>
         </div>
-        <div class="row" style="grid-template-columns: 1fr auto auto; gap: 8px;">
-          <input id="acStage3Minutes" type="number" min="0" step="1" placeholder="Tercer recordatorio (minutos)" />
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
           <button class="btn-secondary" style="width: auto;" onclick="loadAbandonedCartSettings()">Cargar</button>
           <button style="width: auto;" onclick="saveAbandonedCartSettings()">Guardar configuracion</button>
         </div>
-        <p class="label">Tip: usa 0 para desactivar una etapa.</p>
+        <p class="label">Tip: usa 0h y 0m para desactivar una etapa.</p>
       </div>
 
       <div class="card">
@@ -556,18 +596,42 @@
         }
       }
 
-      function readMinutesInput(id) {
+      function readIntInput(id, max = null) {
         const el = document.getElementById(id);
         const value = Number(el?.value || 0);
         if (!Number.isFinite(value)) return 0;
         const parsed = Math.floor(value);
-        return parsed < 0 ? 0 : parsed;
+        const normalized = parsed < 0 ? 0 : parsed;
+        if (Number.isFinite(max)) {
+          return Math.min(normalized, max);
+        }
+        return normalized;
+      }
+
+      function toDurationParts(totalMinutes) {
+        const safeTotal = Math.max(0, Math.floor(Number(totalMinutes || 0)));
+        return {
+          hours: Math.floor(safeTotal / 60),
+          minutes: safeTotal % 60
+        };
+      }
+
+      function readDurationMinutes(hoursId, minutesId) {
+        const hours = readIntInput(hoursId);
+        const minutes = readIntInput(minutesId, 59);
+        return (hours * 60) + minutes;
       }
 
       function applyAbandonedCartSettings(settings = {}) {
-        document.getElementById("acStage1Minutes").value = Number(settings.stage1DelayMinutes || 0);
-        document.getElementById("acStage2Minutes").value = Number(settings.stage2DelayMinutes || 0);
-        document.getElementById("acStage3Minutes").value = Number(settings.stage3DelayMinutes || 0);
+        const stage1 = toDurationParts(settings.stage1DelayMinutes || 0);
+        const stage2 = toDurationParts(settings.stage2DelayMinutes || 0);
+        const stage3 = toDurationParts(settings.stage3DelayMinutes || 0);
+        document.getElementById("acStage1Hours").value = stage1.hours;
+        document.getElementById("acStage1Minutes").value = stage1.minutes;
+        document.getElementById("acStage2Hours").value = stage2.hours;
+        document.getElementById("acStage2Minutes").value = stage2.minutes;
+        document.getElementById("acStage3Hours").value = stage3.hours;
+        document.getElementById("acStage3Minutes").value = stage3.minutes;
       }
 
       async function loadAbandonedCartSettings() {
@@ -578,9 +642,9 @@
       async function saveAbandonedCartSettings() {
         const payload = {
           shopDomain: cfg().shopDomain,
-          stage1DelayMinutes: readMinutesInput("acStage1Minutes"),
-          stage2DelayMinutes: readMinutesInput("acStage2Minutes"),
-          stage3DelayMinutes: readMinutesInput("acStage3Minutes")
+          stage1DelayMinutes: readDurationMinutes("acStage1Hours", "acStage1Minutes"),
+          stage2DelayMinutes: readDurationMinutes("acStage2Hours", "acStage2Minutes"),
+          stage3DelayMinutes: readDurationMinutes("acStage3Hours", "acStage3Minutes")
         };
         const data = await api("/api/abandoned-cart/settings", {
           method: "POST",
