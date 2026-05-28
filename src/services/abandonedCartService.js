@@ -10,6 +10,8 @@ const DEFAULT_ABANDONED_CART_SETTINGS = {
   stage3DelayMinutes: 3 * 24 * 60
 };
 
+let ensureSettingsTablePromise = null;
+
 function pickFirstString(candidates) {
   for (const value of candidates) {
     const text = String(value || "").trim();
@@ -68,6 +70,24 @@ function normalizeAbandonedCartSettings(value = {}) {
     stage2DelayMinutes: toSafeMinutes(source.stage2DelayMinutes, DEFAULT_ABANDONED_CART_SETTINGS.stage2DelayMinutes),
     stage3DelayMinutes: toSafeMinutes(source.stage3DelayMinutes, DEFAULT_ABANDONED_CART_SETTINGS.stage3DelayMinutes)
   };
+}
+
+async function ensureAbandonedCartSettingsTable() {
+  if (!ensureSettingsTablePromise) {
+    ensureSettingsTablePromise = pool.query(
+      `
+      CREATE TABLE IF NOT EXISTS abandoned_cart_settings (
+        shop_domain TEXT PRIMARY KEY,
+        stage1_delay_minutes INTEGER NOT NULL DEFAULT 60,
+        stage2_delay_minutes INTEGER NOT NULL DEFAULT 1440,
+        stage3_delay_minutes INTEGER NOT NULL DEFAULT 4320,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      )
+      `
+    );
+  }
+  await ensureSettingsTablePromise;
 }
 
 const abandonedStageLabel = {
@@ -135,6 +155,7 @@ async function upsertCheckoutEvent({ shopDomain, payload }) {
 }
 
 async function getAbandonedCartSettings(shopDomain) {
+  await ensureAbandonedCartSettingsTable();
   const normalizedShopDomain = String(shopDomain || "").trim();
   if (!normalizedShopDomain) {
     return { ...DEFAULT_ABANDONED_CART_SETTINGS };
@@ -161,6 +182,7 @@ async function getAbandonedCartSettings(shopDomain) {
 }
 
 async function saveAbandonedCartSettings(shopDomain, settings) {
+  await ensureAbandonedCartSettingsTable();
   const normalizedShopDomain = String(shopDomain || "").trim();
   if (!normalizedShopDomain) {
     throw new Error("shopDomain is required");

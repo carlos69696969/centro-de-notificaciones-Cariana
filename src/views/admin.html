@@ -429,7 +429,8 @@
         const response = await fetch(path, { ...options, headers: { ...headers, ...(options.headers || {}) } });
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
-          throw new Error(data.error || "Request failed");
+          const message = data.detail || data.error || "Request failed";
+          throw new Error(message);
         }
         return response.json();
       }
