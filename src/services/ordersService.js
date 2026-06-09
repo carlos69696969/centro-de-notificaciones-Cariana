@@ -450,6 +450,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const productNames = extractProductNames(payload);
   const productsInline = formatProductsInline(productNames);
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
+  const attemptCount = Math.max(0, Number(payload?.attemptCount ?? payload?.attempt_count ?? payload?.attempt ?? 0) || 0);
 
   if (templateCode === "order_preparing") {
     const preparingTitle = normalizedOrder ? `Confirmado - Pedido #${normalizedOrder}` : "Confirmado - Pedido";
@@ -484,6 +485,21 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
 
   if (templateCode === "order_not_delivered") {
     const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
+
+    if (attemptCount === 2) {
+      const message = orderRef
+        ? `Pedido ${orderRef} 🚚. Realizamos un segundo intento de entrega, pero no fue posible localizarte en tu domicilio ni comunicarnos contigo. Nuestro equipo realizará un último intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m.\n\nImportante: Si durante este tercer intento tampoco logramos entregarte tu pedido, este será resguardado en nuestra sucursal para que puedas recogerlo personalmente dentro del plazo establecido.\n\n¡Gracias por tu comprensión! 😊`
+        : `Pedido #**** 🚚. Realizamos un segundo intento de entrega, pero no fue posible localizarte en tu domicilio ni comunicarnos contigo. Nuestro equipo realizará un último intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m.\n\nImportante: Si durante este tercer intento tampoco logramos entregarte tu pedido, este será resguardado en nuestra sucursal para que puedas recogerlo personalmente dentro del plazo establecido.\n\n¡Gracias por tu comprensión! 😊`;
+
+      return {
+        title: "Segundo intento de entrega 📦⚠️",
+        message,
+        statusLabel,
+        productNames,
+        productsInline
+      };
+    }
+
     const message = orderRef
       ? `Pedido ${orderRef} 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉\n\n¡Gracias por tu comprensión!`
       : `Pedido #**** 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉\n\n¡Gracias por tu comprensión!`;
@@ -777,7 +793,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   return sendResult;
 }
 
-async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEmail, orderId, orderNumber, status }) {
+async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEmail, orderId, orderNumber, status, attemptCount }) {
   const templateCode = normalizeManualStatus(status);
   if (!validManualStatusCodes.has(templateCode)) {
     throw new Error("Unsupported order status");
@@ -809,7 +825,7 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEm
   const copy = buildOrderNotificationCopy({
     templateCode,
     orderNumber,
-    payload: {},
+    payload: { attemptCount },
     fallbackTitle: template.title,
     fallbackMessage: template.message
   });
@@ -832,6 +848,7 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEm
       orderId,
       orderNumber,
       status: templateCode,
+      attemptCount: Math.max(0, Number(attemptCount || 0) || 0),
       statusLabel: copy.statusLabel,
       productName: copy.productsInline || "",
       productNames: copy.productNames || [],
@@ -969,3 +986,4 @@ module.exports = {
   sendManualOrderStatus,
   processRefundWebhook
 };
+
