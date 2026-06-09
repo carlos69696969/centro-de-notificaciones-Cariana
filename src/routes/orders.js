@@ -6,8 +6,12 @@ const router = express.Router();
 router.post("/manual-status", async (req, res, next) => {
   try {
     const { shopDomain, shopifyCustomerId, orderId, orderNumber, status } = req.body;
-    if (!shopDomain || !shopifyCustomerId || !orderId || !status) {
-      return res.status(400).json({ error: "Missing required fields" });
+    const hasOrderContext = Boolean(orderId || orderNumber);
+    if (!shopDomain || !hasOrderContext || !status) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        detail: "shopDomain, orderId or orderNumber, and status are required"
+      });
     }
 
     const result = await sendManualOrderStatus({

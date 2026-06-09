@@ -150,6 +150,9 @@ Estados soportados:
 - `delivered`
 - `cancelled`
 
+Tambien se aceptan aliases como `en_ruta`, `en_camino`, `route` y `entregado`.
+Si no envias `shopifyCustomerId`, el backend intenta resolver el cliente con `orderId` o `orderNumber`.
+
 Notas de automatizacion en pedidos:
 
 - Si Shopify envia estado de entrega (`delivered`), se usa plantilla `order_delivered`.

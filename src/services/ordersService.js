@@ -364,6 +364,72 @@ const orderStatusLabels = {
   refund_processed: "Reembolso procesado"
 };
 
+const manualStatusAliases = {
+  confirmed: "order_confirmed",
+  confirm: "order_confirmed",
+  preparado: "order_preparing",
+  preparing: "order_preparing",
+  preparation: "order_preparing",
+  en_preparacion: "order_preparing",
+  shipped: "order_shipped",
+  enviado: "order_shipped",
+  in_transit: "order_in_transit",
+  en_transito: "order_in_transit",
+  en_ruta: "order_in_transit",
+  en_route: "order_in_transit",
+  enruta: "order_in_transit",
+  in_route: "order_in_transit",
+  route: "order_in_transit",
+  en_camino: "order_in_transit",
+  on_route: "order_in_transit",
+  delivered: "order_delivered",
+  entregado: "order_delivered",
+  cancelled: "order_cancelled",
+  canceled: "order_cancelled",
+  cancelado: "order_cancelled"
+};
+
+const validManualStatusCodes = new Set([
+  "order_confirmed",
+  "order_preparing",
+  "order_shipped",
+  "order_in_transit",
+  "order_delivered",
+  "order_cancelled"
+]);
+
+function normalizeManualStatus(value) {
+  const normalized = normalizeStatus(value);
+  return manualStatusAliases[normalized] || normalized;
+}
+
+async function getCustomerByOrderReference({ shopDomain, orderId, orderNumber }) {
+  const normalizedOrderId = parseLegacyNumericId(orderId);
+  const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
+
+  if (!normalizedOrderId && !normalizedOrderNumber) {
+    return null;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT c.id, c.shopify_customer_id
+    FROM order_customer_map ocm
+    JOIN customers c ON c.shop_domain = ocm.shop_domain AND c.shopify_customer_id = ocm.shopify_customer_id
+    WHERE ocm.shop_domain = $1
+      AND (
+        ($2::bigint IS NOT NULL AND ocm.order_id = $2::bigint)
+        OR ($3 <> '' AND COALESCE(ocm.order_number, '') = $3)
+      )
+    ORDER BY ocm.updated_at DESC, ocm.id DESC
+    LIMIT 1
+    `,
+    [shopDomain, normalizedOrderId || null, normalizedOrderNumber]
+  );
+
+  return result.rows[0] || null;
+}
+
 function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallbackTitle, fallbackMessage }) {
   const normalizedOrder = normalizeOrderNumber(orderNumber);
   const statusLabel = orderStatusLabels[templateCode] || pickFirstString([fallbackTitle, "Actualizacion"]);
@@ -683,20 +749,22 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
 }
 
 async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, orderNumber, status }) {
-  const map = {
-    confirmed: "order_confirmed",
-    preparing: "order_preparing",
-    shipped: "order_shipped",
-    in_transit: "order_in_transit",
-    delivered: "order_delivered",
-    cancelled: "order_cancelled"
-  };
-  const templateCode = map[status];
-  if (!templateCode) {
+  const templateCode = normalizeManualStatus(status);
+  if (!validManualStatusCodes.has(templateCode)) {
     throw new Error("Unsupported order status");
   }
 
-  const customer = await getCustomerByShopifyId(shopDomain, shopifyCustomerId);
+  let customer = null;
+  if (shopifyCustomerId) {
+    customer = await getCustomerByShopifyId(shopDomain, shopifyCustomerId);
+  }
+  if (!customer) {
+    customer = await getCustomerByOrderReference({
+      shopDomain,
+      orderId,
+      orderNumber
+    });
+  }
   if (!customer) {
     throw new Error("Customer not found");
   }
