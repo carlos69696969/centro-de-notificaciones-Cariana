@@ -5,7 +5,17 @@ const router = express.Router();
 
 router.post("/manual-status", async (req, res, next) => {
   try {
-    const { shopDomain, shopifyCustomerId, customerEmail, orderId, orderNumber, status, attemptCount } = req.body;
+    const {
+      shopDomain,
+      shopifyCustomerId,
+      customerEmail,
+      orderId,
+      orderNumber,
+      status,
+      attemptCount,
+      branchAddress,
+      branchHours,
+    } = req.body;
     const hasOrderContext = Boolean(orderId || orderNumber);
     if (!shopDomain || !hasOrderContext || !status) {
       return res.status(400).json({
@@ -21,7 +31,9 @@ router.post("/manual-status", async (req, res, next) => {
       orderId,
       orderNumber,
       status,
-      attemptCount
+      attemptCount,
+      branchAddress,
+      branchHours
     });
     return res.json({ ok: true, result });
   } catch (error) {

@@ -417,6 +417,14 @@ function normalizeManualStatus(value) {
   return manualStatusAliases[normalized] || normalized;
 }
 
+const DEFAULT_BRANCH_ADDRESS = "Sucursal principal por definir";
+const DEFAULT_BRANCH_HOURS = "Lunes a Viernes de 9:00 a 18:00";
+
+function normalizeBranchText(value, fallback) {
+  const text = String(value || "").trim();
+  return text || fallback;
+}
+
 async function getCustomerByOrderReference({ shopDomain, orderId, orderNumber }) {
   const normalizedOrderId = parseLegacyNumericId(orderId);
   const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
@@ -451,6 +459,14 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const productsInline = formatProductsInline(productNames);
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
   const attemptCount = Math.max(0, Number(payload?.attemptCount ?? payload?.attempt_count ?? payload?.attempt ?? 0) || 0);
+  const branchAddress = normalizeBranchText(
+    payload?.branchAddress ?? payload?.branch_address ?? payload?.pickupAddress,
+    DEFAULT_BRANCH_ADDRESS
+  );
+  const branchHours = normalizeBranchText(
+    payload?.branchHours ?? payload?.branch_hours ?? payload?.pickupHours,
+    DEFAULT_BRANCH_HOURS
+  );
 
   if (templateCode === "order_preparing") {
     const preparingTitle = normalizedOrder ? `Confirmado - Pedido #${normalizedOrder}` : "Confirmado - Pedido";
@@ -484,7 +500,28 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   }
 
   if (templateCode === "order_not_delivered") {
-    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
+    const orderRef = "#****";
+
+    if (attemptCount >= 3) {
+      const message = [
+        `Pedido ${orderRef} 🚚 Realizamos el tercer y último intento de entrega de tu pedido, pero no fue posible localizarte en tu domicilio ni comunicarnos contigo.`,
+        "Tu paquete ha sido resguardado en nuestra sucursal y estará disponible para su recolección durante los próximos 30 días naturales.",
+        `📍 Dirección de la sucursal: ${branchAddress}`,
+        `🕒 Horario de la sucursal: ${branchHours}`,
+        "Para recoger tu pedido, será necesario presentar:",
+        "✅ Número de pedido.",
+        "✅ Nombre del comprador.",
+        "⚠️ Importante: Si tu pedido no es recogido dentro de los próximos 30 días naturales, procederemos a cancelar la entrega y realizar el reembolso correspondiente a tu método de pago original."
+      ].join("\n\n");
+
+      return {
+        title: "Tercer intento de entrega 📦❌",
+        message,
+        statusLabel,
+        productNames,
+        productsInline
+      };
+    }
 
     if (attemptCount === 2) {
       const message = orderRef
@@ -793,7 +830,17 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   return sendResult;
 }
 
-async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEmail, orderId, orderNumber, status, attemptCount }) {
+async function sendManualOrderStatus({
+  shopDomain,
+  shopifyCustomerId,
+  customerEmail,
+  orderId,
+  orderNumber,
+  status,
+  attemptCount,
+  branchAddress,
+  branchHours
+}) {
   const templateCode = normalizeManualStatus(status);
   if (!validManualStatusCodes.has(templateCode)) {
     throw new Error("Unsupported order status");
@@ -825,7 +872,11 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEm
   const copy = buildOrderNotificationCopy({
     templateCode,
     orderNumber,
-    payload: { attemptCount },
+    payload: {
+      attemptCount,
+      branchAddress,
+      branchHours
+    },
     fallbackTitle: template.title,
     fallbackMessage: template.message
   });
@@ -849,6 +900,8 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEm
       orderNumber,
       status: templateCode,
       attemptCount: Math.max(0, Number(attemptCount || 0) || 0),
+      branchAddress: String(branchAddress || "").trim(),
+      branchHours: String(branchHours || "").trim(),
       statusLabel: copy.statusLabel,
       productName: copy.productsInline || "",
       productNames: copy.productNames || [],
