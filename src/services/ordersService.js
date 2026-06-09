@@ -360,6 +360,7 @@ const orderStatusLabels = {
   order_shipped: "Enviado",
   order_in_transit: "En ruta",
   order_delivered: "Entregado",
+  order_not_delivered: "No entregado",
   order_cancelled: "Cancelado",
   refund_processed: "Reembolso procesado"
 };
@@ -384,6 +385,11 @@ const manualStatusAliases = {
   on_route: "order_in_transit",
   delivered: "order_delivered",
   entregado: "order_delivered",
+  no_entregado: "order_not_delivered",
+  noentregado: "order_not_delivered",
+  not_delivered: "order_not_delivered",
+  failed_delivery: "order_not_delivered",
+  entrega_fallida: "order_not_delivered",
   cancelled: "order_cancelled",
   canceled: "order_cancelled",
   cancelado: "order_cancelled"
@@ -395,8 +401,16 @@ const validManualStatusCodes = new Set([
   "order_shipped",
   "order_in_transit",
   "order_delivered",
+  "order_not_delivered",
   "order_cancelled"
 ]);
+
+const defaultManualTemplates = {
+  order_not_delivered: {
+    title: "No entregado - Pedido",
+    message: "No logramos entregar tu pedido en esta visita."
+  }
+};
 
 function normalizeManualStatus(value) {
   const normalized = normalizeStatus(value);
@@ -458,6 +472,21 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     const message = orderRef
       ? `¡Tu pedido ${orderRef} ha sido entregado con éxito! 📦✨\n\nEsperamos que te encante tu compra. Gracias por confiar en Cariana y ser parte de nuestra comunidad. 💙`
       : `¡Tu pedido ha sido entregado con éxito! 📦✨\n\nEsperamos que te encante tu compra. Gracias por confiar en Cariana y ser parte de nuestra comunidad. 💙`;
+
+    return {
+      title,
+      message,
+      statusLabel,
+      productNames,
+      productsInline
+    };
+  }
+
+  if (templateCode === "order_not_delivered") {
+    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
+    const message = orderRef
+      ? `No logramos entregar tu pedido ${orderRef} en esta visita. 🚚\n\nNuestro equipo intentará comunicarse contigo o reprogramar la entrega.\n\nGracias por confiar en Cariana. 💙`
+      : `No logramos entregar tu pedido en esta visita. 🚚\n\nNuestro equipo intentará comunicarse contigo o reprogramar la entrega.\n\nGracias por confiar en Cariana. 💙`;
 
     return {
       title,
@@ -772,7 +801,7 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEm
     throw new Error("Customer not found");
   }
 
-  const template = await getTemplate(shopDomain, templateCode);
+  const template = (await getTemplate(shopDomain, templateCode)) || defaultManualTemplates[templateCode] || null;
   if (!template) {
     throw new Error(`Template not found for ${templateCode}`);
   }

@@ -28,6 +28,11 @@ const templates = [
     message: "Tu pedido ha sido entregado."
   },
   {
+    code: "order_not_delivered",
+    title: "No entregado - Pedido",
+    message: "No logramos entregar tu pedido en esta visita."
+  },
+  {
     code: "order_cancelled",
     title: "Pedido cancelado",
     message: "Tu pedido ha sido cancelado."
