@@ -1,6 +1,13 @@
 const env = require("../config/env");
 
 function requireInternalApiKey(req, res, next) {
+  const publicPath = String(req.originalUrl || "").split("?")[0];
+  const isPublicOrderManualStatus =
+    req.method === "POST" && publicPath === "/api/orders/manual-status";
+  if (isPublicOrderManualStatus) {
+    return next();
+  }
+
   if (!env.appInternalApiKey) {
     return next();
   }
