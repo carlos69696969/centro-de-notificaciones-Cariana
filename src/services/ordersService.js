@@ -358,7 +358,7 @@ const orderStatusLabels = {
   order_confirmed: "Confirmado",
   order_preparing: "En preparacion",
   order_shipped: "Enviado",
-  order_in_transit: "En transito",
+  order_in_transit: "En ruta",
   order_delivered: "Entregado",
   order_cancelled: "Cancelado",
   refund_processed: "Reembolso procesado"
