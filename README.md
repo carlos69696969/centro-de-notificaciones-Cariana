@@ -151,7 +151,7 @@ Estados soportados:
 - `cancelled`
 
 Tambien se aceptan aliases como `en_ruta`, `en_camino`, `route` y `entregado`.
-Si no envias `shopifyCustomerId`, el backend intenta resolver el cliente con `orderId` o `orderNumber`.
+Si no envias `shopifyCustomerId`, el backend intenta resolver el cliente con `orderId`, `orderNumber` o `customerEmail`.
 
 Notas de automatizacion en pedidos:
 

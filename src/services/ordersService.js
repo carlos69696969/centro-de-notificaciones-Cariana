@@ -1,5 +1,5 @@
 const pool = require("../db/pool");
-const { upsertCustomerFromShopify, getCustomerByShopifyId } = require("./customerService");
+const { upsertCustomerFromShopify, getCustomerByShopifyId, getCustomerByEmail } = require("./customerService");
 const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens } = require("./notificationService");
 const { buildOrderDeepLink, buildReturnDeepLink } = require("./deepLinkService");
@@ -748,7 +748,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   return sendResult;
 }
 
-async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, orderNumber, status }) {
+async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, customerEmail, orderId, orderNumber, status }) {
   const templateCode = normalizeManualStatus(status);
   if (!validManualStatusCodes.has(templateCode)) {
     throw new Error("Unsupported order status");
@@ -764,6 +764,9 @@ async function sendManualOrderStatus({ shopDomain, shopifyCustomerId, orderId, o
       orderId,
       orderNumber
     });
+  }
+  if (!customer && customerEmail) {
+    customer = await getCustomerByEmail(shopDomain, customerEmail);
   }
   if (!customer) {
     throw new Error("Customer not found");
