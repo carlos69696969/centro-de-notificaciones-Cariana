@@ -29,8 +29,8 @@ const templates = [
   },
   {
     code: "order_not_delivered",
-    title: "No entregado - Pedido",
-    message: "No logramos entregar tu pedido en esta visita."
+    title: "Pedido no entregado 📦❌",
+    message: "Pedido #**** 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉 ¡Gracias por tu comprensión!"
   },
   {
     code: "order_cancelled",

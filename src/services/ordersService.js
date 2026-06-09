@@ -407,8 +407,8 @@ const validManualStatusCodes = new Set([
 
 const defaultManualTemplates = {
   order_not_delivered: {
-    title: "No entregado - Pedido",
-    message: "No logramos entregar tu pedido en esta visita."
+    title: "Pedido no entregado 📦❌",
+    message: "Pedido #**** 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉 ¡Gracias por tu comprensión!"
   }
 };
 
@@ -485,11 +485,11 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   if (templateCode === "order_not_delivered") {
     const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
     const message = orderRef
-      ? `No logramos entregar tu pedido ${orderRef} en esta visita. 🚚\n\nNuestro equipo intentará comunicarse contigo o reprogramar la entrega.\n\nGracias por confiar en Cariana. 💙`
-      : `No logramos entregar tu pedido en esta visita. 🚚\n\nNuestro equipo intentará comunicarse contigo o reprogramar la entrega.\n\nGracias por confiar en Cariana. 💙`;
+      ? `Pedido ${orderRef} 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉\n\n¡Gracias por tu comprensión!`
+      : `Pedido #**** 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉\n\n¡Gracias por tu comprensión!`;
 
     return {
-      title,
+      title: "Pedido no entregado 📦❌",
       message,
       statusLabel,
       productNames,
