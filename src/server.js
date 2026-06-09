@@ -36,6 +36,7 @@ app.use("/api/orders", requireInternalApiKey, ordersRoutes);
 app.use("/api/abandoned-cart", requireInternalApiKey, abandonedCartRoutes);
 app.use("/proxy/notifications", storefrontNotificationsRoutes);
 app.use("/proxy/returns", returnsRoutes);
+app.use("/proxy/orders", ordersRoutes);
 
 app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname, "views", "admin.html"));
