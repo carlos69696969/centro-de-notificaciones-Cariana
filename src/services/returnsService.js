@@ -54,6 +54,11 @@ const returnTemplateMap = {
   collection_scheduled: "return_pickup_scheduled",
   recoleccion_programada: "return_pickup_scheduled",
 
+  // Courier pickup route aliases
+  order_in_transit: "return_pickup_in_transit",
+  courier_mark_en_route: "return_pickup_in_transit",
+  return_pickup_in_transit: "return_pickup_in_transit",
+
   // Picked-up / received aliases
   mark_received: "return_picked_up",
   recibida: "return_picked_up",
@@ -92,6 +97,10 @@ const defaultReturnTemplates = {
   return_pickup_scheduled: {
     title: "Intento de recoleccion fallido",
     message: "No se pudo completar la recoleccion de tu devolucion."
+  },
+  return_pickup_in_transit: {
+    title: "Vamos en camino",
+    message: "Nuestro repartidor ya se dirige a tu domicilio para recoger tu devolucion."
   },
   return_picked_up: {
     title: "Producto recogido",
@@ -336,6 +345,7 @@ const returnStatusLabels = {
   return_approved: "Aprobada",
   return_rejected: "Rechazada",
   return_pickup_scheduled: "Intento de recoleccion fallido",
+  return_pickup_in_transit: "En ruta",
   return_picked_up: "Producto recogido",
   refund_processed: "Reembolso procesado",
   refund_completed: "Reembolso completado"
@@ -347,6 +357,7 @@ function buildReturnStatusTitle(templateCode) {
     return_approved: "Devolucion aprobada",
     return_rejected: "Devoluci\u00F3n rechazada \u274C",
     return_pickup_scheduled: "Intento de recolecci\u00F3n fallido \u274C",
+    return_pickup_in_transit: "En ruta para recoger tu devolucion",
     return_picked_up: "Producto recogido",
     refund_processed: "Reembolso procesado",
     refund_completed: "Reembolso completado"
@@ -459,6 +470,17 @@ function buildReturnPremiumTemplate({
     ? "Devolucion entregada"
     : buildReturnStatusTitle(templateCode);
   const portalCurrentText = buildPortalCurrentStatusText(templateCode, payload, fallbackMessage);
+
+  if (templateCode === "return_pickup_in_transit") {
+    return {
+      title: pickFirstString([payload.title, statusTitle]),
+      message: pickFirstString([payload.message, payload.note, fallbackMessage]),
+      productNames: mergedProductNames,
+      productsInline,
+      rejectionReason,
+      statusLabel
+    };
+  }
 
   if (templateCode === "return_rejected") {
     const formalTitle = statusTitle;
@@ -629,6 +651,7 @@ async function processReturnEvent({ shopDomain, payload }) {
     productName: "",
     productNames: [],
     reason: premiumCopy.rejectionReason || "",
+    routeStep: payload.route_step || payload.routeStep || "",
     deepLinkType: "return",
     deeplinkType: "return",
     linkType: "return",
