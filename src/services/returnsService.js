@@ -50,6 +50,7 @@ const returnTemplateMap = {
   pickup_attempt_failed: "return_pickup_scheduled",
   intento_fallido_1: "return_pickup_scheduled",
   intento_fallido_2: "return_pickup_scheduled",
+  intento_fallido_3: "return_pickup_scheduled",
   pickup_scheduled: "return_pickup_scheduled",
   collection_scheduled: "return_pickup_scheduled",
   recoleccion_programada: "return_pickup_scheduled",
