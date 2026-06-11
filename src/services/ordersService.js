@@ -500,7 +500,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   }
 
   if (templateCode === "order_not_delivered") {
-    const orderRef = "#****";
+    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "#****";
 
     if (attemptCount >= 3) {
       const message = [
