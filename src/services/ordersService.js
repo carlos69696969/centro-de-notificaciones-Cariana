@@ -467,6 +467,12 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     payload?.branchHours ?? payload?.branch_hours ?? payload?.pickupHours,
     DEFAULT_BRANCH_HOURS
   );
+  const nextDeliveryDate = new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }).format(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
   if (templateCode === "order_preparing") {
     const preparingTitle = normalizedOrder ? `Confirmado - Pedido #${normalizedOrder}` : "Confirmado - Pedido";
@@ -525,8 +531,8 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
 
     if (attemptCount === 2) {
       const message = orderRef
-        ? `Pedido ${orderRef} 🚚. Realizamos un segundo intento de entrega, pero no fue posible localizarte en tu domicilio ni comunicarnos contigo. Nuestro equipo realizará un último intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m.\n\nImportante: Si durante este tercer intento tampoco logramos entregarte tu pedido, este será resguardado en nuestra sucursal para que puedas recogerlo personalmente dentro del plazo establecido.\n\n¡Gracias por tu comprensión! 😊`
-        : `Pedido #**** 🚚. Realizamos un segundo intento de entrega, pero no fue posible localizarte en tu domicilio ni comunicarnos contigo. Nuestro equipo realizará un último intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m.\n\nImportante: Si durante este tercer intento tampoco logramos entregarte tu pedido, este será resguardado en nuestra sucursal para que puedas recogerlo personalmente dentro del plazo establecido.\n\n¡Gracias por tu comprensión! 😊`;
+        ? `Pedido ${orderRef} 🚚. Reprogramado para el ${nextDeliveryDate}. Realizamos un segundo intento de entrega, pero no fue posible localizarte en tu domicilio ni comunicarnos contigo. Nuestro equipo realizará un último intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m.\n\nImportante: Si durante este tercer intento tampoco logramos entregarte tu pedido, este será resguardado en nuestra sucursal para que puedas recogerlo personalmente dentro del plazo establecido.\n\n¡Gracias por tu comprensión! 😊`
+        : `Pedido #**** 🚚. Reprogramado para el ${nextDeliveryDate}. Realizamos un segundo intento de entrega, pero no fue posible localizarte en tu domicilio ni comunicarnos contigo. Nuestro equipo realizará un último intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m.\n\nImportante: Si durante este tercer intento tampoco logramos entregarte tu pedido, este será resguardado en nuestra sucursal para que puedas recogerlo personalmente dentro del plazo establecido.\n\n¡Gracias por tu comprensión! 😊`;
 
       return {
         title: "Segundo intento de entrega 📦⚠️",
@@ -538,8 +544,8 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     }
 
     const message = orderRef
-      ? `Pedido ${orderRef} 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉\n\n¡Gracias por tu comprensión!`
-      : `Pedido #**** 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉\n\n¡Gracias por tu comprensión!`;
+      ? `Pedido ${orderRef} 🚚. Reprogramado para el ${nextDeliveryDate}. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉\n\n¡Gracias por tu comprensión!`
+      : `Pedido #**** 🚚. Reprogramado para el ${nextDeliveryDate}. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉\n\n¡Gracias por tu comprensión!`;
 
     return {
       title: "Pedido no entregado 📦❌",
