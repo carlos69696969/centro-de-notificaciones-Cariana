@@ -15,6 +15,8 @@ router.post("/manual-status", async (req, res, next) => {
       attemptCount,
       branchAddress,
       branchHours,
+      rescheduledDate,
+      rescheduledDateLabel,
     } = req.body;
     const hasOrderContext = Boolean(orderId || orderNumber);
     if (!shopDomain || !hasOrderContext || !status) {
@@ -33,7 +35,9 @@ router.post("/manual-status", async (req, res, next) => {
       status,
       attemptCount,
       branchAddress,
-      branchHours
+      branchHours,
+      rescheduledDate,
+      rescheduledDateLabel
     });
     return res.json({ ok: true, result });
   } catch (error) {

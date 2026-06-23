@@ -54,6 +54,10 @@ const returnTemplateMap = {
   pickup_scheduled: "return_pickup_scheduled",
   collection_scheduled: "return_pickup_scheduled",
   recoleccion_programada: "return_pickup_scheduled",
+  return_pickup_reprogrammed: "return_pickup_reprogrammed",
+  pickup_reprogrammed: "return_pickup_reprogrammed",
+  devolucion_reprogramada: "return_pickup_reprogrammed",
+  recoleccion_reprogramada: "return_pickup_reprogrammed",
 
   // Courier pickup route aliases
   order_in_transit: "return_pickup_in_transit",
@@ -98,6 +102,10 @@ const defaultReturnTemplates = {
   return_pickup_scheduled: {
     title: "Intento de recoleccion fallido",
     message: "No se pudo completar la recoleccion de tu devolucion."
+  },
+  return_pickup_reprogrammed: {
+    title: "Devolución reprogramada 🔄📦",
+    message: "Tu devolucion no pudo ser recogida el dia de hoy y fue reprogramada para manana."
   },
   return_pickup_in_transit: {
     title: "Vamos en camino",
@@ -346,6 +354,7 @@ const returnStatusLabels = {
   return_approved: "Aprobada",
   return_rejected: "Rechazada",
   return_pickup_scheduled: "Intento de recoleccion fallido",
+  return_pickup_reprogrammed: "Devolucion reprogramada",
   return_pickup_in_transit: "En ruta",
   return_picked_up: "Producto recogido",
   refund_processed: "Reembolso procesado",
@@ -358,6 +367,7 @@ function buildReturnStatusTitle(templateCode) {
     return_approved: "Devolucion aprobada",
     return_rejected: "Devoluci\u00F3n rechazada \u274C",
     return_pickup_scheduled: "Intento de recolecci\u00F3n fallido \u274C",
+    return_pickup_reprogrammed: "Devolución reprogramada 🔄📦",
     return_pickup_in_transit: "En ruta para recoger tu devolucion",
     return_picked_up: "Producto recogido",
     refund_processed: "Reembolso procesado",
@@ -473,6 +483,17 @@ function buildReturnPremiumTemplate({
   const portalCurrentText = buildPortalCurrentStatusText(templateCode, payload, fallbackMessage);
 
   if (templateCode === "return_pickup_in_transit") {
+    return {
+      title: pickFirstString([payload.title, statusTitle]),
+      message: pickFirstString([payload.message, payload.note, fallbackMessage]),
+      productNames: mergedProductNames,
+      productsInline,
+      rejectionReason,
+      statusLabel
+    };
+  }
+
+  if (templateCode === "return_pickup_reprogrammed") {
     return {
       title: pickFirstString([payload.title, statusTitle]),
       message: pickFirstString([payload.message, payload.note, fallbackMessage]),

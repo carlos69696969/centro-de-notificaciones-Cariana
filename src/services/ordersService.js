@@ -359,6 +359,7 @@ const orderStatusLabels = {
   order_preparing: "En preparacion",
   order_shipped: "Enviado",
   order_in_transit: "En ruta",
+  order_rescheduled: "Entrega reprogramada",
   order_delivered: "Entregado",
   order_not_delivered: "No entregado",
   order_cancelled: "Cancelado",
@@ -383,6 +384,12 @@ const manualStatusAliases = {
   route: "order_in_transit",
   en_camino: "order_in_transit",
   on_route: "order_in_transit",
+  reprogramado: "order_rescheduled",
+  reprogramada: "order_rescheduled",
+  reintento_pendiente: "order_rescheduled",
+  order_rescheduled: "order_rescheduled",
+  delivery_rescheduled: "order_rescheduled",
+  route_rescheduled: "order_rescheduled",
   delivered: "order_delivered",
   entregado: "order_delivered",
   no_entregado: "order_not_delivered",
@@ -400,6 +407,7 @@ const validManualStatusCodes = new Set([
   "order_preparing",
   "order_shipped",
   "order_in_transit",
+  "order_rescheduled",
   "order_delivered",
   "order_not_delivered",
   "order_cancelled"
@@ -565,6 +573,24 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     return {
       title,
       message,
+      statusLabel,
+      productNames,
+      productsInline
+    };
+  }
+
+  if (templateCode === "order_rescheduled") {
+    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "#****";
+    const rescheduledDate = pickFirstString([
+      payload?.rescheduledDateLabel,
+      payload?.rescheduled_date_label,
+      payload?.rescheduledDate,
+      payload?.rescheduled_date
+    ]);
+
+    return {
+      title: "Entrega reprogramada 🔄📦",
+      message: `🚚 Pedido ${orderRef}. Tu pedido no pudo ser entregado el día de hoy debido al volumen de entregas programadas para hoy, tu pedido ha sido reprogramado para mañana (fecha) ${rescheduledDate}.\nAgradecemos tu comprensión y por confiar en siempre en Cariana . ✨`,
       statusLabel,
       productNames,
       productsInline
@@ -845,7 +871,9 @@ async function sendManualOrderStatus({
   status,
   attemptCount,
   branchAddress,
-  branchHours
+  branchHours,
+  rescheduledDate,
+  rescheduledDateLabel
 }) {
   const templateCode = normalizeManualStatus(status);
   if (!validManualStatusCodes.has(templateCode)) {
@@ -881,7 +909,9 @@ async function sendManualOrderStatus({
     payload: {
       attemptCount,
       branchAddress,
-      branchHours
+      branchHours,
+      rescheduledDate,
+      rescheduledDateLabel
     },
     fallbackTitle: template.title,
     fallbackMessage: template.message
@@ -908,6 +938,8 @@ async function sendManualOrderStatus({
       attemptCount: Math.max(0, Number(attemptCount || 0) || 0),
       branchAddress: String(branchAddress || "").trim(),
       branchHours: String(branchHours || "").trim(),
+      rescheduledDate: String(rescheduledDate || "").trim(),
+      rescheduledDateLabel: String(rescheduledDateLabel || "").trim(),
       statusLabel: copy.statusLabel,
       productName: copy.productsInline || "",
       productNames: copy.productNames || [],
