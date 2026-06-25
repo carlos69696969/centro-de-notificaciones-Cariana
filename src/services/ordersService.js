@@ -417,6 +417,10 @@ const defaultManualTemplates = {
   order_not_delivered: {
     title: "Pedido no entregado 📦❌",
     message: "Pedido #**** 🚚. Pasamos a tu domicilio, pero no tuvimos respuesta al tocar la puerta ni al intentar comunicarnos contigo. Nuestro equipo realizará un nuevo intento de entrega mañana, en un horario de 8:00 a. m. a 8:00 p. m. 😉 ¡Gracias por tu comprensión!"
+  },
+  order_rescheduled: {
+    title: "Entrega reprogramada 🔄📦",
+    message: "🚚 Pedido #****. Tu pedido no pudo ser entregado el día de hoy debido al volumen de entregas programadas para hoy, tu pedido ha sido reprogramado para mañana (fecha). Agradecemos tu comprensión y por confiar en siempre en Cariana . ✨"
   }
 };
 
