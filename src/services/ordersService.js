@@ -413,6 +413,33 @@ const validManualStatusCodes = new Set([
   "order_cancelled"
 ]);
 
+async function hasRecentOrderRescheduleNotification({ shopDomain, orderId, orderNumber, minutes = 10 }) {
+  const normalizedOrderId = parseLegacyNumericId(orderId);
+  const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
+
+  if (!shopDomain || (!normalizedOrderId && !normalizedOrderNumber)) {
+    return false;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM notifications
+    WHERE shop_domain = $1
+      AND created_at >= NOW() - ($4::int * INTERVAL '1 minute')
+      AND COALESCE(data->>'status', '') = 'order_rescheduled'
+      AND (
+        ($2::bigint IS NOT NULL AND NULLIF(regexp_replace(COALESCE(data->>'orderId', ''), '\\D', '', 'g'), '')::bigint = $2::bigint)
+        OR ($3 <> '' AND regexp_replace(COALESCE(data->>'orderNumber', ''), '\\D', '', 'g') = $3)
+      )
+    LIMIT 1
+    `,
+    [shopDomain, normalizedOrderId || null, normalizedOrderNumber, Math.max(1, Number(minutes) || 10)]
+  );
+
+  return result.rowCount > 0;
+}
+
 const defaultManualTemplates = {
   order_not_delivered: {
     title: "Pedido no entregado 📦❌",
@@ -757,6 +784,21 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     return { skipped: true, reason: "Duplicate status event" };
   }
 
+  if (
+    templateCode === "order_in_transit" &&
+    (await hasRecentOrderRescheduleNotification({
+      shopDomain,
+      orderId,
+      orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || ""
+    }))
+  ) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Skipped in-route after recent route-time reschedule', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Skipped in-route after recent route-time reschedule" };
+  }
+
   let customer = null;
   const customerIdFromPayload = effectivePayload.customer?.id || context.customerId || null;
   const customerIdFromMap = existingMap?.shopify_customer_id || null;
@@ -905,6 +947,13 @@ async function sendManualOrderStatus({
   const template = (await getTemplate(shopDomain, templateCode)) || defaultManualTemplates[templateCode] || null;
   if (!template) {
     throw new Error(`Template not found for ${templateCode}`);
+  }
+
+  if (
+    templateCode === "order_in_transit" &&
+    (await hasRecentOrderRescheduleNotification({ shopDomain, orderId, orderNumber }))
+  ) {
+    return { total: 0, sent: 0, skipped: true, reason: "Skipped in-route after recent route-time reschedule" };
   }
 
   const copy = buildOrderNotificationCopy({
