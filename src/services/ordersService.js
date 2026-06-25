@@ -949,13 +949,6 @@ async function sendManualOrderStatus({
     throw new Error(`Template not found for ${templateCode}`);
   }
 
-  if (
-    templateCode === "order_in_transit" &&
-    (await hasRecentOrderRescheduleNotification({ shopDomain, orderId, orderNumber }))
-  ) {
-    return { total: 0, sent: 0, skipped: true, reason: "Skipped in-route after recent route-time reschedule" };
-  }
-
   const copy = buildOrderNotificationCopy({
     templateCode,
     orderNumber,
