@@ -420,7 +420,7 @@ const defaultManualTemplates = {
   },
   order_rescheduled: {
     title: "Entrega reprogramada 🔄📦",
-    message: "🚚 Pedido #****. Tu pedido no pudo ser entregado el día de hoy debido al volumen de entregas programadas para hoy, tu pedido ha sido reprogramado para mañana (fecha). Agradecemos tu comprensión y por confiar en siempre en Cariana . ✨"
+    message: "🚚 Pedido #****. Tu pedido no pudo ser entregado el día de hoy debido al volumen de entregas programadas para hoy, tu pedido ha sido reprogramado para mañana. Agradecemos tu comprensión y por confiar en siempre en Cariana . ✨"
   }
 };
 
@@ -594,7 +594,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
 
     return {
       title: "Entrega reprogramada 🔄📦",
-      message: `🚚 Pedido ${orderRef}. Tu pedido no pudo ser entregado el día de hoy debido al volumen de entregas programadas para hoy, tu pedido ha sido reprogramado para mañana (fecha) ${rescheduledDate}.\nAgradecemos tu comprensión y por confiar en siempre en Cariana . ✨`,
+      message: `🚚 Pedido ${orderRef}. Tu pedido no pudo ser entregado el día de hoy debido al volumen de entregas programadas para hoy, tu pedido ha sido reprogramado para mañana ${rescheduledDate}.\nAgradecemos tu comprensión y por confiar en siempre en Cariana . ✨`,
       statusLabel,
       productNames,
       productsInline
