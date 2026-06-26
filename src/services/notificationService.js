@@ -15,6 +15,18 @@ function normalizeData(input = {}) {
   return output;
 }
 
+function dedupeTokenRowsByToken(rows = []) {
+  const seenTokens = new Set();
+  const deduped = [];
+  for (const row of rows) {
+    const token = String(row?.token || "").trim();
+    if (!token || seenTokens.has(token)) continue;
+    seenTokens.add(token);
+    deduped.push(row);
+  }
+  return deduped;
+}
+
 async function markTokenInvalid(tokenId) {
   await pool.query(
     `
@@ -163,7 +175,7 @@ async function sendToCustomerTokens({
     [shopDomain, customerId]
   );
 
-  const tokens = tokensResult.rows;
+  const tokens = dedupeTokenRowsByToken(tokensResult.rows);
   let sent = 0;
   let failed = 0;
 
@@ -261,7 +273,7 @@ async function sendToEmailTokens({
     [shopDomain, normalizedEmail]
   );
 
-  let tokens = exactShopTokens.rows;
+  let tokens = dedupeTokenRowsByToken(exactShopTokens.rows);
   if (!tokens.length) {
     // Fallback: when a merchant changed store domain during setup, try matching by
     // customer email on active tokens from the same merchant database.
@@ -278,7 +290,7 @@ async function sendToEmailTokens({
       `,
       [normalizedEmail]
     );
-    tokens = crossShopTokens.rows;
+    tokens = dedupeTokenRowsByToken(crossShopTokens.rows);
   }
   let sent = 0;
   let failed = 0;
