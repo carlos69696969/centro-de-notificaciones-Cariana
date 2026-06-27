@@ -412,6 +412,8 @@ const validManualStatusCodes = new Set([
   "order_not_delivered",
   "order_cancelled"
 ]);
+const ORDER_STATUS_DEDUPE_WINDOW_MINUTES = 2;
+const DEDUPED_ORDER_STATUS_CODES = new Set(["order_in_transit"]);
 
 async function hasRecentOrderRescheduleNotification({ shopDomain, orderId, orderNumber, minutes = 10 }) {
   const normalizedOrderId = parseLegacyNumericId(orderId);
@@ -438,6 +440,72 @@ async function hasRecentOrderRescheduleNotification({ shopDomain, orderId, order
   );
 
   return result.rowCount > 0;
+}
+
+async function hasRecentOrderStatusNotification({
+  shopDomain,
+  orderId,
+  orderNumber,
+  status,
+  minutes = ORDER_STATUS_DEDUPE_WINDOW_MINUTES
+}) {
+  const normalizedOrderId = parseLegacyNumericId(orderId);
+  const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
+  const normalizedStatus = normalizeManualStatus(status);
+
+  if (!shopDomain || !normalizedStatus || (!normalizedOrderId && !normalizedOrderNumber)) {
+    return false;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM notifications
+    WHERE shop_domain = $1
+      AND status = 'sent'
+      AND created_at >= NOW() - ($5::int * INTERVAL '1 minute')
+      AND COALESCE(data->>'status', '') = $4
+      AND (
+        ($2::bigint IS NOT NULL AND NULLIF(regexp_replace(COALESCE(data->>'orderId', ''), '\\D', '', 'g'), '')::bigint = $2::bigint)
+        OR ($3 <> '' AND regexp_replace(COALESCE(data->>'orderNumber', ''), '\\D', '', 'g') = $3)
+      )
+    LIMIT 1
+    `,
+    [
+      shopDomain,
+      normalizedOrderId || null,
+      normalizedOrderNumber,
+      normalizedStatus,
+      Math.max(1, Number(minutes) || ORDER_STATUS_DEDUPE_WINDOW_MINUTES)
+    ]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function withOrderStatusNotificationLock({ shopDomain, orderId, orderNumber, status }, callback) {
+  const normalizedOrderId = parseLegacyNumericId(orderId);
+  const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
+  const normalizedStatus = normalizeManualStatus(status);
+  const orderReference = normalizedOrderId || normalizedOrderNumber;
+  if (
+    !shopDomain ||
+    !orderReference ||
+    !normalizedStatus ||
+    !DEDUPED_ORDER_STATUS_CODES.has(normalizedStatus)
+  ) {
+    return callback();
+  }
+
+  const lockKey = `order-status:${shopDomain}:${orderReference}:${normalizedStatus}`;
+  const client = await pool.connect();
+  try {
+    await client.query("SELECT pg_advisory_lock(hashtext($1))", [lockKey]);
+    return await callback();
+  } finally {
+    await client.query("SELECT pg_advisory_unlock(hashtext($1))", [lockKey]).catch(() => {});
+    client.release();
+  }
 }
 
 const defaultManualTemplates = {
@@ -878,23 +946,42 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     customerEmail: effectivePayload.customer?.email || ""
   };
 
-  const sendResult = await sendToCustomerTokens({
-    shopDomain,
-    customerId: customer.id,
-    type: "order_event",
-    title: copy.title,
-    message: copy.message,
-    deepLink: buildOrderDeepLink({
-      shopDomain,
-      orderId,
-      orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
-      orderToken: effectivePayload.token || context.orderToken || "",
-      orderStatusUrl: effectivePayload.order_status_url || context.orderStatusUrl || "",
-      deepLink: template.deep_link
-    }),
-    data,
-    eventId
-  });
+  const effectiveOrderNumber =
+    effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "";
+  const sendResult = await withOrderStatusNotificationLock(
+    { shopDomain, orderId, orderNumber: effectiveOrderNumber, status: templateCode },
+    async () => {
+      const duplicated =
+        DEDUPED_ORDER_STATUS_CODES.has(templateCode) &&
+        (await hasRecentOrderStatusNotification({
+          shopDomain,
+          orderId,
+          orderNumber: effectiveOrderNumber,
+          status: templateCode
+        }));
+      if (duplicated) {
+        return { sent: 0, failed: 0, total: 0, deduplicated: true, reason: "Duplicate recent order status" };
+      }
+
+      return sendToCustomerTokens({
+        shopDomain,
+        customerId: customer.id,
+        type: "order_event",
+        title: copy.title,
+        message: copy.message,
+        deepLink: buildOrderDeepLink({
+          shopDomain,
+          orderId,
+          orderNumber: effectiveOrderNumber,
+          orderToken: effectivePayload.token || context.orderToken || "",
+          orderStatusUrl: effectivePayload.order_status_url || context.orderStatusUrl || "",
+          deepLink: template.deep_link
+        }),
+        data,
+        eventId
+      });
+    }
+  );
 
   await pool.query(
     `
@@ -902,7 +989,11 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     SET status = $2, processed_at = NOW(), error_message = $3
     WHERE id = $1
     `,
-    [eventId, sendResult.total > 0 ? "processed" : "skipped", sendResult.total > 0 ? null : "No active tokens"]
+    [
+      eventId,
+      sendResult.total > 0 ? "processed" : "skipped",
+      sendResult.deduplicated ? sendResult.reason : sendResult.total > 0 ? null : "No active tokens"
+    ]
   );
 
   return sendResult;
@@ -963,35 +1054,52 @@ async function sendManualOrderStatus({
     fallbackMessage: template.message
   });
 
-  return sendToCustomerTokens({
-    shopDomain,
-    customerId: customer.id,
-    type: "order_manual",
-    title: copy.title,
-    message: copy.message,
-    deepLink: buildOrderDeepLink({
-      shopDomain,
-      orderId,
-      orderNumber,
-      orderToken: "",
-      orderStatusUrl: "",
-      deepLink: template.deep_link
-    }),
-    data: {
-      orderId,
-      orderNumber,
-      status: templateCode,
-      attemptCount: Math.max(0, Number(attemptCount || 0) || 0),
-      branchAddress: String(branchAddress || "").trim(),
-      branchHours: String(branchHours || "").trim(),
-      rescheduledDate: String(rescheduledDate || "").trim(),
-      rescheduledDateLabel: String(rescheduledDateLabel || "").trim(),
-      statusLabel: copy.statusLabel,
-      productName: copy.productsInline || "",
-      productNames: copy.productNames || [],
-      deepLinkType: "order"
+  return withOrderStatusNotificationLock(
+    { shopDomain, orderId, orderNumber, status: templateCode },
+    async () => {
+      const duplicated =
+        DEDUPED_ORDER_STATUS_CODES.has(templateCode) &&
+        (await hasRecentOrderStatusNotification({
+          shopDomain,
+          orderId,
+          orderNumber,
+          status: templateCode
+        }));
+      if (duplicated) {
+        return { sent: 0, failed: 0, total: 0, deduplicated: true, reason: "Duplicate recent order status" };
+      }
+
+      return sendToCustomerTokens({
+        shopDomain,
+        customerId: customer.id,
+        type: "order_manual",
+        title: copy.title,
+        message: copy.message,
+        deepLink: buildOrderDeepLink({
+          shopDomain,
+          orderId,
+          orderNumber,
+          orderToken: "",
+          orderStatusUrl: "",
+          deepLink: template.deep_link
+        }),
+        data: {
+          orderId,
+          orderNumber,
+          status: templateCode,
+          attemptCount: Math.max(0, Number(attemptCount || 0) || 0),
+          branchAddress: String(branchAddress || "").trim(),
+          branchHours: String(branchHours || "").trim(),
+          rescheduledDate: String(rescheduledDate || "").trim(),
+          rescheduledDateLabel: String(rescheduledDateLabel || "").trim(),
+          statusLabel: copy.statusLabel,
+          productName: copy.productsInline || "",
+          productNames: copy.productNames || [],
+          deepLinkType: "order"
+        }
+      });
     }
-  });
+  );
 }
 
 async function processRefundWebhook({ shopDomain, payload, webhookId }) {
