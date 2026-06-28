@@ -1226,7 +1226,37 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
   return sendResult;
 }
 
+async function getLatestOrderNotification({ shopDomain, orderNumber }) {
+  const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
+  if (!shopDomain || !normalizedOrderNumber) return null;
+
+  const result = await pool.query(
+    `
+    SELECT n.id, n.title, n.message, n.data, n.created_at
+    FROM notifications n
+    WHERE n.shop_domain = $1
+      AND n.status = 'sent'
+      AND n.type IN ('order_event', 'order_manual')
+      AND regexp_replace(COALESCE(n.data->>'orderNumber', ''), '\\D', '', 'g') = $2
+      AND COALESCE(n.data->>'status', '') <> 'order_delivered'
+    ORDER BY n.created_at DESC, n.id DESC
+    LIMIT 1
+    `,
+    [shopDomain, normalizedOrderNumber]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title || "",
+    message: row.message || "",
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : "",
+  };
+}
+
 module.exports = {
+  getLatestOrderNotification,
   processOrderWebhook,
   sendManualOrderStatus,
   processRefundWebhook

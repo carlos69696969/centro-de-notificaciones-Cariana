@@ -1,7 +1,25 @@
 const express = require("express");
-const { sendManualOrderStatus } = require("../services/ordersService");
+const { getLatestOrderNotification, sendManualOrderStatus } = require("../services/ordersService");
 
 const router = express.Router();
+
+router.get("/latest-notification", async (req, res, next) => {
+  try {
+    const shopDomain = req.query.shopDomain || req.query.shop || req.shopDomain || "";
+    const orderNumber = req.query.orderNumber || req.query.order || "";
+    if (!shopDomain || !orderNumber) {
+      return res.status(400).json({
+        error: "Missing required fields",
+        detail: "shopDomain and orderNumber are required"
+      });
+    }
+
+    const notification = await getLatestOrderNotification({ shopDomain, orderNumber });
+    return res.json({ ok: true, notification });
+  } catch (error) {
+    return next(error);
+  }
+});
 
 router.post("/manual-status", async (req, res, next) => {
   try {
