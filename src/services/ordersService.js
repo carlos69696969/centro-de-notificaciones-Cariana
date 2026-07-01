@@ -377,14 +377,14 @@ function normalizeMeridiem(value) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, " ")
-    .replace(/\ba\s*\.?\s*m\.?\b/g, "a.m.")
-    .replace(/\bp\s*\.?\s*m\.?\b/g, "p.m.");
+    .replace(/\ba\s*\.?\s*m\.?(?=\s|$)/g, "a.m.")
+    .replace(/\bp\s*\.?\s*m\.?(?=\s|$)/g, "p.m.");
   return text.replace(/(\d)\s+(a\.m\.|p\.m\.)/g, "$1 $2");
 }
 
 function extractDeliveryCutoffTime(value) {
   const text = normalizeMeridiem(value);
-  const matches = Array.from(text.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)\b/g));
+  const matches = Array.from(text.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)(?=\s|$)/g));
   const lastMatch = matches.at(-1);
   if (!lastMatch) return DEFAULT_DELIVERY_HOURS.split(" a ").at(-1) || "8:00 p.m.";
   const hour = lastMatch[1];
