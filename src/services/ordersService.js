@@ -447,7 +447,7 @@ function returnsPortalBaseUrl() {
 
 async function fetchReturnSettingsForShop(shopDomain) {
   const shop = String(shopDomain || "").trim();
-  const apiKey = String(env.appInternalApiKey || process.env.APP_INTERNAL_API_KEY || "").trim();
+  const apiKey = String(process.env.NOTIFICATIONS_API_KEY || env.appInternalApiKey || process.env.APP_INTERNAL_API_KEY || "").trim();
   if (!shop || !apiKey) return null;
 
   const endpoint = new URL("/api/return-settings", returnsPortalBaseUrl());
@@ -717,7 +717,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     const deliveryDate = formatDeliveryDateFromPurchase(
       payload?.created_at ?? payload?.createdAt ?? payload?.processed_at ?? payload?.processedAt
     );
-    const message = `📦Tu pedido ${orderRef} está siendo preparado para ser enviado. Llegará mañana (${deliveryDate}) en un horario de ${deliveryHours}. No olvides darle tu clave de entrega al repartidor para recibir tu pedido.\n\nGracias por confiar en Cariana. ✨`;
+    const message = `📦Tu pedido ${orderRef} está siendo preparado para ser enviado. Llegará mañana ${deliveryDate} en un horario de ${deliveryHours}. No olvides darle tu clave de entrega al repartidor para recibir tu pedido.\n\nGracias por confiar en Cariana. ✨`;
 
     return {
       title: "Pedido confirmado ✅",
