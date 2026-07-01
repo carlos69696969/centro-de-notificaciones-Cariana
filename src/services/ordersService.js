@@ -352,6 +352,26 @@ function formatDeliveryDateFromPurchase(value) {
   return `${capitalizeFirst(formattedParts.weekday)} ${formattedParts.day}/${formattedParts.month}/${formattedParts.year}`;
 }
 
+function formatRescheduledDeliveryDate(value) {
+  const text = String(value || "").trim();
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!isoMatch) return text;
+  const date = new Date(Date.UTC(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]), 12));
+  const parts = new Intl.DateTimeFormat("es-MX", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  })
+    .formatToParts(date)
+    .reduce((acc, part) => {
+      if (part.type !== "literal") acc[part.type] = part.value;
+      return acc;
+    }, {});
+  return `${capitalizeFirst(parts.weekday)} ${parts.day}/${capitalizeFirst(parts.month)}/${parts.year}`;
+}
+
 function normalizeMeridiem(value) {
   const text = String(value || "")
     .trim()
@@ -678,12 +698,19 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     DEFAULT_DELIVERY_HOURS
   );
   const deliveryCutoffTime = extractDeliveryCutoffTime(deliveryHours);
-  const nextDeliveryDate = new Intl.DateTimeFormat("es-MX", {
-    timeZone: "America/Mexico_City",
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  }).format(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const rescheduledDeliveryDate = pickFirstString([
+    formatRescheduledDeliveryDate(payload?.rescheduledDate ?? payload?.rescheduled_date),
+    payload?.rescheduledDateLabel,
+    payload?.rescheduled_date_label
+  ]);
+  const nextDeliveryDate =
+    rescheduledDeliveryDate ||
+    new Intl.DateTimeFormat("es-MX", {
+      timeZone: "America/Mexico_City",
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }).format(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
   if (templateCode === "order_preparing") {
     const orderRef = normalizedOrder ? `#${normalizedOrder}` : "#****";
