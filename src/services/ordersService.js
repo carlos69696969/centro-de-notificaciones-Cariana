@@ -1059,7 +1059,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     ...effectivePayload,
     branchAddress: effectivePayload.branchAddress ?? effectivePayload.branch_address ?? returnSettings?.branchAddress,
     branchHours: effectivePayload.branchHours ?? effectivePayload.branch_hours ?? returnSettings?.branchHours,
-    pickupHours: effectivePayload.pickupHours ?? effectivePayload.pickup_hours ?? returnSettings?.pickupHours
+    pickupHours: returnSettings?.pickupHours ?? effectivePayload.pickupHours ?? effectivePayload.pickup_hours
   };
 
   const copy = buildOrderNotificationCopy({
@@ -1186,7 +1186,7 @@ async function sendManualOrderStatus({
       attemptCount,
       branchAddress: branchAddress || returnSettings?.branchAddress,
       branchHours: branchHours || returnSettings?.branchHours,
-      pickupHours: pickupHours || returnSettings?.pickupHours,
+      pickupHours: returnSettings?.pickupHours || pickupHours,
       rescheduledDate,
       rescheduledDateLabel
     },
