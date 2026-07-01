@@ -33,6 +33,7 @@ router.post("/manual-status", async (req, res, next) => {
       attemptCount,
       branchAddress,
       branchHours,
+      pickupHours,
       rescheduledDate,
       rescheduledDateLabel,
     } = req.body;
@@ -54,6 +55,7 @@ router.post("/manual-status", async (req, res, next) => {
       attemptCount,
       branchAddress,
       branchHours,
+      pickupHours,
       rescheduledDate,
       rescheduledDateLabel
     });

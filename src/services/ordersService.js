@@ -4,8 +4,11 @@ const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens } = require("./notificationService");
 const { buildOrderDeepLink, buildReturnDeepLink } = require("./deepLinkService");
 const { closeAbandonedCartsFromOrder } = require("./abandonedCartService");
+const env = require("../config/env");
 
 const LOCAL_DELIVERY_READY_TOPIC = "fulfillment_orders/line_items_prepared_for_local_delivery";
+const DEFAULT_DELIVERY_HOURS = "8:00 a.m. a 8:00 p.m.";
+const DEFAULT_RETURNS_PORTAL_BASE_URL = "https://gestion-devoluciones-pro.onrender.com";
 
 function normalizeStatus(value) {
   return String(value || "")
@@ -354,6 +357,45 @@ function formatProductsInline(productNames = []) {
   return clean.join(", ");
 }
 
+function returnsPortalBaseUrl() {
+  const configured = String(env.returnsPortalUrl || process.env.RETURNS_PORTAL_URL || "").trim();
+  if (!configured) return DEFAULT_RETURNS_PORTAL_BASE_URL;
+  try {
+    const url = new URL(configured);
+    return url.origin;
+  } catch {
+    return configured.replace(/\/devoluciones\/?$/i, "").replace(/\/+$/, "");
+  }
+}
+
+async function fetchReturnSettingsForShop(shopDomain) {
+  const shop = String(shopDomain || "").trim();
+  const apiKey = String(env.appInternalApiKey || process.env.APP_INTERNAL_API_KEY || "").trim();
+  if (!shop || !apiKey) return null;
+
+  const endpoint = new URL("/api/return-settings", returnsPortalBaseUrl());
+  endpoint.searchParams.set("shop", shop);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        "x-shop-domain": shop
+      }
+    });
+    if (!response.ok) return null;
+    const payload = await response.json().catch(() => null);
+    return payload?.ok ? payload.settings || null : null;
+  } catch (error) {
+    console.warn("Failed to fetch return settings for order notification", {
+      shopDomain: shop,
+      error: String(error?.message || error || "unknown")
+    });
+    return null;
+  }
+}
+
 const orderStatusLabels = {
   order_confirmed: "Confirmado",
   order_preparing: "En preparacion",
@@ -574,6 +616,10 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     payload?.branchHours ?? payload?.branch_hours ?? payload?.pickupHours,
     DEFAULT_BRANCH_HOURS
   );
+  const deliveryHours = normalizeBranchText(
+    payload?.pickupHours ?? payload?.pickup_hours ?? payload?.deliveryHours ?? payload?.delivery_hours,
+    DEFAULT_DELIVERY_HOURS
+  );
   const nextDeliveryDate = new Intl.DateTimeFormat("es-MX", {
     timeZone: "America/Mexico_City",
     day: "numeric",
@@ -582,14 +628,11 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   }).format(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
   if (templateCode === "order_preparing") {
-    const preparingTitle = normalizedOrder ? `Confirmado - Pedido #${normalizedOrder}` : "Confirmado - Pedido";
-    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
-    const message = orderRef
-      ? `Tu pedido ${orderRef} está siendo preparado para ser enviado. Llegará mañana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`
-      : `Tu pedido está siendo preparado para ser enviado. Llegará mañana en un horario de 8:00 a.m. a 8:00 p.m.\n\nGracias por confiar en Cariana. 😉`;
+    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "#****";
+    const message = `📦Tu pedido ${orderRef} está siendo preparado para ser enviado. Llegará mañana en un horario de ${deliveryHours}. No olvides darle tu clave de entrega al repartidor para recibir tu pedido.\n\nGracias por confiar en Cariana. ✨`;
 
     return {
-      title: preparingTitle,
+      title: "Pedido confirmado ✅",
       message,
       statusLabel,
       productNames,
@@ -925,10 +968,18 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     return { skipped: true, reason: "Template not found" };
   }
 
+  const returnSettings = await fetchReturnSettingsForShop(shopDomain);
+  const payloadWithSettings = {
+    ...effectivePayload,
+    branchAddress: effectivePayload.branchAddress ?? effectivePayload.branch_address ?? returnSettings?.branchAddress,
+    branchHours: effectivePayload.branchHours ?? effectivePayload.branch_hours ?? returnSettings?.branchHours,
+    pickupHours: effectivePayload.pickupHours ?? effectivePayload.pickup_hours ?? returnSettings?.pickupHours
+  };
+
   const copy = buildOrderNotificationCopy({
     templateCode,
     orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
-    payload: effectivePayload,
+    payload: payloadWithSettings,
     fallbackTitle: template.title,
     fallbackMessage: template.message
   });
@@ -1009,6 +1060,7 @@ async function sendManualOrderStatus({
   attemptCount,
   branchAddress,
   branchHours,
+  pickupHours,
   rescheduledDate,
   rescheduledDateLabel
 }) {
@@ -1040,13 +1092,15 @@ async function sendManualOrderStatus({
     throw new Error(`Template not found for ${templateCode}`);
   }
 
+  const returnSettings = await fetchReturnSettingsForShop(shopDomain);
   const copy = buildOrderNotificationCopy({
     templateCode,
     orderNumber,
     payload: {
       attemptCount,
-      branchAddress,
-      branchHours,
+      branchAddress: branchAddress || returnSettings?.branchAddress,
+      branchHours: branchHours || returnSettings?.branchHours,
+      pickupHours: pickupHours || returnSettings?.pickupHours,
       rescheduledDate,
       rescheduledDateLabel
     },
@@ -1090,6 +1144,7 @@ async function sendManualOrderStatus({
           attemptCount: Math.max(0, Number(attemptCount || 0) || 0),
           branchAddress: String(branchAddress || "").trim(),
           branchHours: String(branchHours || "").trim(),
+          pickupHours: String(pickupHours || returnSettings?.pickupHours || "").trim(),
           rescheduledDate: String(rescheduledDate || "").trim(),
           rescheduledDateLabel: String(rescheduledDateLabel || "").trim(),
           statusLabel: copy.statusLabel,
