@@ -9,6 +9,7 @@ const env = require("../config/env");
 const LOCAL_DELIVERY_READY_TOPIC = "fulfillment_orders/line_items_prepared_for_local_delivery";
 const DEFAULT_DELIVERY_HOURS = "8:00 a.m. a 8:00 p.m.";
 const DEFAULT_RETURNS_PORTAL_BASE_URL = "https://gestion-devoluciones-pro.onrender.com";
+const NOTIFICATION_TIME_ZONE = "America/Mexico_City";
 
 function normalizeStatus(value) {
   return String(value || "")
@@ -313,6 +314,42 @@ function truncateText(value, max = 90) {
     return "";
   }
   return text.length > max ? `${text.slice(0, max - 1)}...` : text;
+}
+
+function capitalizeFirst(value) {
+  const text = String(value || "").trim();
+  return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : "";
+}
+
+function formatDeliveryDateFromPurchase(value) {
+  const purchaseDate = value ? new Date(value) : new Date();
+  const baseDate = Number.isNaN(purchaseDate.getTime()) ? new Date() : purchaseDate;
+  const parts = new Intl.DateTimeFormat("es-MX", {
+    timeZone: NOTIFICATION_TIME_ZONE,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric"
+  })
+    .formatToParts(baseDate)
+    .reduce((acc, part) => {
+      if (part.type !== "literal") acc[part.type] = Number(part.value);
+      return acc;
+    }, {});
+  const deliveryDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + 1, 12));
+  const formattedParts = new Intl.DateTimeFormat("es-MX", {
+    timeZone: NOTIFICATION_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  })
+    .formatToParts(deliveryDate)
+    .reduce((acc, part) => {
+      if (part.type !== "literal") acc[part.type] = part.value;
+      return acc;
+    }, {});
+
+  return `${capitalizeFirst(formattedParts.weekday)} ${formattedParts.day}/${formattedParts.month}/${formattedParts.year}`;
 }
 
 function extractProductNames(payload) {
@@ -629,7 +666,10 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
 
   if (templateCode === "order_preparing") {
     const orderRef = normalizedOrder ? `#${normalizedOrder}` : "#****";
-    const message = `📦Tu pedido ${orderRef} está siendo preparado para ser enviado. Llegará mañana en un horario de ${deliveryHours}. No olvides darle tu clave de entrega al repartidor para recibir tu pedido.\n\nGracias por confiar en Cariana. ✨`;
+    const deliveryDate = formatDeliveryDateFromPurchase(
+      payload?.created_at ?? payload?.createdAt ?? payload?.processed_at ?? payload?.processedAt
+    );
+    const message = `📦Tu pedido ${orderRef} está siendo preparado para ser enviado. Llegará mañana (${deliveryDate}) en un horario de ${deliveryHours}. No olvides darle tu clave de entrega al repartidor para recibir tu pedido.\n\nGracias por confiar en Cariana. ✨`;
 
     return {
       title: "Pedido confirmado ✅",
