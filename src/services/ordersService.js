@@ -352,6 +352,26 @@ function formatDeliveryDateFromPurchase(value) {
   return `${capitalizeFirst(formattedParts.weekday)} ${formattedParts.day}/${formattedParts.month}/${formattedParts.year}`;
 }
 
+function normalizeMeridiem(value) {
+  const text = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/\ba\s*\.?\s*m\.?\b/g, "a.m.")
+    .replace(/\bp\s*\.?\s*m\.?\b/g, "p.m.");
+  return text.replace(/(\d)\s+(a\.m\.|p\.m\.)/g, "$1 $2");
+}
+
+function extractDeliveryCutoffTime(value) {
+  const text = normalizeMeridiem(value);
+  const matches = Array.from(text.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)\b/g));
+  const lastMatch = matches.at(-1);
+  if (!lastMatch) return DEFAULT_DELIVERY_HOURS.split(" a ").at(-1) || "8:00 p.m.";
+  const hour = lastMatch[1];
+  const minutes = lastMatch[2] || "00";
+  return `${hour}:${minutes} ${lastMatch[3]}`;
+}
+
 function extractProductNames(payload) {
   const lineItems = []
     .concat(Array.isArray(payload?.line_items) ? payload.line_items : [])
@@ -657,6 +677,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     payload?.pickupHours ?? payload?.pickup_hours ?? payload?.deliveryHours ?? payload?.delivery_hours,
     DEFAULT_DELIVERY_HOURS
   );
+  const deliveryCutoffTime = extractDeliveryCutoffTime(deliveryHours);
   const nextDeliveryDate = new Intl.DateTimeFormat("es-MX", {
     timeZone: "America/Mexico_City",
     day: "numeric",
@@ -747,10 +768,8 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   }
 
   if (templateCode === "order_in_transit") {
-    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "";
-    const message = orderRef
-      ? `¡Tu pedido ${orderRef} ya está en camino! 🚚✨\n\nNuestro repartidor se dirige a tu ubicación. La entrega está programada para hoy antes de las 8:00 p.m.\n\nGracias por confiar en Cariana. 💙`
-      : `¡Tu pedido ya está en camino! 🚚✨\n\nNuestro repartidor se dirige a tu ubicación. La entrega está programada para hoy antes de las 8:00 p.m.\n\nGracias por confiar en Cariana. 💙`;
+    const orderRef = normalizedOrder ? `#${normalizedOrder}` : "#****";
+    const message = `¡Tu pedido ${orderRef} ya está en camino! 🚚✨ Nuestro repartidor se dirige a tu ubicación. La entrega está programada para hoy antes de las ${deliveryCutoffTime}. No olvides darle tu clave de entrega al repartidor para recibir tu pedido.\n\nGracias por confiar en Cariana. 💙`;
 
     return {
       title,
