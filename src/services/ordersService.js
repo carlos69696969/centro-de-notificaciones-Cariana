@@ -904,6 +904,26 @@ function isReturnPortalRefund(payload = {}) {
   );
 }
 
+function isBranchPickupExpiredRefund(payload = {}) {
+  const noteText = pickFirstString([
+    payload?.note,
+    payload?.reason,
+    payload?.message
+  ])
+    .toLowerCase()
+    .trim();
+
+  if (!noteText) {
+    return false;
+  }
+
+  return (
+    noteText.includes("no recogido en sucursal") ||
+    noteText.includes("pedido no recogido en sucursal") ||
+    noteText.includes("reembolso por pedido no recogido en sucursal")
+  );
+}
+
 async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   const eventResult = await pool.query(
     `
@@ -1277,6 +1297,14 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
   }
 
   const eventId = eventResult.rows[0].id;
+  if (isBranchPickupExpiredRefund(payload)) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Branch pickup refund notification sent manually', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Branch pickup refund notification sent manually" };
+  }
+
   const mapResult = await pool.query(
     `
     SELECT shopify_customer_id, order_number
