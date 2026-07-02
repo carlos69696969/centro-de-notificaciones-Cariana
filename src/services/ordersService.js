@@ -516,6 +516,8 @@ const manualStatusAliases = {
   not_delivered: "order_not_delivered",
   failed_delivery: "order_not_delivered",
   entrega_fallida: "order_not_delivered",
+  refund_processed: "refund_processed",
+  reembolso_procesado: "refund_processed",
   cancelled: "order_cancelled",
   canceled: "order_cancelled",
   cancelado: "order_cancelled"
@@ -529,6 +531,7 @@ const validManualStatusCodes = new Set([
   "order_rescheduled",
   "order_delivered",
   "order_not_delivered",
+  "refund_processed",
   "order_cancelled"
 ]);
 const ORDER_STATUS_DEDUPE_WINDOW_MINUTES = 2;
@@ -680,6 +683,17 @@ async function getCustomerByOrderReference({ shopDomain, orderId, orderNumber })
 
 function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallbackTitle, fallbackMessage }) {
   const normalizedOrder = normalizeOrderNumber(orderNumber);
+  const customTitle = String(payload?.title || "").trim();
+  const customMessage = String(payload?.message || "").trim();
+  if (customTitle && customMessage) {
+    return {
+      title: customTitle,
+      message: customMessage,
+      statusLabel: orderStatusLabels[templateCode] || pickFirstString([fallbackTitle, "Actualizacion"]),
+      productNames: [],
+      productsInline: ""
+    };
+  }
   const statusLabel = orderStatusLabels[templateCode] || pickFirstString([fallbackTitle, "Actualizacion"]);
   const productNames = extractProductNames(payload);
   const productsInline = formatProductsInline(productNames);
@@ -1148,7 +1162,9 @@ async function sendManualOrderStatus({
   branchHours,
   pickupHours,
   rescheduledDate,
-  rescheduledDateLabel
+  rescheduledDateLabel,
+  title,
+  message
 }) {
   const templateCode = normalizeManualStatus(status);
   if (!validManualStatusCodes.has(templateCode)) {
@@ -1188,7 +1204,9 @@ async function sendManualOrderStatus({
       branchHours: branchHours || returnSettings?.branchHours,
       pickupHours: returnSettings?.pickupHours || pickupHours,
       rescheduledDate,
-      rescheduledDateLabel
+      rescheduledDateLabel,
+      title,
+      message
     },
     fallbackTitle: template.title,
     fallbackMessage: template.message
