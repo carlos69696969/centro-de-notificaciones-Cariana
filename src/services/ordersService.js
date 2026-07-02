@@ -700,11 +700,11 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
   const attemptCount = Math.max(0, Number(payload?.attemptCount ?? payload?.attempt_count ?? payload?.attempt ?? 0) || 0);
   const branchAddress = normalizeBranchText(
-    payload?.branchAddress ?? payload?.branch_address ?? payload?.pickupAddress,
+    payload?.returnSettingsBranchAddress ?? payload?.branchAddress ?? payload?.branch_address ?? payload?.pickupAddress,
     DEFAULT_BRANCH_ADDRESS
   );
   const branchHours = normalizeBranchText(
-    payload?.branchHours ?? payload?.branch_hours ?? payload?.pickupHours,
+    payload?.returnSettingsBranchHours ?? payload?.branchHours ?? payload?.branch_hours ?? payload?.pickupHours,
     DEFAULT_BRANCH_HOURS
   );
   const deliveryHours = normalizeBranchText(
@@ -768,7 +768,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
         `🕒 Horario de la sucursal: ${branchHours}`,
         "Para recoger tu pedido, será necesario presentar:",
         "✅ Número de pedido.",
-        "✅ Nombre del comprador.",
+        "✅ Clave de entrega.",
         "⚠️ Importante: Si tu pedido no es recogido dentro de los próximos 30 días naturales, procederemos a cancelar la entrega y realizar el reembolso correspondiente a tu método de pago original."
       ].join("\n\n");
 
@@ -1091,6 +1091,8 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   const returnSettings = await fetchReturnSettingsForShop(shopDomain);
   const payloadWithSettings = {
     ...effectivePayload,
+    returnSettingsBranchAddress: returnSettings?.branchAddress,
+    returnSettingsBranchHours: returnSettings?.branchHours,
     branchAddress: effectivePayload.branchAddress ?? effectivePayload.branch_address ?? returnSettings?.branchAddress,
     branchHours: effectivePayload.branchHours ?? effectivePayload.branch_hours ?? returnSettings?.branchHours,
     pickupHours: returnSettings?.pickupHours ?? effectivePayload.pickupHours ?? effectivePayload.pickup_hours
@@ -1220,6 +1222,8 @@ async function sendManualOrderStatus({
     orderNumber,
     payload: {
       attemptCount,
+      returnSettingsBranchAddress: returnSettings?.branchAddress,
+      returnSettingsBranchHours: returnSettings?.branchHours,
       branchAddress: branchAddress || returnSettings?.branchAddress,
       branchHours: branchHours || returnSettings?.branchHours,
       pickupHours: returnSettings?.pickupHours || pickupHours,
