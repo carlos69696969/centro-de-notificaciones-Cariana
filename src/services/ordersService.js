@@ -472,11 +472,6 @@ function returnsPortalBaseUrl() {
 
 async function fetchReturnSettingsForShop(shopDomain) {
   const shop = String(shopDomain || "").trim();
-  const cachedSettings = await getReturnNotificationSettings(shop);
-  if (cachedSettings?.branchAddress || cachedSettings?.branchHours || cachedSettings?.pickupHours) {
-    return cachedSettings;
-  }
-
   const apiKeys = Array.from(
     new Set([
       process.env.NOTIFICATIONS_API_KEY,
@@ -524,6 +519,11 @@ async function fetchReturnSettingsForShop(shopDomain) {
         error: String(error?.message || error || "unknown")
       });
     }
+  }
+
+  const cachedSettings = await getReturnNotificationSettings(shop);
+  if (cachedSettings?.branchAddress || cachedSettings?.branchHours || cachedSettings?.pickupHours) {
+    return cachedSettings;
   }
   return null;
 }
