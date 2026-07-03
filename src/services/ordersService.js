@@ -507,12 +507,15 @@ async function fetchReturnSettingsForShop(shopDomain) {
 
   const endpoint = new URL("/api/return-settings", returnsPortalBaseUrl());
   endpoint.searchParams.set("shop", shop);
+  endpoint.searchParams.set("t", String(Date.now()));
 
   for (const apiKey of apiKeys) {
     try {
       const response = await fetch(endpoint, {
         method: "GET",
         headers: {
+          "Cache-Control": "no-cache, no-store, max-age=0",
+          "Pragma": "no-cache",
           "x-api-key": apiKey,
           "x-shop-domain": shop
         }
