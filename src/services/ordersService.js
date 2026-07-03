@@ -494,7 +494,7 @@ function returnsPortalBaseUrl() {
   }
 }
 
-async function fetchReturnSettingsForShop(shopDomain) {
+async function fetchReturnSettingsForShop(shopDomain, { allowCachedFallback = true } = {}) {
   const shop = String(shopDomain || "").trim();
   const apiKeys = Array.from(
     new Set([
@@ -503,22 +503,25 @@ async function fetchReturnSettingsForShop(shopDomain) {
       process.env.APP_INTERNAL_API_KEY
     ].map((value) => String(value || "").trim()).filter(Boolean))
   );
-  if (!shop || !apiKeys.length) return null;
+  if (!shop) return null;
 
   const endpoint = new URL("/api/return-settings", returnsPortalBaseUrl());
   endpoint.searchParams.set("shop", shop);
   endpoint.searchParams.set("t", String(Date.now()));
 
-  for (const apiKey of apiKeys) {
+  for (const apiKey of [...apiKeys, ""]) {
     try {
+      const headers = {
+        "Cache-Control": "no-cache, no-store, max-age=0",
+        "Pragma": "no-cache",
+        "x-shop-domain": shop
+      };
+      if (apiKey) {
+        headers["x-api-key"] = apiKey;
+      }
       const response = await fetch(endpoint, {
         method: "GET",
-        headers: {
-          "Cache-Control": "no-cache, no-store, max-age=0",
-          "Pragma": "no-cache",
-          "x-api-key": apiKey,
-          "x-shop-domain": shop
-        }
+        headers
       });
       if (!response.ok) {
         console.warn("Return settings endpoint rejected order notification lookup", {
@@ -546,6 +549,10 @@ async function fetchReturnSettingsForShop(shopDomain) {
         error: String(error?.message || error || "unknown")
       });
     }
+  }
+
+  if (!allowCachedFallback) {
+    return null;
   }
 
   const cachedSettings = await getReturnNotificationSettings(shop);
@@ -1185,7 +1192,16 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     return { skipped: true, reason: "Template not found" };
   }
 
-  const returnSettings = await fetchReturnSettingsForShop(shopDomain);
+  const returnSettings = await fetchReturnSettingsForShop(shopDomain, {
+    allowCachedFallback: templateCode !== "order_preparing"
+  });
+  const webhookPickupHours = templateCode === "order_preparing"
+    ? String(returnSettings?.pickupHours || "").trim()
+    : pickFirstString([
+        returnSettings?.pickupHours,
+        effectivePayload.pickupHours,
+        effectivePayload.pickup_hours
+      ]);
   const payloadWithSettings = {
     ...effectivePayload,
     returnSettingsBranchAddress: returnSettings?.branchAddress,
@@ -1193,11 +1209,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     returnSettingsPickupHours: returnSettings?.pickupHours,
     branchAddress: returnSettings?.branchAddress ?? effectivePayload.branchAddress ?? effectivePayload.branch_address,
     branchHours: returnSettings?.branchHours ?? effectivePayload.branchHours ?? effectivePayload.branch_hours,
-    pickupHours: pickFirstString([
-      returnSettings?.pickupHours,
-      effectivePayload.pickupHours,
-      effectivePayload.pickup_hours
-    ])
+    pickupHours: webhookPickupHours
   };
 
   const copy = buildOrderNotificationCopy({
