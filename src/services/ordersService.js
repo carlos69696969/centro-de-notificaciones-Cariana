@@ -50,6 +50,8 @@ function formatNotificationSentAt(value) {
     .format(date)
     .replace(".", "")
     .replace(",", "")
+    .replace(/\bp\.?\s*m\.?/i, "pm.")
+    .replace(/\ba\.?\s*m\.?/i, "am.")
     .toLowerCase();
 }
 
@@ -1518,7 +1520,7 @@ async function getLatestOrderNotification({ shopDomain, orderNumber }) {
   const createdAt = row.created_at ? new Date(row.created_at).toISOString() : "";
   const createdAtLabel = formatNotificationSentAt(row.created_at);
   const message = row.message || "";
-  const orderDetailLineBreakSpacer = "\u2003".repeat(18);
+  const orderDetailLineBreakSpacer = "\u2003".repeat(10);
   return {
     id: row.id,
     title: row.title || "",
