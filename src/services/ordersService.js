@@ -417,6 +417,30 @@ function extractDeliveryCutoffTime(value) {
   return `${hour}:${minutes} ${lastMatch[3]}`;
 }
 
+function formatBranchPickupDeadlineDate(value) {
+  const directLabel = String(value || "").trim();
+  if (!directLabel) return "";
+  const date = new Date(directLabel);
+  if (Number.isFinite(date.getTime())) {
+    return new Intl.DateTimeFormat("es-MX", {
+      timeZone: NOTIFICATION_TIME_ZONE,
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }).format(date);
+  }
+  const cleanLabel = directLabel
+    .replace(/^(?:lun|mar|mie|mié|jue|vie|sab|sáb|dom)\.?\s+/i, "")
+    .replace(/^0+(\d)/, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+  const spanishDateMatch = cleanLabel.match(/^(\d{1,2})\s+([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)\s+(\d{4})$/);
+  if (spanishDateMatch) {
+    return `${Number(spanishDateMatch[1])} de ${spanishDateMatch[2].toLowerCase()} de ${spanishDateMatch[3]}`;
+  }
+  return cleanLabel;
+}
+
 function extractProductNames(payload) {
   const lineItems = []
     .concat(Array.isArray(payload?.line_items) ? payload.line_items : [])
@@ -773,6 +797,15 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     DEFAULT_DELIVERY_HOURS
   );
   const deliveryCutoffTime = extractDeliveryCutoffTime(deliveryHours);
+  const branchPickupDeadlineLabel = formatBranchPickupDeadlineDate(
+    pickFirstString([
+      payload?.branchPickupDeadlineAt,
+      payload?.branchPickupDeadline,
+      payload?.branchPickupDeadlineLabel,
+      payload?.pickupDeadlineAt,
+      payload?.pickupDeadlineLabel
+    ])
+  );
   const rescheduledDeliveryDate = pickFirstString([
     formatRescheduledDeliveryDate(payload?.rescheduledDate ?? payload?.rescheduled_date),
     payload?.rescheduledDateLabel,
@@ -830,7 +863,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
         "Para recoger tu pedido, será necesario presentar:",
         "✅ Número de pedido.",
         "✅ Clave de entrega.",
-        "⚠️ Importante: Si tu pedido no es recogido dentro de los próximos 30 días naturales, procederemos a cancelar la entrega y realizar el reembolso correspondiente a tu método de pago original."
+        `⚠️ Importante: Si tu pedido no es recogido antes del ${branchPickupDeadlineLabel || "plazo indicado"}, procederemos a cancelar tu pedido y realizar el reembolso correspondiente a tu método de pago original.`
       ].join("\n\n");
 
       return {
@@ -1249,6 +1282,8 @@ async function sendManualOrderStatus({
   branchAddress,
   branchHours,
   pickupHours,
+  branchPickupDeadlineAt,
+  branchPickupDeadlineLabel,
   rescheduledDate,
   rescheduledDateLabel,
   title,
@@ -1309,6 +1344,8 @@ async function sendManualOrderStatus({
       branchAddress: effectiveBranchAddress,
       branchHours: effectiveBranchHours,
       pickupHours: effectivePickupHours,
+      branchPickupDeadlineAt,
+      branchPickupDeadlineLabel,
       rescheduledDate,
       rescheduledDateLabel,
       title,
@@ -1355,6 +1392,8 @@ async function sendManualOrderStatus({
           branchAddress: String(branchAddress || "").trim(),
           branchHours: String(branchHours || "").trim(),
           pickupHours: String(effectivePickupHours || "").trim(),
+          branchPickupDeadlineAt: String(branchPickupDeadlineAt || "").trim(),
+          branchPickupDeadlineLabel: String(branchPickupDeadlineLabel || "").trim(),
           rescheduledDate: String(rescheduledDate || "").trim(),
           rescheduledDateLabel: String(rescheduledDateLabel || "").trim(),
           statusLabel: copy.statusLabel,
