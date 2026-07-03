@@ -4,6 +4,10 @@ const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens } = require("./notificationService");
 const { buildOrderDeepLink, buildReturnDeepLink } = require("./deepLinkService");
 const { closeAbandonedCartsFromOrder } = require("./abandonedCartService");
+const {
+  getReturnNotificationSettings,
+  saveReturnNotificationSettings
+} = require("./returnSettingsService");
 const env = require("../config/env");
 
 const LOCAL_DELIVERY_READY_TOPIC = "fulfillment_orders/line_items_prepared_for_local_delivery";
@@ -447,6 +451,11 @@ function returnsPortalBaseUrl() {
 
 async function fetchReturnSettingsForShop(shopDomain) {
   const shop = String(shopDomain || "").trim();
+  const cachedSettings = await getReturnNotificationSettings(shop);
+  if (cachedSettings?.branchAddress || cachedSettings?.branchHours || cachedSettings?.pickupHours) {
+    return cachedSettings;
+  }
+
   const apiKeys = Array.from(
     new Set([
       process.env.NOTIFICATIONS_API_KEY,
@@ -476,7 +485,18 @@ async function fetchReturnSettingsForShop(shopDomain) {
         continue;
       }
       const payload = await response.json().catch(() => null);
-      if (payload?.ok) return payload.settings || null;
+      if (payload?.ok) {
+        const settings = payload.settings || null;
+        if (settings?.branchAddress || settings?.branchHours || settings?.pickupHours) {
+          await saveReturnNotificationSettings(shop, settings).catch((error) => {
+            console.warn("Failed to cache fetched return settings", {
+              shopDomain: shop,
+              error: String(error?.message || error || "unknown")
+            });
+          });
+        }
+        return settings;
+      }
     } catch (error) {
       console.warn("Failed to fetch return settings for order notification", {
         shopDomain: shop,
@@ -1242,6 +1262,18 @@ async function sendManualOrderStatus({
   }
 
   const returnSettings = await fetchReturnSettingsForShop(shopDomain);
+  if (branchAddress || branchHours || pickupHours) {
+    await saveReturnNotificationSettings(shopDomain, {
+      branchAddress: branchAddress || returnSettings?.branchAddress,
+      branchHours: branchHours || returnSettings?.branchHours,
+      pickupHours: pickupHours || returnSettings?.pickupHours
+    }).catch((error) => {
+      console.warn("Failed to cache manual return settings", {
+        shopDomain,
+        error: String(error?.message || error || "unknown")
+      });
+    });
+  }
   const copy = buildOrderNotificationCopy({
     templateCode,
     orderNumber,

@@ -15,6 +15,7 @@ const templatesRoutes = require("./routes/templates");
 const dashboardRoutes = require("./routes/dashboard");
 const returnsRoutes = require("./routes/returns");
 const ordersRoutes = require("./routes/orders");
+const returnSettingsRoutes = require("./routes/returnSettings");
 const storefrontNotificationsRoutes = require("./routes/storefrontNotifications");
 const abandonedCartRoutes = require("./routes/abandonedCart");
 
@@ -33,6 +34,7 @@ app.use("/api/templates", requireInternalApiKey, templatesRoutes);
 app.use("/api/dashboard", requireInternalApiKey, dashboardRoutes);
 app.use("/api/returns", requireInternalApiKey, returnsRoutes);
 app.use("/api/orders", requireInternalApiKey, ordersRoutes);
+app.use("/api/return-settings", requireInternalApiKey, returnSettingsRoutes);
 app.use("/api/abandoned-cart", requireInternalApiKey, abandonedCartRoutes);
 app.use("/proxy/notifications", storefrontNotificationsRoutes);
 app.use("/proxy/returns", returnsRoutes);
