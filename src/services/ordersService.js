@@ -708,7 +708,13 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     DEFAULT_BRANCH_HOURS
   );
   const deliveryHours = normalizeBranchText(
-    payload?.pickupHours ?? payload?.pickup_hours ?? payload?.deliveryHours ?? payload?.delivery_hours,
+    pickFirstString([
+      payload?.returnSettingsPickupHours,
+      payload?.pickupHours,
+      payload?.pickup_hours,
+      payload?.deliveryHours,
+      payload?.delivery_hours
+    ]),
     DEFAULT_DELIVERY_HOURS
   );
   const deliveryCutoffTime = extractDeliveryCutoffTime(deliveryHours);
@@ -1093,9 +1099,14 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     ...effectivePayload,
     returnSettingsBranchAddress: returnSettings?.branchAddress,
     returnSettingsBranchHours: returnSettings?.branchHours,
+    returnSettingsPickupHours: returnSettings?.pickupHours,
     branchAddress: effectivePayload.branchAddress ?? effectivePayload.branch_address ?? returnSettings?.branchAddress,
     branchHours: effectivePayload.branchHours ?? effectivePayload.branch_hours ?? returnSettings?.branchHours,
-    pickupHours: returnSettings?.pickupHours ?? effectivePayload.pickupHours ?? effectivePayload.pickup_hours
+    pickupHours: pickFirstString([
+      returnSettings?.pickupHours,
+      effectivePayload.pickupHours,
+      effectivePayload.pickup_hours
+    ])
   };
 
   const copy = buildOrderNotificationCopy({
@@ -1224,9 +1235,10 @@ async function sendManualOrderStatus({
       attemptCount,
       returnSettingsBranchAddress: returnSettings?.branchAddress,
       returnSettingsBranchHours: returnSettings?.branchHours,
+      returnSettingsPickupHours: returnSettings?.pickupHours,
       branchAddress: branchAddress || returnSettings?.branchAddress,
       branchHours: branchHours || returnSettings?.branchHours,
-      pickupHours: returnSettings?.pickupHours || pickupHours,
+      pickupHours: pickFirstString([returnSettings?.pickupHours, pickupHours]),
       rescheduledDate,
       rescheduledDateLabel,
       title,
@@ -1272,7 +1284,7 @@ async function sendManualOrderStatus({
           attemptCount: Math.max(0, Number(attemptCount || 0) || 0),
           branchAddress: String(branchAddress || "").trim(),
           branchHours: String(branchHours || "").trim(),
-          pickupHours: String(pickupHours || returnSettings?.pickupHours || "").trim(),
+          pickupHours: String(returnSettings?.pickupHours || pickupHours || "").trim(),
           rescheduledDate: String(rescheduledDate || "").trim(),
           rescheduledDateLabel: String(rescheduledDateLabel || "").trim(),
           statusLabel: copy.statusLabel,
