@@ -1521,7 +1521,7 @@ async function getLatestOrderNotification({ shopDomain, orderNumber }) {
   return {
     id: row.id,
     title: row.title || "",
-    message: createdAtLabel ? `${createdAtLabel}<br>${message}` : message,
+    message: createdAtLabel ? `${createdAtLabel}\u2028${message}` : message,
     rawMessage: message,
     createdAt,
     createdAtLabel,
