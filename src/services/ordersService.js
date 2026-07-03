@@ -447,30 +447,44 @@ function returnsPortalBaseUrl() {
 
 async function fetchReturnSettingsForShop(shopDomain) {
   const shop = String(shopDomain || "").trim();
-  const apiKey = String(process.env.NOTIFICATIONS_API_KEY || env.appInternalApiKey || process.env.APP_INTERNAL_API_KEY || "").trim();
-  if (!shop || !apiKey) return null;
+  const apiKeys = Array.from(
+    new Set([
+      process.env.NOTIFICATIONS_API_KEY,
+      env.appInternalApiKey,
+      process.env.APP_INTERNAL_API_KEY
+    ].map((value) => String(value || "").trim()).filter(Boolean))
+  );
+  if (!shop || !apiKeys.length) return null;
 
   const endpoint = new URL("/api/return-settings", returnsPortalBaseUrl());
   endpoint.searchParams.set("shop", shop);
 
-  try {
-    const response = await fetch(endpoint, {
-      method: "GET",
-      headers: {
-        "x-api-key": apiKey,
-        "x-shop-domain": shop
+  for (const apiKey of apiKeys) {
+    try {
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "x-api-key": apiKey,
+          "x-shop-domain": shop
+        }
+      });
+      if (!response.ok) {
+        console.warn("Return settings endpoint rejected order notification lookup", {
+          shopDomain: shop,
+          status: response.status
+        });
+        continue;
       }
-    });
-    if (!response.ok) return null;
-    const payload = await response.json().catch(() => null);
-    return payload?.ok ? payload.settings || null : null;
-  } catch (error) {
-    console.warn("Failed to fetch return settings for order notification", {
-      shopDomain: shop,
-      error: String(error?.message || error || "unknown")
-    });
-    return null;
+      const payload = await response.json().catch(() => null);
+      if (payload?.ok) return payload.settings || null;
+    } catch (error) {
+      console.warn("Failed to fetch return settings for order notification", {
+        shopDomain: shop,
+        error: String(error?.message || error || "unknown")
+      });
+    }
   }
+  return null;
 }
 
 const orderStatusLabels = {
