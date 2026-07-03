@@ -755,18 +755,18 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   const title = normalizedOrder ? `${statusLabel} - Pedido #${normalizedOrder}` : `${statusLabel} - Pedido`;
   const attemptCount = Math.max(0, Number(payload?.attemptCount ?? payload?.attempt_count ?? payload?.attempt ?? 0) || 0);
   const branchAddress = normalizeBranchText(
-    payload?.returnSettingsBranchAddress ?? payload?.branchAddress ?? payload?.branch_address ?? payload?.pickupAddress,
+    payload?.branchAddress ?? payload?.branch_address ?? payload?.pickupAddress ?? payload?.returnSettingsBranchAddress,
     DEFAULT_BRANCH_ADDRESS
   );
   const branchHours = normalizeBranchText(
-    payload?.returnSettingsBranchHours ?? payload?.branchHours ?? payload?.branch_hours ?? payload?.pickupHours,
+    payload?.branchHours ?? payload?.branch_hours ?? payload?.returnSettingsBranchHours ?? payload?.pickupHours,
     DEFAULT_BRANCH_HOURS
   );
   const deliveryHours = normalizeBranchText(
     pickFirstString([
-      payload?.returnSettingsPickupHours,
       payload?.pickupHours,
       payload?.pickup_hours,
+      payload?.returnSettingsPickupHours,
       payload?.deliveryHours,
       payload?.delivery_hours
     ]),
@@ -1158,9 +1158,9 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     branchAddress: effectivePayload.branchAddress ?? effectivePayload.branch_address ?? returnSettings?.branchAddress,
     branchHours: effectivePayload.branchHours ?? effectivePayload.branch_hours ?? returnSettings?.branchHours,
     pickupHours: pickFirstString([
-      returnSettings?.pickupHours,
       effectivePayload.pickupHours,
-      effectivePayload.pickup_hours
+      effectivePayload.pickup_hours,
+      returnSettings?.pickupHours
     ])
   };
 
@@ -1283,11 +1283,14 @@ async function sendManualOrderStatus({
   }
 
   const returnSettings = await fetchReturnSettingsForShop(shopDomain);
+  const effectiveBranchAddress = branchAddress || returnSettings?.branchAddress;
+  const effectiveBranchHours = branchHours || returnSettings?.branchHours;
+  const effectivePickupHours = pickFirstString([pickupHours, returnSettings?.pickupHours]);
   if (branchAddress || branchHours || pickupHours) {
     await saveReturnNotificationSettings(shopDomain, {
-      branchAddress: branchAddress || returnSettings?.branchAddress,
-      branchHours: branchHours || returnSettings?.branchHours,
-      pickupHours: pickupHours || returnSettings?.pickupHours
+      branchAddress: effectiveBranchAddress,
+      branchHours: effectiveBranchHours,
+      pickupHours: effectivePickupHours
     }).catch((error) => {
       console.warn("Failed to cache manual return settings", {
         shopDomain,
@@ -1303,9 +1306,9 @@ async function sendManualOrderStatus({
       returnSettingsBranchAddress: returnSettings?.branchAddress,
       returnSettingsBranchHours: returnSettings?.branchHours,
       returnSettingsPickupHours: returnSettings?.pickupHours,
-      branchAddress: branchAddress || returnSettings?.branchAddress,
-      branchHours: branchHours || returnSettings?.branchHours,
-      pickupHours: pickFirstString([returnSettings?.pickupHours, pickupHours]),
+      branchAddress: effectiveBranchAddress,
+      branchHours: effectiveBranchHours,
+      pickupHours: effectivePickupHours,
       rescheduledDate,
       rescheduledDateLabel,
       title,
@@ -1351,7 +1354,7 @@ async function sendManualOrderStatus({
           attemptCount: Math.max(0, Number(attemptCount || 0) || 0),
           branchAddress: String(branchAddress || "").trim(),
           branchHours: String(branchHours || "").trim(),
-          pickupHours: String(returnSettings?.pickupHours || pickupHours || "").trim(),
+          pickupHours: String(effectivePickupHours || "").trim(),
           rescheduledDate: String(rescheduledDate || "").trim(),
           rescheduledDateLabel: String(rescheduledDateLabel || "").trim(),
           statusLabel: copy.statusLabel,
