@@ -34,6 +34,25 @@ function parseLegacyNumericId(value) {
   return match ? match[1] : null;
 }
 
+function formatNotificationSentAt(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("es-MX", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: NOTIFICATION_TIME_ZONE
+  })
+    .format(date)
+    .replace(".", "")
+    .replace(",", "")
+    .toLowerCase();
+}
+
 function hasDeliveredSignal(payload) {
   const deliveredValues = new Set(["delivered", "delivered_to_customer"]);
   const candidates = [];
@@ -1496,11 +1515,16 @@ async function getLatestOrderNotification({ shopDomain, orderNumber }) {
 
   const row = result.rows[0];
   if (!row) return null;
+  const createdAt = row.created_at ? new Date(row.created_at).toISOString() : "";
+  const createdAtLabel = formatNotificationSentAt(row.created_at);
+  const message = row.message || "";
   return {
     id: row.id,
     title: row.title || "",
-    message: row.message || "",
-    createdAt: row.created_at ? new Date(row.created_at).toISOString() : "",
+    message: createdAtLabel ? `${createdAtLabel}\n${message}` : message,
+    rawMessage: message,
+    createdAt,
+    createdAtLabel,
   };
 }
 
