@@ -1191,12 +1191,12 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     returnSettingsBranchAddress: returnSettings?.branchAddress,
     returnSettingsBranchHours: returnSettings?.branchHours,
     returnSettingsPickupHours: returnSettings?.pickupHours,
-    branchAddress: effectivePayload.branchAddress ?? effectivePayload.branch_address ?? returnSettings?.branchAddress,
-    branchHours: effectivePayload.branchHours ?? effectivePayload.branch_hours ?? returnSettings?.branchHours,
+    branchAddress: returnSettings?.branchAddress ?? effectivePayload.branchAddress ?? effectivePayload.branch_address,
+    branchHours: returnSettings?.branchHours ?? effectivePayload.branchHours ?? effectivePayload.branch_hours,
     pickupHours: pickFirstString([
+      returnSettings?.pickupHours,
       effectivePayload.pickupHours,
-      effectivePayload.pickup_hours,
-      returnSettings?.pickupHours
+      effectivePayload.pickup_hours
     ])
   };
 
