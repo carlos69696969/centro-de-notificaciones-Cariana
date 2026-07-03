@@ -27,7 +27,7 @@ async function getReturnNotificationSettings(shopDomain) {
   if (!shop) return null;
 
   await ensureReturnNotificationSettingsTable();
-  const result = await pool.query(
+  let result = await pool.query(
     `
     SELECT branch_address, branch_hours, pickup_hours
     FROM return_notification_settings
@@ -35,6 +35,20 @@ async function getReturnNotificationSettings(shopDomain) {
     `,
     [shop]
   );
+
+  if (!result.rows[0]) {
+    result = await pool.query(
+      `
+      SELECT branch_address, branch_hours, pickup_hours
+      FROM return_notification_settings
+      WHERE COALESCE(branch_address, '') <> ''
+         OR COALESCE(branch_hours, '') <> ''
+         OR COALESCE(pickup_hours, '') <> ''
+      ORDER BY updated_at DESC
+      LIMIT 1
+      `
+    );
+  }
 
   const row = result.rows[0];
   if (!row) return null;
