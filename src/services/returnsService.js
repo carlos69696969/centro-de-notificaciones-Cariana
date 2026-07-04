@@ -364,7 +364,7 @@ const returnStatusLabels = {
 function buildReturnStatusTitle(templateCode) {
   const map = {
     return_requested: "Devolucion en revision",
-    return_approved: "Devolucion aprobada",
+    return_approved: "Devolución aprobada ✅",
     return_rejected: "Devoluci\u00F3n rechazada \u274C",
     return_pickup_scheduled: "Intento de recolecci\u00F3n fallido \u274C",
     return_pickup_reprogrammed: "Devolución reprogramada 🔄📦",
@@ -411,7 +411,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return "\u2728Nuestro equipo ya comenz\u00F3 el proceso de verificaci\u00F3n de tu producto. Muy pronto recibir\u00E1s una actualizaci\u00F3n sobre el estado de tu solicitud.\uD83D\uDCE6";
   }
   if (templateCode === "return_approved" && isBranchReturnMethod(payload)) {
-    return "Tu solicitud de devoluci\u00F3n fue aprobada. \uD83D\uDCE6 Por favor, lleva tu producto a la sucursal de devoluciones siguiendo las instrucciones de entrega.";
+    return "Tu solicitud de devolución fue aprobada. Por favor, lleva tu producto a la sucursal de devoluciones antes de la fecha limite de entrega siguiendo las instrucciones de entrega.";
   }
   if (templateCode === "return_approved" && isPickupReturnMethod(payload)) {
     return "Tu solicitud fue aprobada exitosamente. Nuestro equipo recoger\u00E1 tu producto en el domicilio y fecha indicados. \uD83D\uDE9A\u2728 Gracias por ser parte de Cariana. \uD83D\uDC99";
@@ -521,6 +521,20 @@ function buildReturnPremiumTemplate({
     return {
       title: formalTitle,
       message: formalParts.join(" "),
+      productNames: mergedProductNames,
+      productsInline,
+      rejectionReason,
+      statusLabel
+    };
+  }
+
+  if (templateCode === "return_approved" && isBranchReturnMethod(payload)) {
+    const message = normalizedOrder
+      ? `📦Pedido #${normalizedOrder}. ${portalCurrentText}`
+      : `📦${portalCurrentText}`;
+    return {
+      title: statusTitle,
+      message,
       productNames: mergedProductNames,
       productsInline,
       rejectionReason,
