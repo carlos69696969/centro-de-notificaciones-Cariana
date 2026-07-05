@@ -92,7 +92,7 @@ const defaultReturnTemplates = {
     message: "Tu solicitud de devolucion ha sido recibida."
   },
   return_approved: {
-    title: "Devolucion aprobada",
+    title: "Devolucion aprobada ✅",
     message: "Tu devolucion ha sido aprobada."
   },
   return_rejected: {
@@ -364,7 +364,7 @@ const returnStatusLabels = {
 function buildReturnStatusTitle(templateCode) {
   const map = {
     return_requested: "Devolución en revisión 🔍",
-    return_approved: "Devolución aprobada ✅",
+    return_approved: "Devolucion aprobada ✅",
     return_rejected: "Devoluci\u00F3n rechazada \u274C",
     return_pickup_scheduled: "Intento de recolecci\u00F3n fallido \u274C",
     return_pickup_reprogrammed: "Devolución reprogramada 🔄📦",
@@ -414,7 +414,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return "Tu solicitud de devolución fue aprobada. Por favor, lleva tu producto a la sucursal de devoluciones antes de la fecha limite de entrega siguiendo las instrucciones de entrega.";
   }
   if (templateCode === "return_approved" && isPickupReturnMethod(payload)) {
-    return "Tu solicitud fue aprobada exitosamente. Nuestro equipo recoger\u00E1 tu producto en el domicilio y fecha indicados. \uD83D\uDE9A\u2728 Gracias por ser parte de Cariana. \uD83D\uDC99";
+    return "Tu solicitud fue aprobada exitosamente. Nuestro equipo recogerá tu pedido en el domicilio y fecha indicados por ti. 🚚 Gracias por confiar y ser parte de Cariana. 💙";
   }
   if (templateCode === "return_picked_up") {
     return "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0";
@@ -444,7 +444,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return_requested:
       "Nuestro equipo ya comenzó el proceso de verificación de tu producto. Revisaremos la descripción y las fotografías del problema reportado. Una vez que validemos tu solicitud, te notificaremos el resultado. Regresa más tarde para consultar el estado de tu devolución.",
     return_approved:
-      "Tu solicitud fue aprobada exitosamente. Nuestro equipo recoger\u00E1 tu producto en el domicilio y fecha indicados. \uD83D\uDE9A\u2728 Gracias por ser parte de Cariana. \uD83D\uDC99",
+      "Tu solicitud fue aprobada exitosamente. Nuestro equipo recogerá tu pedido en el domicilio y fecha indicados por ti. 🚚 Gracias por confiar y ser parte de Cariana. 💙",
     return_rejected:
       "Tu solicitud fue rechazada. Revisa el detalle para conocer el motivo y las opciones disponibles.",
     return_pickup_scheduled:
@@ -546,6 +546,18 @@ function buildReturnPremiumTemplate({
     const message = normalizedOrder
       ? `📦Pedido #${normalizedOrder}. ${portalCurrentText}`
       : `📦${portalCurrentText}`;
+    return {
+      title: statusTitle,
+      message,
+      productNames: mergedProductNames,
+      productsInline,
+      rejectionReason,
+      statusLabel
+    };
+  }
+
+  if (templateCode === "return_approved" && isPickupReturnMethod(payload)) {
+    const message = `📦Pedido #${normalizedOrder || "****"}. ${portalCurrentText}`;
     return {
       title: statusTitle,
       message,
