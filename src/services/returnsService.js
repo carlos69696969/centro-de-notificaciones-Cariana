@@ -112,8 +112,8 @@ const defaultReturnTemplates = {
     message: "Nuestro repartidor ya se dirige a tu domicilio para recoger tu devolucion."
   },
   return_picked_up: {
-    title: "Producto recogido",
-    message: "Recibimos tu producto para continuar con tu devolucion."
+    title: "Devolucion recibida ✅",
+    message: "Producto recibido. Hemos recibido tu devolución y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificación, realizaremos tu reembolso correspondiente. 💰"
   },
   refund_processed: {
     title: "Reembolso procesado",
@@ -356,7 +356,7 @@ const returnStatusLabels = {
   return_pickup_scheduled: "Intento de recoleccion fallido",
   return_pickup_reprogrammed: "Devolucion reprogramada",
   return_pickup_in_transit: "En ruta",
-  return_picked_up: "Producto recogido",
+  return_picked_up: "Devolucion recibida",
   refund_processed: "Reembolso procesado",
   refund_completed: "Reembolso completado"
 };
@@ -369,7 +369,7 @@ function buildReturnStatusTitle(templateCode) {
     return_pickup_scheduled: "Intento de recolecci\u00F3n fallido \u274C",
     return_pickup_reprogrammed: "Devolución reprogramada 🔄📦",
     return_pickup_in_transit: "En ruta para recoger tu devolucion",
-    return_picked_up: "Producto recogido",
+    return_picked_up: "Devolucion recibida ✅",
     refund_processed: "Reembolso procesado",
     refund_completed: "Reembolso completado"
   };
@@ -417,7 +417,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return "Tu solicitud fue aprobada exitosamente. Nuestro equipo recoger\u00E1 tu producto en el domicilio y fecha indicados. \uD83D\uDE9A\u2728 Gracias por ser parte de Cariana. \uD83D\uDC99";
   }
   if (templateCode === "return_picked_up") {
-    return "Producto recibido. \uD83D\uDCE6 Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0";
+    return "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0";
   }
   if (templateCode === "refund_processed") {
     return "Tu reembolso ya fue procesado correctamente. Dependiendo de tu banco, puede reflejarse en un plazo de 5 a 10 dias habiles.";
@@ -450,7 +450,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return_pickup_scheduled:
       "No se pudo completar la recoleccion. Estamos gestionando un nuevo intento para tu devolucion.",
     return_picked_up:
-      "Tu paquete ya fue recolectado y estamos procesando tu devolucion.",
+      "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0",
     refund_processed:
       "Tu reembolso fue procesado y se vera reflejado segun los tiempos de tu metodo de pago.",
     refund_completed:
@@ -529,6 +529,20 @@ function buildReturnPremiumTemplate({
   }
 
   if (templateCode === "return_approved" && isBranchReturnMethod(payload)) {
+    const message = normalizedOrder
+      ? `📦Pedido #${normalizedOrder}. ${portalCurrentText}`
+      : `📦${portalCurrentText}`;
+    return {
+      title: statusTitle,
+      message,
+      productNames: mergedProductNames,
+      productsInline,
+      rejectionReason,
+      statusLabel
+    };
+  }
+
+  if (templateCode === "return_picked_up") {
     const message = normalizedOrder
       ? `📦Pedido #${normalizedOrder}. ${portalCurrentText}`
       : `📦${portalCurrentText}`;
