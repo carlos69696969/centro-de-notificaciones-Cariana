@@ -363,7 +363,7 @@ const returnStatusLabels = {
 
 function buildReturnStatusTitle(templateCode) {
   const map = {
-    return_requested: "Devolucion en revision",
+    return_requested: "Devolución en revisión 🔍",
     return_approved: "Devolución aprobada ✅",
     return_rejected: "Devoluci\u00F3n rechazada \u274C",
     return_pickup_scheduled: "Intento de recolecci\u00F3n fallido \u274C",
@@ -408,7 +408,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return "\uD83D\uDCE6Tu devolucion ya fue recogida en nuestra sucursal de devoluciones. Gracias por recoger tu devolucion.";
   }
   if (templateCode === "return_requested") {
-    return "\u2728Nuestro equipo ya comenz\u00F3 el proceso de verificaci\u00F3n de tu producto. Muy pronto recibir\u00E1s una actualizaci\u00F3n sobre el estado de tu solicitud.\uD83D\uDCE6";
+    return "Nuestro equipo ya comenzó el proceso de verificación de tu producto. Revisaremos la descripción y las fotografías del problema reportado. Una vez que validemos tu solicitud, te notificaremos el resultado. Regresa más tarde para consultar el estado de tu devolución.";
   }
   if (templateCode === "return_approved" && isBranchReturnMethod(payload)) {
     return "Tu solicitud de devolución fue aprobada. Por favor, lleva tu producto a la sucursal de devoluciones antes de la fecha limite de entrega siguiendo las instrucciones de entrega.";
@@ -442,7 +442,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
   }
   const byStatus = {
     return_requested:
-      "\u2728Nuestro equipo ya comenz\u00F3 el proceso de verificaci\u00F3n de tu producto. Muy pronto recibir\u00E1s una actualizaci\u00F3n sobre el estado de tu solicitud.\uD83D\uDCE6",
+      "Nuestro equipo ya comenzó el proceso de verificación de tu producto. Revisaremos la descripción y las fotografías del problema reportado. Una vez que validemos tu solicitud, te notificaremos el resultado. Regresa más tarde para consultar el estado de tu devolución.",
     return_approved:
       "Tu solicitud fue aprobada exitosamente. Nuestro equipo recoger\u00E1 tu producto en el domicilio y fecha indicados. \uD83D\uDE9A\u2728 Gracias por ser parte de Cariana. \uD83D\uDC99",
     return_rejected:
@@ -497,6 +497,20 @@ function buildReturnPremiumTemplate({
     return {
       title: pickFirstString([payload.title, statusTitle]),
       message: pickFirstString([payload.message, payload.note, fallbackMessage]),
+      productNames: mergedProductNames,
+      productsInline,
+      rejectionReason,
+      statusLabel
+    };
+  }
+
+  if (templateCode === "return_requested") {
+    const message = normalizedOrder
+      ? `📦 Pedido #${normalizedOrder}. ${portalCurrentText}`
+      : `📦 Pedido #****. ${portalCurrentText}`;
+    return {
+      title: statusTitle,
+      message,
       productNames: mergedProductNames,
       productsInline,
       rejectionReason,
