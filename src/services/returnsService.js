@@ -37,10 +37,14 @@ const returnTemplateMap = {
   deny_received: "return_rejected",
   mark_returned_to_customer: "return_rejected",
   mark_not_returned: "return_rejected",
+  mark_never_arrived: "return_expired",
+  never_arrived_branch: "return_expired",
+  return_expired: "return_expired",
+  devolucion_vencida: "return_expired",
   rejected: "return_rejected",
   rechazada: "return_rejected",
   reembolso_denegado: "return_rejected",
-  no_devuelto: "return_rejected",
+  no_devuelto: "return_expired",
   return_rejected: "return_rejected",
   devolucion_rechazada: "return_rejected",
 
@@ -98,6 +102,11 @@ const defaultReturnTemplates = {
   return_rejected: {
     title: "Devolucion rechazada",
     message: "Tu devolucion ha sido rechazada."
+  },
+  return_expired: {
+    title: "Devolución vencida 🗓️❌",
+    message:
+      "Estimado cliente, la fecha límite para entregar tu devolución ha expirado. Lamentablemente, ya no podremos aceptar el producto."
   },
   return_pickup_scheduled: {
     title: "Intento de recoleccion fallido",
@@ -353,6 +362,7 @@ const returnStatusLabels = {
   return_requested: "Solicitud recibida",
   return_approved: "Aprobada",
   return_rejected: "Rechazada",
+  return_expired: "Devolucion vencida",
   return_pickup_scheduled: "Intento de recoleccion fallido",
   return_pickup_reprogrammed: "Devolucion reprogramada",
   return_pickup_in_transit: "En ruta",
@@ -366,6 +376,7 @@ function buildReturnStatusTitle(templateCode) {
     return_requested: "Devolución en revisión 🔍",
     return_approved: "Devolucion aprobada ✅",
     return_rejected: "Devoluci\u00F3n rechazada \u274C",
+    return_expired: "Devolución vencida 🗓️❌",
     return_pickup_scheduled: "Intento de recolecci\u00F3n fallido \u274C",
     return_pickup_reprogrammed: "Devolución reprogramada 🔄📦",
     return_pickup_in_transit: "En ruta para recoger tu devolucion",
@@ -416,6 +427,9 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
   if (templateCode === "return_approved" && isPickupReturnMethod(payload)) {
     return "Tu solicitud fue aprobada exitosamente. Nuestro equipo recogerá tu pedido en el domicilio y fecha indicados por ti. 🚚 Gracias por confiar y ser parte de Cariana. 💙";
   }
+  if (templateCode === "return_expired") {
+    return "Estimado cliente, la fecha límite para entregar tu devolución ha expirado. Lamentablemente, ya no podremos aceptar el producto.";
+  }
   if (templateCode === "return_picked_up") {
     return "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0";
   }
@@ -447,6 +461,8 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
       "Tu solicitud fue aprobada exitosamente. Nuestro equipo recogerá tu pedido en el domicilio y fecha indicados por ti. 🚚 Gracias por confiar y ser parte de Cariana. 💙",
     return_rejected:
       "Tu solicitud fue rechazada. Revisa el detalle para conocer el motivo y las opciones disponibles.",
+    return_expired:
+      "Estimado cliente, la fecha límite para entregar tu devolución ha expirado. Lamentablemente, ya no podremos aceptar el producto.",
     return_pickup_scheduled:
       "No se pudo completar la recoleccion. Estamos gestionando un nuevo intento para tu devolucion.",
     return_picked_up:
@@ -535,6 +551,17 @@ function buildReturnPremiumTemplate({
     return {
       title: formalTitle,
       message: formalParts.join(" "),
+      productNames: mergedProductNames,
+      productsInline,
+      rejectionReason,
+      statusLabel
+    };
+  }
+
+  if (templateCode === "return_expired") {
+    return {
+      title: statusTitle,
+      message: `Pedido #${normalizedOrder || "****"}. ${portalCurrentText}`,
       productNames: mergedProductNames,
       productsInline,
       rejectionReason,

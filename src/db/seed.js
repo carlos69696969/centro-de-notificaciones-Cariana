@@ -53,6 +53,12 @@ const templates = [
     message: "Tu devolucion ha sido rechazada."
   },
   {
+    code: "return_expired",
+    title: "Devolución vencida 🗓️❌",
+    message:
+      "Estimado cliente, la fecha límite para entregar tu devolución ha expirado. Lamentablemente, ya no podremos aceptar el producto."
+  },
+  {
     code: "return_pickup_scheduled",
     title: "Recoleccion programada",
     message: "La recoleccion de tu devolucion ya fue programada."
