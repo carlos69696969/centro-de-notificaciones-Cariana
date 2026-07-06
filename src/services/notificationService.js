@@ -160,6 +160,7 @@ async function sendToCustomerTokens({
   title,
   message,
   deepLink,
+  pushDeepLink,
   data,
   eventId,
   campaignId
@@ -180,22 +181,23 @@ async function sendToCustomerTokens({
   let failed = 0;
 
   for (const tokenRow of tokens) {
+    const fcmDeepLink = pushDeepLink || deepLink || "";
     const payload = {
       title,
       body: message,
       data: normalizeData({
-        deepLink: deepLink || "",
-        deeplink: deepLink || "",
-        deep_link: deepLink || "",
-        deepLinkUrl: deepLink || "",
-        deeplink_url: deepLink || "",
-        url: deepLink || "",
-        link: deepLink || "",
-        targetUrl: deepLink || "",
-        target_url: deepLink || "",
-        openUrl: deepLink || "",
-        open_url: deepLink || "",
-        ...data
+        ...data,
+        deepLink: fcmDeepLink,
+        deeplink: fcmDeepLink,
+        deep_link: fcmDeepLink,
+        deepLinkUrl: fcmDeepLink,
+        deeplink_url: fcmDeepLink,
+        url: fcmDeepLink,
+        link: fcmDeepLink,
+        targetUrl: fcmDeepLink,
+        target_url: fcmDeepLink,
+        openUrl: fcmDeepLink,
+        open_url: fcmDeepLink
       })
     };
 
@@ -249,6 +251,7 @@ async function sendToEmailTokens({
   title,
   message,
   deepLink,
+  pushDeepLink,
   data,
   eventId,
   campaignId
@@ -296,22 +299,23 @@ async function sendToEmailTokens({
   let failed = 0;
 
   for (const tokenRow of tokens) {
+    const fcmDeepLink = pushDeepLink || deepLink || "";
     const payload = {
       title,
       body: message,
       data: normalizeData({
-        deepLink: deepLink || "",
-        deeplink: deepLink || "",
-        deep_link: deepLink || "",
-        deepLinkUrl: deepLink || "",
-        deeplink_url: deepLink || "",
-        url: deepLink || "",
-        link: deepLink || "",
-        targetUrl: deepLink || "",
-        target_url: deepLink || "",
-        openUrl: deepLink || "",
-        open_url: deepLink || "",
-        ...data
+        ...data,
+        deepLink: fcmDeepLink,
+        deeplink: fcmDeepLink,
+        deep_link: fcmDeepLink,
+        deepLinkUrl: fcmDeepLink,
+        deeplink_url: fcmDeepLink,
+        url: fcmDeepLink,
+        link: fcmDeepLink,
+        targetUrl: fcmDeepLink,
+        target_url: fcmDeepLink,
+        openUrl: fcmDeepLink,
+        open_url: fcmDeepLink
       })
     };
 

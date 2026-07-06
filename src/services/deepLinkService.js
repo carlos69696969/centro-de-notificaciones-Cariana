@@ -153,6 +153,10 @@ function buildReturnDeepLink({ shopDomain, orderNumber, email, deepLink }) {
   });
 }
 
+function buildNotificationsDeepLink({ shopDomain }) {
+  return toAbsoluteShopDomainUrl(shopDomain, "/apps/notificaciones");
+}
+
 function buildCampaignDeepLink({ shopDomain, deepLink, campaignId }) {
   const targetUrl = safeTrim(deepLink)
     ? toAbsoluteStorefrontUrl(shopDomain, deepLink)
@@ -169,6 +173,7 @@ module.exports = {
   buildOrderDeepLink,
   buildLegacyOrderFallbackDeepLink,
   buildReturnDeepLink,
+  buildNotificationsDeepLink,
   buildCampaignDeepLink,
   toAbsoluteStorefrontUrl
 };

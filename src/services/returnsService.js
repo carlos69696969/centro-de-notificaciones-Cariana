@@ -6,7 +6,7 @@ const {
 } = require("./customerService");
 const { getTemplate } = require("./templateService");
 const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
-const { buildReturnDeepLink } = require("./deepLinkService");
+const { buildNotificationsDeepLink, buildReturnDeepLink } = require("./deepLinkService");
 
 const returnTemplateMap = {
   // Generic review/request aliases
@@ -745,6 +745,16 @@ async function processReturnEvent({ shopDomain, payload }) {
   });
   const notificationTitle = premiumCopy.title || template.title;
   const notificationMessage = premiumCopy.message || template.message;
+  const returnDeepLink = buildReturnDeepLink({
+    shopDomain,
+    orderNumber,
+    email: eventEmail,
+    deepLink: template.deep_link
+  });
+  const pushDeepLink =
+    templateCode === "return_pickup_in_transit"
+      ? buildNotificationsDeepLink({ shopDomain })
+      : returnDeepLink;
   const notificationData = {
     returnReference: returnReference || "",
     status: templateCode,
@@ -771,12 +781,8 @@ async function processReturnEvent({ shopDomain, payload }) {
       type: "return_event",
       title: notificationTitle,
       message: notificationMessage,
-      deepLink: buildReturnDeepLink({
-        shopDomain,
-        orderNumber,
-        email: eventEmail,
-        deepLink: template.deep_link
-      }),
+      deepLink: returnDeepLink,
+      pushDeepLink,
       data: notificationData,
       eventId: null
     });
@@ -793,12 +799,8 @@ async function processReturnEvent({ shopDomain, payload }) {
       type: "return_event",
       title: notificationTitle,
       message: notificationMessage,
-      deepLink: buildReturnDeepLink({
-        shopDomain,
-        orderNumber,
-        email: eventEmail,
-        deepLink: template.deep_link
-      }),
+      deepLink: returnDeepLink,
+      pushDeepLink,
       data: notificationData,
       eventId: null
     });
