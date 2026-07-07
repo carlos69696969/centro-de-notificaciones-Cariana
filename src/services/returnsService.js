@@ -122,7 +122,7 @@ const defaultReturnTemplates = {
   },
   return_picked_up: {
     title: "Devolucion recibida ✅",
-    message: "Producto recibido. Hemos recibido tu devolución y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificación, realizaremos tu reembolso correspondiente. 💰"
+    message: "Producto recibido. Hemos recibido tu devolución y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificación, realizaremos tu reembolso correspondiente. 💰 Regresa mas tarde para ver el estado de tu devolucion."
   },
   refund_processed: {
     title: "Reembolso procesado",
@@ -431,7 +431,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return "Estimado cliente, la fecha límite para entregar tu devolución ha expirado. Lamentablemente, ya no podremos aceptar el producto.";
   }
   if (templateCode === "return_picked_up") {
-    return "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0";
+    return "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0 Regresa mas tarde para ver el estado de tu devolucion.";
   }
   if (templateCode === "refund_processed") {
     return "Tu reembolso ya fue procesado correctamente. Dependiendo de tu banco, puede reflejarse en un plazo de 5 a 10 dias habiles.";
@@ -466,7 +466,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     return_pickup_scheduled:
       "No se pudo completar la recoleccion. Estamos gestionando un nuevo intento para tu devolucion.",
     return_picked_up:
-      "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0",
+      "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0 Regresa mas tarde para ver el estado de tu devolucion.",
     refund_processed:
       "Tu reembolso fue procesado y se vera reflejado segun los tiempos de tu metodo de pago.",
     refund_completed:
