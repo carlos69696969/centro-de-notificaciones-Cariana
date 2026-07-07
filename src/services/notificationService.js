@@ -5,7 +5,7 @@ const logger = require("../utils/logger");
 
 const MAX_STORED_NOTIFICATIONS_PER_CUSTOMER = Number.isFinite(env.notificationsMaxPerCustomer) && env.notificationsMaxPerCustomer > 0
   ? Math.floor(env.notificationsMaxPerCustomer)
-  : 50;
+  : 100;
 
 function normalizeData(input = {}) {
   const output = {};
