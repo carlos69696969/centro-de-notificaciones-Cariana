@@ -541,7 +541,7 @@ function buildReturnPremiumTemplate({
       formalParts.push(`Pedido #${normalizedOrder}.`);
     }
     const fallbackDetail = truncateText(fallbackMessage, 80);
-    if (!productsInline && fallbackDetail) {
+    if (!productsInline && fallbackDetail && !portalCurrentText) {
       formalParts.push(`${fallbackDetail}.`);
     }
     if (portalCurrentText) {
