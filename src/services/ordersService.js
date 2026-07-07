@@ -968,13 +968,57 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
   };
 }
 
-function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessage }) {
+function pickRefundAmount(payload = {}) {
+  const candidates = [
+    payload?.amount,
+    payload?.total_refunded,
+    payload?.total_refunded_amount,
+    payload?.refund_amount,
+    payload?.amount_set?.shop_money?.amount,
+    payload?.amount_set?.presentment_money?.amount
+  ];
+
+  if (Array.isArray(payload?.transactions)) {
+    for (const transaction of payload.transactions) {
+      candidates.push(
+        transaction?.amount,
+        transaction?.amount_set?.shop_money?.amount,
+        transaction?.amount_set?.presentment_money?.amount
+      );
+    }
+  }
+
+  const numeric = candidates
+    .map((value) => Number(value))
+    .find((value) => Number.isFinite(value) && value > 0);
+
+  if (!numeric) {
+    return "";
+  }
+
+  const currency = pickFirstString([
+    payload?.currency,
+    payload?.currency_code,
+    payload?.presentment_currency,
+    payload?.amount_set?.shop_money?.currency_code,
+    payload?.transactions?.[0]?.currency,
+    payload?.transactions?.[0]?.currency_code,
+    payload?.transactions?.[0]?.amount_set?.shop_money?.currency_code
+  ]) || "MXN";
+
+  return `$${numeric.toFixed(2)} ${currency.toUpperCase()}`;
+}
+
+function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessage, refundAmountLabel = "" }) {
   const normalizedOrder = normalizeOrderNumber(orderNumber);
   const title = "Reembolso procesado ✅";
   const orderLabel = normalizedOrder || "****";
+  const amountText = refundAmountLabel
+    ? ` por la cantidad de ${refundAmountLabel}`
+    : "";
   const parts = [
     `Pedido #${orderLabel}.`,
-    "\uD83D\uDCB8 Tu reembolso ya fue procesado correctamente.",
+    `\uD83D\uDCB8 Tu reembolso ya fue procesado correctamente${amountText}.`,
     "Dependiendo de tu banco, el monto podr\u00E1 verse reflejado en tu cuenta dentro de 5 a 10 d\u00EDas h\u00E1biles.",
     "Gracias por confiar en Cariana. \uD83D\uDC99"
   ];
@@ -1484,7 +1528,8 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
   const copy = buildRefundNotificationCopy({
     orderNumber: mapped.order_number,
     fallbackTitle: template.title,
-    fallbackMessage: template.message
+    fallbackMessage: template.message,
+    refundAmountLabel: pickRefundAmount(payload)
   });
 
   const refundOrder = payload.order_id ? await fetchShopifyOrderById(shopDomain, payload.order_id) : null;
