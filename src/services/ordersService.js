@@ -571,7 +571,7 @@ const orderStatusLabels = {
   order_delivered: "Entregado",
   order_not_delivered: "No entregado",
   order_cancelled: "Cancelado",
-  refund_processed: "Reembolso procesado"
+  refund_processed: "Reembolso procesado ✅"
 };
 
 const manualStatusAliases = {
@@ -970,7 +970,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
 
 function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessage }) {
   const normalizedOrder = normalizeOrderNumber(orderNumber);
-  const title = "Reembolso procesado";
+  const title = "Reembolso procesado ✅";
   const orderLabel = normalizedOrder || "****";
   const parts = [
     `Pedido #${orderLabel}.`,
@@ -982,7 +982,7 @@ function buildRefundNotificationCopy({ orderNumber, fallbackTitle, fallbackMessa
   return {
     title,
     message: parts.join(" "),
-    statusLabel: fallbackTitle || "Reembolso procesado",
+    statusLabel: fallbackTitle || "Reembolso procesado ✅",
     productNames: [],
     productsInline: ""
   };

@@ -125,7 +125,7 @@ const defaultReturnTemplates = {
     message: "Producto recibido. Hemos recibido tu devolución y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificación, realizaremos tu reembolso correspondiente. 💰 Regresa mas tarde para ver el estado de tu devolucion."
   },
   refund_processed: {
-    title: "Reembolso procesado",
+    title: "Reembolso procesado ✅",
     message: "Tu reembolso ya fue procesado."
   },
   refund_completed: {
@@ -367,7 +367,7 @@ const returnStatusLabels = {
   return_pickup_reprogrammed: "Devolucion reprogramada",
   return_pickup_in_transit: "En ruta",
   return_picked_up: "Devolucion recibida",
-  refund_processed: "Reembolso procesado",
+  refund_processed: "Reembolso procesado ✅",
   refund_completed: "Reembolso completado"
 };
 
@@ -381,7 +381,7 @@ function buildReturnStatusTitle(templateCode) {
     return_pickup_reprogrammed: "Devolución reprogramada 🔄📦",
     return_pickup_in_transit: "En ruta para recoger tu devolucion",
     return_picked_up: "Devolucion recibida ✅",
-    refund_processed: "Reembolso procesado",
+    refund_processed: "Reembolso procesado ✅",
     refund_completed: "Reembolso completado"
   };
   return map[templateCode] || "Actualizacion de devolucion";

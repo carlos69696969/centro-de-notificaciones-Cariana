@@ -70,7 +70,7 @@ const templates = [
   },
   {
     code: "refund_processed",
-    title: "Reembolso procesado",
+    title: "Reembolso procesado ✅",
     message: "Tu reembolso ya fue procesado."
   },
   {
