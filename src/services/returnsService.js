@@ -347,7 +347,7 @@ function extractRejectionReason(payload, options = {}) {
     candidates.push(payload.note, payload.message);
   }
 
-  return truncateText(pickFirstString(candidates));
+  return pickFirstString(candidates);
 }
 
 function formatProductsInline(productNames = []) {

@@ -343,6 +343,33 @@ function resolveNotificationDeepLink({ shopDomain, item }) {
   return safeTrim(generated) || existing;
 }
 
+function expandStoredNotificationMessage(item) {
+  const message = String(item?.message || "");
+  if (!/\.\.\.\s*$/.test(message)) {
+    return message;
+  }
+
+  const title = String(item?.title || "").toLowerCase();
+  if (!title.includes("intento de recolecci")) {
+    return message;
+  }
+
+  const failedPickupText =
+    "No logramos completar la recolección. 🚚 Visitamos tu domicilio, pero no obtuvimos respuesta al tocar la puerta ni al comunicarnos contigo. Nuestro equipo volverá a intentarlo mañana. 📦✨";
+  const failedPickupTextNoAccent =
+    "No logramos completar la recoleccion. 🚚 Visitamos tu domicilio, pero no obtuvimos respuesta al tocar la puerta ni al comunicarnos contigo. Nuestro equipo volvera a intentarlo mañana. 📦✨";
+  const prefix = message.split(/No logramos completar la recolecci[oó]n\./i)[0] || "";
+  const hasAccent = /recolección/i.test(message);
+  return `${prefix}${hasAccent ? failedPickupText : failedPickupTextNoAccent}`;
+}
+
+function normalizeNotificationItem(item) {
+  return {
+    ...item,
+    message: expandStoredNotificationMessage(item)
+  };
+}
+
 function renderItemsHtml(items) {
   if (!Array.isArray(items) || items.length === 0) {
     return '<div class="item"><div class="msg">Aun no tienes notificaciones.</div></div>';
@@ -367,7 +394,8 @@ function renderItemsHtml(items) {
   };
 
   return items
-    .map((item) => {
+    .map((rawItem) => {
+      const item = normalizeNotificationItem(rawItem);
       const unread = !item.opened_at;
       const deepLink = item.deep_link
         ? `<div class="meta"><a class="link" href="${escapeHtml(item.deep_link)}">Abrir</a></div>`
@@ -687,7 +715,7 @@ async function getNotificationsByCustomer(shopDomain, shopifyCustomerId) {
   );
 
   const rows = history.rows.map((row) => ({
-    ...row,
+    ...normalizeNotificationItem(row),
     deep_link: resolveNotificationDeepLink({
       shopDomain,
       item: row
