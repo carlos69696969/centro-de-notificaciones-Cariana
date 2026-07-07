@@ -477,8 +477,10 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
       .home-action-icon {
         display: inline-flex;
         align-items: center;
-        font-size: 20px;
-        line-height: 1;
+        justify-content: center;
+        font-size: 32px;
+        line-height: 0.72;
+        transform: translateY(-1px);
       }
       .muted {
         color: var(--muted);
