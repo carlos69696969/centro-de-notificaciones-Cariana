@@ -449,19 +449,19 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
       .wrap {
         max-width: 720px;
         margin: 0 auto;
-        padding: 16px;
+        padding: 12px 16px 16px;
       }
       h1 {
         font-size: 22px;
-        margin: 0 0 8px;
+        margin: 0 0 4px;
       }
       .home-action {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        min-height: 36px;
-        margin: 0 0 12px;
-        padding: 8px 12px;
+        min-height: 30px;
+        margin: 0 0 6px;
+        padding: 4px 12px;
         border-radius: 8px;
         background: var(--brand);
         color: #fff;
@@ -475,7 +475,9 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
         transform: translateY(1px);
       }
       .home-action-icon {
-        font-size: 18px;
+        display: inline-flex;
+        align-items: center;
+        font-size: 20px;
         line-height: 1;
       }
       .muted {
@@ -496,7 +498,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
         cursor: pointer;
       }
       .list {
-        margin-top: 14px;
+        margin-top: 8px;
         display: grid;
         gap: 10px;
       }
