@@ -436,8 +436,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
   if (templateCode === "refund_processed") {
     return "Tu reembolso ya fue procesado correctamente. Dependiendo de tu banco, puede reflejarse en un plazo de 5 a 10 dias habiles.";
   }
-  const fromPayload = truncateText(
-    pickFirstString([
+  const fromPayload = pickFirstString([
       payload.portal_status_message,
       payload.portalStatusMessage,
       payload.status_message,
@@ -448,9 +447,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
       payload.latestStatusMessage,
       payload.note,
       payload.message
-    ]),
-    180
-  );
+    ]);
   if (fromPayload) {
     return fromPayload;
   }
@@ -472,7 +469,7 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     refund_completed:
       "Tu reembolso fue completado correctamente."
   };
-  return byStatus[templateCode] || truncateText(fallbackMessage, 180);
+  return byStatus[templateCode] || String(fallbackMessage || "").trim();
 }
 
 function buildReturnPremiumTemplate({
@@ -540,7 +537,7 @@ function buildReturnPremiumTemplate({
     if (normalizedOrder) {
       formalParts.push(`Pedido #${normalizedOrder}.`);
     }
-    const fallbackDetail = truncateText(fallbackMessage, 80);
+    const fallbackDetail = String(fallbackMessage || "").trim();
     if (!productsInline && fallbackDetail && !portalCurrentText) {
       formalParts.push(`${fallbackDetail}.`);
     }
@@ -615,7 +612,7 @@ function buildReturnPremiumTemplate({
   if (normalizedOrder) {
     parts.push(`Pedido #${normalizedOrder}.`);
   }
-  const detail = truncateText(fallbackMessage, 70);
+  const detail = String(fallbackMessage || "").trim();
   if (detail && !productsInline) {
     parts.push(`${detail}.`);
   }

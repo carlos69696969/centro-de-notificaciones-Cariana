@@ -952,7 +952,7 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     parts.push(`${productsInline}.`);
   }
 
-  const detail = truncateText(fallbackMessage, 70);
+  const detail = String(fallbackMessage || "").trim();
   if (detail && !productsInline) {
     parts.push(`${detail}.`);
   }
