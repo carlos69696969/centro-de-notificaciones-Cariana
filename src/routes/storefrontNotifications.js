@@ -461,7 +461,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
         gap: 8px;
         min-height: 30px;
         margin: 0 0 6px;
-        padding: 4px 12px;
+        padding: 4px 9px;
         border-radius: 8px;
         background: var(--brand);
         color: #fff;
@@ -480,7 +480,7 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
         justify-content: center;
         font-size: 32px;
         line-height: 0.72;
-        transform: translateY(-1px);
+        transform: translateY(-3px);
       }
       .muted {
         color: var(--muted);
