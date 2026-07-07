@@ -532,6 +532,29 @@ function buildReturnPremiumTemplate({
   }
 
   if (templateCode === "return_rejected") {
+    const explicitTitle = pickFirstString([
+      payload.title,
+      payload.notification_title,
+      payload.notificationTitle
+    ]);
+    const explicitMessage = pickFirstString([
+      payload.message,
+      payload.portal_status_message,
+      payload.portalStatusMessage,
+      payload.current_status_message,
+      payload.currentStatusMessage
+    ]);
+    if (explicitTitle || explicitMessage) {
+      return {
+        title: explicitTitle || statusTitle,
+        message: explicitMessage || portalCurrentText,
+        productNames: mergedProductNames,
+        productsInline,
+        rejectionReason,
+        statusLabel
+      };
+    }
+
     const formalTitle = statusTitle;
     const formalParts = [];
     if (normalizedOrder) {
