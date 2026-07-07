@@ -55,6 +55,11 @@ async function pruneSentNotificationHistory({ shopDomain, customerId, tokenId })
         WHERE n.shop_domain = $1
           AND n.status = 'sent'
           AND n.customer_id = $2
+          AND NOT (
+            n.type IN ('order_event', 'order_manual')
+            AND COALESCE(n.data->>'orderNumber', '') <> ''
+            AND COALESCE(n.data->>'status', '') <> 'order_delivered'
+          )
         ORDER BY n.created_at DESC, n.id DESC
         OFFSET $3
       )
@@ -77,6 +82,11 @@ async function pruneSentNotificationHistory({ shopDomain, customerId, tokenId })
           AND n.status = 'sent'
           AND n.customer_id IS NULL
           AND n.fcm_token_id = $2
+          AND NOT (
+            n.type IN ('order_event', 'order_manual')
+            AND COALESCE(n.data->>'orderNumber', '') <> ''
+            AND COALESCE(n.data->>'status', '') <> 'order_delivered'
+          )
         ORDER BY n.created_at DESC, n.id DESC
         OFFSET $3
       )
