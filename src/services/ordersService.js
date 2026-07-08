@@ -55,6 +55,39 @@ function formatNotificationSentAt(value) {
     .toLowerCase();
 }
 
+function formatDeliveryRouteTime(date) {
+  return new Intl.DateTimeFormat("es-MX", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: NOTIFICATION_TIME_ZONE
+  })
+    .format(date)
+    .replace(/\bp\.?\s*m\.?/i, "p.m.")
+    .replace(/\ba\.?\s*m\.?/i, "a.m.")
+    .toLowerCase();
+}
+
+function deliveryRouteHourArticle(date) {
+  const parts = new Intl.DateTimeFormat("es-MX", {
+    hour: "numeric",
+    hour12: true,
+    timeZone: NOTIFICATION_TIME_ZONE
+  }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value || 0);
+  return hour === 1 ? "la" : "las";
+}
+
+function buildDeliveryRouteArrivalRange(date = new Date()) {
+  const start = new Date(date.getTime() + 10 * 60 * 1000);
+  const end = new Date(date.getTime() + 45 * 60 * 1000);
+  return {
+    startLabel: formatDeliveryRouteTime(start),
+    endArticle: deliveryRouteHourArticle(end),
+    endLabel: formatDeliveryRouteTime(end)
+  };
+}
+
 function hasDeliveredSignal(payload) {
   const deliveredValues = new Set(["delivered", "delivered_to_customer"]);
   const candidates = [];
@@ -405,16 +438,6 @@ function normalizeMeridiem(value) {
     .replace(/\ba\s*\.?\s*m\.?(?=\s|$)/g, "a.m.")
     .replace(/\bp\s*\.?\s*m\.?(?=\s|$)/g, "p.m.");
   return text.replace(/(\d)\s+(a\.m\.|p\.m\.)/g, "$1 $2");
-}
-
-function extractDeliveryCutoffTime(value) {
-  const text = normalizeMeridiem(value);
-  const matches = Array.from(text.matchAll(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.m\.|p\.m\.)(?=\s|$)/g));
-  const lastMatch = matches.at(-1);
-  if (!lastMatch) return DEFAULT_DELIVERY_HOURS.split(" a ").at(-1) || "8:00 p.m.";
-  const hour = lastMatch[1];
-  const minutes = lastMatch[2] || "00";
-  return `${hour}:${minutes} ${lastMatch[3]}`;
 }
 
 function formatBranchPickupDeadlineDate(value) {
@@ -806,7 +829,6 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
     ]),
     DEFAULT_DELIVERY_HOURS
   );
-  const deliveryCutoffTime = extractDeliveryCutoffTime(deliveryHours);
   const branchPickupDeadlineLabel = formatBranchPickupDeadlineDate(
     pickFirstString([
       payload?.branchPickupDeadlineAt,
@@ -914,10 +936,11 @@ function buildOrderNotificationCopy({ templateCode, orderNumber, payload, fallba
 
   if (templateCode === "order_in_transit") {
     const orderRef = normalizedOrder ? `#${normalizedOrder}` : "#****";
-    const message = `¡Tu pedido ${orderRef} ya está en camino! 🚚✨ Nuestro repartidor se dirige a tu ubicación. La entrega está programada para hoy antes de las ${deliveryCutoffTime}. No olvides darle tu clave de entrega al repartidor para recibir tu pedido.\n\nGracias por confiar en Cariana. 💙`;
+    const arrivalRange = buildDeliveryRouteArrivalRange();
+    const message = `📦 Tu pedido ${orderRef}. Nuestro repartidor ya se dirige a tu domicilio para entregar tu pedido. Llegará aproximadamente entre ${arrivalRange.startLabel} y ${arrivalRange.endArticle} ${arrivalRange.endLabel}. No olvides darle tu clave de entrega al repartidor para recibir tu pedido.\n\nGracias por confiar en Cariana. 💙`;
 
     return {
-      title,
+      title: "🚚 ¡Vamos en camino!",
       message,
       statusLabel,
       productNames,
