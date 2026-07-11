@@ -676,6 +676,65 @@ async function hasRecentOrderRescheduleNotification({ shopDomain, orderId, order
   return result.rowCount > 0;
 }
 
+async function hasRecentCourierOrderRefundNotification({ shopDomain, orderId, orderNumber, minutes = 10 }) {
+  const normalizedOrderId = parseLegacyNumericId(orderId);
+  const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
+
+  if (!shopDomain || (!normalizedOrderId && !normalizedOrderNumber)) {
+    return false;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM notifications
+    WHERE shop_domain = $1
+      AND status = 'sent'
+      AND created_at >= NOW() - ($4::int * INTERVAL '1 minute')
+      AND (
+        COALESCE(data->>'source', '') = 'courier_order_refund'
+        OR COALESCE(data->>'notificationSource', '') = 'courier_order_refund'
+      )
+      AND (
+        ($2::bigint IS NOT NULL AND NULLIF(regexp_replace(COALESCE(data->>'orderId', ''), '\\D', '', 'g'), '')::bigint = $2::bigint)
+        OR ($3 <> '' AND regexp_replace(COALESCE(data->>'orderNumber', ''), '\\D', '', 'g') = $3)
+      )
+    LIMIT 1
+    `,
+    [shopDomain, normalizedOrderId || null, normalizedOrderNumber, Math.max(1, Number(minutes) || 10)]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function hasRecentCourierOrderRefundEvent({ shopDomain, orderId, minutes = 10 }) {
+  const normalizedOrderId = parseLegacyNumericId(orderId);
+
+  if (!shopDomain || !normalizedOrderId) {
+    return false;
+  }
+
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM notification_events
+    WHERE shop_domain = $1
+      AND topic = 'refunds/create'
+      AND created_at >= NOW() - ($3::int * INTERVAL '1 minute')
+      AND NULLIF(regexp_replace(COALESCE(payload->>'order_id', ''), '\\D', '', 'g'), '')::bigint = $2::bigint
+      AND (
+        LOWER(COALESCE(payload->>'note', '')) LIKE '%desde ordenes repartidor%'
+        OR LOWER(COALESCE(payload->>'note', '')) LIKE '%desde órdenes repartidor%'
+        OR LOWER(COALESCE(payload->>'note', '')) LIKE '%courier_order_refund%'
+      )
+    LIMIT 1
+    `,
+    [shopDomain, normalizedOrderId, Math.max(1, Number(minutes) || 10)]
+  );
+
+  return result.rowCount > 0;
+}
+
 async function hasRecentOrderStatusNotification({
   shopDomain,
   orderId,
@@ -1095,6 +1154,26 @@ function isBranchPickupExpiredRefund(payload = {}) {
   );
 }
 
+function isCourierOrderRefund(payload = {}) {
+  const noteText = pickFirstString([
+    payload?.note,
+    payload?.reason,
+    payload?.message
+  ])
+    .toLowerCase()
+    .trim();
+
+  if (!noteText) {
+    return false;
+  }
+
+  return (
+    noteText.includes("desde ordenes repartidor") ||
+    noteText.includes("desde órdenes repartidor") ||
+    noteText.includes("courier_order_refund")
+  );
+}
+
 async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
   const eventResult = await pool.query(
     `
@@ -1199,6 +1278,27 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
       [eventId]
     );
     return { skipped: true, reason: "Skipped in-route after recent route-time reschedule" };
+  }
+
+  if (
+    templateCode === "order_in_transit" &&
+    ((await hasRecentCourierOrderRefundNotification({
+        shopDomain,
+        orderId,
+        orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
+        minutes: 15
+      })) ||
+      (await hasRecentCourierOrderRefundEvent({
+        shopDomain,
+        orderId,
+        minutes: 15
+      })))
+  ) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Skipped in-route after recent courier refund notification', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Skipped in-route after recent courier refund notification" };
   }
 
   let customer = null;
@@ -1369,7 +1469,12 @@ async function sendManualOrderStatus({
   rescheduledDate,
   rescheduledDateLabel,
   title,
-  message
+  message,
+  source,
+  notificationSource,
+  refundKind,
+  suppressRefundWebhook,
+  suppressOrderInTransitWebhook
 }) {
   const templateCode = normalizeManualStatus(status);
   if (!validManualStatusCodes.has(templateCode)) {
@@ -1481,7 +1586,12 @@ async function sendManualOrderStatus({
           statusLabel: copy.statusLabel,
           productName: copy.productsInline || "",
           productNames: copy.productNames || [],
-          deepLinkType: "order"
+          deepLinkType: "order",
+          source: String(source || notificationSource || "").trim(),
+          notificationSource: String(notificationSource || source || "").trim(),
+          refundKind: String(refundKind || "").trim(),
+          suppressRefundWebhook: Boolean(suppressRefundWebhook),
+          suppressOrderInTransitWebhook: Boolean(suppressOrderInTransitWebhook)
         }
       });
     }
@@ -1504,12 +1614,12 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
   }
 
   const eventId = eventResult.rows[0].id;
-  if (isBranchPickupExpiredRefund(payload)) {
+  if (isBranchPickupExpiredRefund(payload) || isCourierOrderRefund(payload)) {
     await pool.query(
-      `UPDATE notification_events SET status = 'skipped', error_message = 'Branch pickup refund notification sent manually', processed_at = NOW() WHERE id = $1`,
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Refund notification sent manually', processed_at = NOW() WHERE id = $1`,
       [eventId]
     );
-    return { skipped: true, reason: "Branch pickup refund notification sent manually" };
+    return { skipped: true, reason: "Refund notification sent manually" };
   }
 
   const mapResult = await pool.query(

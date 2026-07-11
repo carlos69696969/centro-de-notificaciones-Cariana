@@ -40,6 +40,11 @@ router.post("/manual-status", async (req, res, next) => {
       rescheduledDateLabel,
       title,
       message,
+      source,
+      notificationSource,
+      refundKind,
+      suppressRefundWebhook,
+      suppressOrderInTransitWebhook,
     } = req.body;
     const hasOrderContext = Boolean(orderId || orderNumber);
     if (!shopDomain || !hasOrderContext || !status) {
@@ -65,7 +70,12 @@ router.post("/manual-status", async (req, res, next) => {
       rescheduledDate,
       rescheduledDateLabel,
       title,
-      message
+      message,
+      source,
+      notificationSource,
+      refundKind,
+      suppressRefundWebhook,
+      suppressOrderInTransitWebhook
     });
     return res.json({ ok: true, result });
   } catch (error) {
