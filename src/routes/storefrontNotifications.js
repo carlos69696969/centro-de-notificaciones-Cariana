@@ -963,6 +963,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var url = "/apps/notificaciones" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
   var lastCartEventHash = "";
   var lastCartEventAt = 0;
+  var lastCartMutationAt = 0;
   var ensureTimer = 0;
   var blankPanelCleanupTimer = 0;
   var hideStorefrontBell = false;
@@ -1205,6 +1206,9 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     var observer = new MutationObserver(function() {
       scheduleEnsure();
       scheduleBlankBellPanelCleanup();
+      if (Date.now() - lastCartMutationAt < 8000) {
+        scheduleBlankTopBlockCleanup();
+      }
     });
     observer.observe(document.documentElement || document.body, {
       childList: true,
@@ -1287,6 +1291,57 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     }, 50);
   }
 
+  function isProbablyInteractiveOrContent(node) {
+    if (!node || !node.querySelector) return false;
+    return !!node.querySelector('img, picture, video, canvas, iframe, svg, input, textarea, select, button, a[href], form, [role="button"], [role="dialog"]');
+  }
+
+  function looksLikeBlankTopStorefrontBlock(node) {
+    if (!node || node === document.body || node === document.documentElement) return false;
+    if (node.id === "cariana-noti-bell" || node.id === "cariana-noti-badge") return false;
+    if (node.closest && node.closest("header, nav, #cariana-noti-bell")) return false;
+    if (!node.getBoundingClientRect) return false;
+
+    var rect = node.getBoundingClientRect();
+    if (rect.width < Math.min(140, window.innerWidth * 0.35)) return false;
+    if (rect.height < 32 || rect.height > 190) return false;
+    if (rect.top < 80 || rect.top > Math.min(330, window.innerHeight * 0.45)) return false;
+    if (rect.left > 80 || rect.right < window.innerWidth * 0.55) return false;
+    if (isProbablyInteractiveOrContent(node)) return false;
+
+    var text = (node.textContent || "").replace(/\\s+/g, "").trim();
+    if (text.length > 2) return false;
+
+    var style = window.getComputedStyle ? window.getComputedStyle(node) : null;
+    if (style) {
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+      var position = String(style.position || "");
+      var bg = String(style.backgroundColor || "").toLowerCase();
+      var hasWhiteBg = bg === "white" || bg === "#fff" || bg === "#ffffff" || /rgba?\\(\\s*255\\s*,\\s*255\\s*,\\s*255/i.test(bg);
+      var floatsOverPage = position === "fixed" || position === "absolute" || position === "sticky";
+      if (!hasWhiteBg && !floatsOverPage && style.boxShadow === "none") return false;
+    }
+
+    return true;
+  }
+
+  function closeBlankTopStorefrontBlocks() {
+    if (Date.now() - lastCartMutationAt > 8000) return;
+    var candidates = document.querySelectorAll("body *");
+    for (var i = 0; i < candidates.length; i++) {
+      var node = candidates[i];
+      if (!looksLikeBlankTopStorefrontBlock(node)) continue;
+      hideElement(node);
+    }
+  }
+
+  function scheduleBlankTopBlockCleanup() {
+    setTimeout(closeBlankTopStorefrontBlocks, 80);
+    setTimeout(closeBlankTopStorefrontBlocks, 300);
+    setTimeout(closeBlankTopStorefrontBlocks, 900);
+    setTimeout(closeBlankTopStorefrontBlocks, 1800);
+  }
+
   function closeStuckCartNotification() {
     var selectors = [
       "cart-notification",
@@ -1324,13 +1379,17 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   }
 
   function afterCartMutation(source) {
+    lastCartMutationAt = Date.now();
     setTimeout(closeStuckCartNotification, 120);
     setTimeout(closeBlankBellPanel, 130);
+    setTimeout(closeBlankTopStorefrontBlocks, 140);
     setTimeout(closeStuckCartNotification, 450);
     setTimeout(closeBlankBellPanel, 460);
+    setTimeout(closeBlankTopStorefrontBlocks, 470);
     setTimeout(function() {
       scheduleEnsure();
       closeBlankBellPanel();
+      scheduleBlankTopBlockCleanup();
       if (source && source.indexOf("add") !== -1) {
         fetchCartAndTrack(source);
       }
