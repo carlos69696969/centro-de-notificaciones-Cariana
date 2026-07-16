@@ -963,6 +963,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var url = "/apps/notificaciones" + (customerHint ? ("?cid=" + encodeURIComponent(customerHint)) : "");
   var lastCartEventHash = "";
   var lastCartEventAt = 0;
+  var ensureTimer = 0;
 
   function readBadgeCache() {
     try {
@@ -1158,12 +1159,20 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     return true;
   }
 
-  function scheduleEnsure() {
+  function runEnsure() {
     ensureCustomerHint();
     attachBell();
     setTimeout(attachBell, 250);
     setTimeout(attachBell, 900);
     setTimeout(attachBell, 1800);
+  }
+
+  function scheduleEnsure() {
+    if (ensureTimer) return;
+    ensureTimer = setTimeout(function() {
+      ensureTimer = 0;
+      runEnsure();
+    }, 80);
   }
 
   function watchDomChanges() {
@@ -1181,9 +1190,65 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     setInterval(function() {
       if (location.href !== lastHref) {
         lastHref = location.href;
-        scheduleEnsure();
+        runEnsure();
       }
     }, 500);
+  }
+
+  function isCartMutationUrl(value) {
+    var requestUrl = String(value || "");
+    return /\\/cart\\/(add|change|update|clear)(\\.js)?(\\?|$)/i.test(requestUrl);
+  }
+
+  function closeStuckCartNotification() {
+    var selectors = [
+      "cart-notification",
+      "#cart-notification",
+      ".cart-notification",
+      ".cart-notification-wrapper",
+      "#cart-notification-form",
+      ".cart-notification-product",
+      ".cart-notification__links"
+    ];
+    var nodes = [];
+    for (var i = 0; i < selectors.length; i++) {
+      var found = document.querySelectorAll(selectors[i]);
+      for (var j = 0; j < found.length; j++) {
+        if (nodes.indexOf(found[j]) === -1) nodes.push(found[j]);
+      }
+    }
+
+    for (var k = 0; k < nodes.length; k++) {
+      var node = nodes[k];
+      var text = (node.textContent || "").trim();
+      var hasCartItems = !!node.querySelector('a[href*="/products/"], img, .cart-item, .cart-notification-product__image');
+      var rect = node.getBoundingClientRect ? node.getBoundingClientRect() : { height: 0 };
+      var looksBlankBlock = rect.height > 80 && text.length < 8 && !hasCartItems;
+      if (!looksBlankBlock) continue;
+
+      node.setAttribute("hidden", "hidden");
+      node.setAttribute("aria-hidden", "true");
+      node.classList.remove("active", "animate", "is-active", "is-open", "cart-notification--active");
+      node.style.setProperty("display", "none", "important");
+      node.style.setProperty("pointer-events", "none", "important");
+    }
+
+    document.documentElement.classList.remove("overflow-hidden");
+    if (document.body) {
+      document.body.classList.remove("overflow-hidden", "cart-notification--active");
+      document.body.style.removeProperty("overflow");
+    }
+  }
+
+  function afterCartMutation(source) {
+    setTimeout(closeStuckCartNotification, 120);
+    setTimeout(closeStuckCartNotification, 450);
+    setTimeout(function() {
+      scheduleEnsure();
+      if (source && source.indexOf("add") !== -1) {
+        fetchCartAndTrack(source);
+      }
+    }, 700);
   }
 
   function hashCartSnapshot(snapshot) {
@@ -1259,12 +1324,31 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       window.fetch = function(input, init) {
         var requestUrl = typeof input === "string" ? input : (input && input.url) || "";
         var responsePromise = originalFetch.apply(this, arguments);
-        if (/\\/cart\\/add(\\.js)?(\\?|$)/i.test(requestUrl)) {
+        if (isCartMutationUrl(requestUrl)) {
           responsePromise.then(function() {
-            setTimeout(function() { fetchCartAndTrack("fetch_add"); }, 650);
+            afterCartMutation(/\\/cart\\/add/i.test(requestUrl) ? "fetch_add" : "fetch_cart_change");
           }).catch(function() {});
         }
         return responsePromise;
+      };
+    }
+
+    if (window.XMLHttpRequest && !window.__carianaCartXhrHooked) {
+      window.__carianaCartXhrHooked = true;
+      var originalOpen = window.XMLHttpRequest.prototype.open;
+      var originalSend = window.XMLHttpRequest.prototype.send;
+      window.XMLHttpRequest.prototype.open = function(method, requestUrl) {
+        this.__carianaCartMutation = isCartMutationUrl(requestUrl);
+        this.__carianaCartAdd = /\\/cart\\/add/i.test(String(requestUrl || ""));
+        return originalOpen.apply(this, arguments);
+      };
+      window.XMLHttpRequest.prototype.send = function() {
+        if (this.__carianaCartMutation) {
+          this.addEventListener("loadend", function() {
+            afterCartMutation(this.__carianaCartAdd ? "xhr_add" : "xhr_cart_change");
+          });
+        }
+        return originalSend.apply(this, arguments);
       };
     }
   }
@@ -1314,7 +1398,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     }
 
     ensureCustomerHint();
-    scheduleEnsure();
+    runEnsure();
     hookAddToCartActions();
     watchDomChanges();
     watchNavigation();
