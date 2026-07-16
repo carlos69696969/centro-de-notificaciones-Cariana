@@ -965,6 +965,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var lastCartEventAt = 0;
   var ensureTimer = 0;
   var blankPanelCleanupTimer = 0;
+  var hideStorefrontBell = true;
 
   function readBadgeCache() {
     try {
@@ -1061,6 +1062,11 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
   function updateBadge(count) {
     unread = Number(count) || 0;
+    if (hideStorefrontBell) {
+      removeBellElement();
+      return;
+    }
+
     var bell = document.getElementById("cariana-noti-bell");
     if (!bell) return;
 
@@ -1135,7 +1141,21 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     return null;
   }
 
+  function removeBellElement() {
+    var nodes = document.querySelectorAll("#cariana-noti-bell, #cariana-noti-badge");
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i] && nodes[i].parentElement) {
+        nodes[i].parentElement.removeChild(nodes[i]);
+      }
+    }
+  }
+
   function attachBell() {
+    if (hideStorefrontBell) {
+      removeBellElement();
+      return false;
+    }
+
     var existing = document.getElementById("cariana-noti-bell");
     var target = findHeaderTarget();
     if (!target) return false;
@@ -1162,6 +1182,10 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
   function runEnsure() {
     ensureCustomerHint();
+    if (hideStorefrontBell) {
+      removeBellElement();
+      return;
+    }
     attachBell();
     scheduleBlankBellPanelCleanup();
     setTimeout(attachBell, 250);
