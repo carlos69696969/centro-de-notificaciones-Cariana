@@ -17,7 +17,7 @@ function androidChannelForPayload(payload = {}) {
       "return_rejected"
     ].includes(type)
   ) {
-    return "cariana_returns_v2";
+    return "cariana_returns_v3";
   }
   if (
     [
@@ -26,7 +26,7 @@ function androidChannelForPayload(payload = {}) {
       "order_delivered"
     ].includes(type)
   ) {
-    return "cariana_shipping_v2";
+    return "cariana_shipping_v3";
   }
   if (
     [
@@ -37,12 +37,12 @@ function androidChannelForPayload(payload = {}) {
       "order_confirmed"
     ].includes(type)
   ) {
-    return "cariana_orders_v2";
+    return "cariana_orders_v3";
   }
   if (["promo", "promotion", "campaign", "cart"].includes(type)) {
-    return "cariana_promos_v2";
+    return "cariana_promos_v3";
   }
-  return "cariana_general_v2";
+  return "cariana_general_v3";
 }
 
 function initFirebase() {
