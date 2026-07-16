@@ -965,7 +965,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var lastCartEventAt = 0;
   var ensureTimer = 0;
   var blankPanelCleanupTimer = 0;
-  var hideStorefrontBell = true;
+  var hideStorefrontBell = false;
 
   function readBadgeCache() {
     try {
