@@ -964,6 +964,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var lastCartEventHash = "";
   var lastCartEventAt = 0;
   var ensureTimer = 0;
+  var blankPanelCleanupTimer = 0;
 
   function readBadgeCache() {
     try {
@@ -1162,6 +1163,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   function runEnsure() {
     ensureCustomerHint();
     attachBell();
+    scheduleBlankBellPanelCleanup();
     setTimeout(attachBell, 250);
     setTimeout(attachBell, 900);
     setTimeout(attachBell, 1800);
@@ -1178,6 +1180,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   function watchDomChanges() {
     var observer = new MutationObserver(function() {
       scheduleEnsure();
+      scheduleBlankBellPanelCleanup();
     });
     observer.observe(document.documentElement || document.body, {
       childList: true,
@@ -1198,6 +1201,66 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   function isCartMutationUrl(value) {
     var requestUrl = String(value || "");
     return /\\/cart\\/(add|change|update|clear)(\\.js)?(\\?|$)/i.test(requestUrl);
+  }
+
+  function hideElement(node) {
+    if (!node || node === document.body || node === document.documentElement) return;
+    node.setAttribute("hidden", "hidden");
+    node.setAttribute("aria-hidden", "true");
+    node.setAttribute("data-cariana-hidden-empty", "1");
+    node.classList.remove("active", "animate", "is-active", "is-open", "cart-notification--active");
+    node.style.setProperty("display", "none", "important");
+    node.style.setProperty("visibility", "hidden", "important");
+    node.style.setProperty("pointer-events", "none", "important");
+  }
+
+  function isNodeNearBell(node, bellRect) {
+    if (!node || !node.getBoundingClientRect) return false;
+    var rect = node.getBoundingClientRect();
+    if (rect.width < 120 || rect.height < 32) return false;
+    if (rect.top < bellRect.top - 12 || rect.top > bellRect.bottom + 120) return false;
+    if (rect.left > bellRect.right + 360 || rect.right < bellRect.left - 40) return false;
+    if (rect.top > Math.min(360, window.innerHeight * 0.55)) return false;
+    return true;
+  }
+
+  function looksLikeEmptyBellPanel(node) {
+    if (!node || node.id === "cariana-noti-bell" || node.id === "cariana-noti-badge") return false;
+    if (node.closest && node.closest("#cariana-noti-bell")) return false;
+    if (node.querySelector && node.querySelector('img, video, canvas, svg, input, textarea, select, button, a[href]:not(#cariana-noti-bell)')) return false;
+    var text = (node.textContent || "").replace(/\\s+/g, "").trim();
+    if (text.length > 2) return false;
+    var style = window.getComputedStyle ? window.getComputedStyle(node) : null;
+    if (style) {
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+      var bg = String(style.backgroundColor || "").toLowerCase();
+      var hasWhiteBg = bg === "white" || bg === "#fff" || bg === "#ffffff" || /rgba?\\(\\s*255\\s*,\\s*255\\s*,\\s*255/i.test(bg);
+      if (!hasWhiteBg && style.boxShadow === "none" && style.borderStyle === "none") return false;
+    }
+    return true;
+  }
+
+  function closeBlankBellPanel() {
+    var bell = document.getElementById("cariana-noti-bell");
+    if (!bell || !bell.getBoundingClientRect) return;
+    var bellRect = bell.getBoundingClientRect();
+    var candidates = document.querySelectorAll("body *");
+    for (var i = 0; i < candidates.length; i++) {
+      var node = candidates[i];
+      if (!isNodeNearBell(node, bellRect)) continue;
+      if (!looksLikeEmptyBellPanel(node)) continue;
+      hideElement(node);
+    }
+  }
+
+  function scheduleBlankBellPanelCleanup() {
+    if (blankPanelCleanupTimer) return;
+    blankPanelCleanupTimer = setTimeout(function() {
+      blankPanelCleanupTimer = 0;
+      closeBlankBellPanel();
+      setTimeout(closeBlankBellPanel, 180);
+      setTimeout(closeBlankBellPanel, 600);
+    }, 50);
   }
 
   function closeStuckCartNotification() {
@@ -1226,11 +1289,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       var looksBlankBlock = rect.height > 80 && text.length < 8 && !hasCartItems;
       if (!looksBlankBlock) continue;
 
-      node.setAttribute("hidden", "hidden");
-      node.setAttribute("aria-hidden", "true");
-      node.classList.remove("active", "animate", "is-active", "is-open", "cart-notification--active");
-      node.style.setProperty("display", "none", "important");
-      node.style.setProperty("pointer-events", "none", "important");
+      hideElement(node);
     }
 
     document.documentElement.classList.remove("overflow-hidden");
@@ -1242,9 +1301,12 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
   function afterCartMutation(source) {
     setTimeout(closeStuckCartNotification, 120);
+    setTimeout(closeBlankBellPanel, 130);
     setTimeout(closeStuckCartNotification, 450);
+    setTimeout(closeBlankBellPanel, 460);
     setTimeout(function() {
       scheduleEnsure();
+      closeBlankBellPanel();
       if (source && source.indexOf("add") !== -1) {
         fetchCartAndTrack(source);
       }
