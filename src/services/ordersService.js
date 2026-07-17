@@ -1342,14 +1342,6 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     ]
   );
 
-  if (templateCode === "order_confirmed") {
-    await pool.query(
-      `UPDATE notification_events SET status = 'skipped', error_message = 'Order confirmed notifications disabled', processed_at = NOW() WHERE id = $1`,
-      [eventId]
-    );
-    return { skipped: true, reason: "Order confirmed notifications disabled" };
-  }
-
   const template = await getTemplate(shopDomain, templateCode);
   if (!template) {
     await pool.query(
