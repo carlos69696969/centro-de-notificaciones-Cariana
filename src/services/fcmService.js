@@ -22,6 +22,9 @@ function androidChannelForPayload(payload = {}) {
   if (
     [
       "order_shipped",
+      "order_in_transit",
+      "order_rescheduled",
+      "order_not_delivered",
       "order_out_for_delivery",
       "order_delivered"
     ].includes(type)
@@ -93,6 +96,9 @@ async function sendToToken(token, payload) {
         priority: "high",
         notification: {
           channelId: androidChannelForPayload(payload),
+          priority: "max",
+          visibility: "public",
+          defaultVibrateTimings: true,
           sound: "cariana_notification_sound"
         }
       }
