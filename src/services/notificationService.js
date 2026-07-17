@@ -15,6 +15,41 @@ function normalizeData(input = {}) {
   return output;
 }
 
+function jsonByteLength(value) {
+  return Buffer.byteLength(JSON.stringify(value || {}), "utf8");
+}
+
+function compactFcmData(data = {}) {
+  let output = { ...data };
+  if (jsonByteLength(output) <= 3800) {
+    return output;
+  }
+
+  delete output.orderStatusUrl;
+  delete output.productNames;
+  if (jsonByteLength(output) <= 3800) {
+    return output;
+  }
+
+  for (const key of [
+    "deepLinkUrl",
+    "deeplink_url",
+    "targetUrl",
+    "target_url",
+    "openUrl",
+    "open_url",
+    "link"
+  ]) {
+    delete output[key];
+  }
+  if (jsonByteLength(output) <= 3800) {
+    return output;
+  }
+
+  delete output.url;
+  return output;
+}
+
 function dedupeTokenRowsByToken(rows = []) {
   const seenTokens = new Set();
   const deduped = [];
@@ -192,23 +227,27 @@ async function sendToCustomerTokens({
 
   for (const tokenRow of tokens) {
     const fcmDeepLink = pushDeepLink || deepLink || "";
+    const dataPayload = compactFcmData(normalizeData({
+      ...data,
+      deepLink: fcmDeepLink,
+      deeplink: fcmDeepLink,
+      deep_link: fcmDeepLink,
+      deepLinkUrl: fcmDeepLink,
+      deeplink_url: fcmDeepLink,
+      url: fcmDeepLink,
+      link: fcmDeepLink,
+      targetUrl: fcmDeepLink,
+      target_url: fcmDeepLink,
+      openUrl: fcmDeepLink,
+      open_url: fcmDeepLink,
+      title,
+      body: message,
+      message
+    }));
     const payload = {
       title,
       body: message,
-      data: normalizeData({
-        ...data,
-        deepLink: fcmDeepLink,
-        deeplink: fcmDeepLink,
-        deep_link: fcmDeepLink,
-        deepLinkUrl: fcmDeepLink,
-        deeplink_url: fcmDeepLink,
-        url: fcmDeepLink,
-        link: fcmDeepLink,
-        targetUrl: fcmDeepLink,
-        target_url: fcmDeepLink,
-        openUrl: fcmDeepLink,
-        open_url: fcmDeepLink
-      })
+      data: dataPayload
     };
 
     const fcmResult = await fcmService.sendToToken(tokenRow.token, payload);
@@ -310,23 +349,27 @@ async function sendToEmailTokens({
 
   for (const tokenRow of tokens) {
     const fcmDeepLink = pushDeepLink || deepLink || "";
+    const dataPayload = compactFcmData(normalizeData({
+      ...data,
+      deepLink: fcmDeepLink,
+      deeplink: fcmDeepLink,
+      deep_link: fcmDeepLink,
+      deepLinkUrl: fcmDeepLink,
+      deeplink_url: fcmDeepLink,
+      url: fcmDeepLink,
+      link: fcmDeepLink,
+      targetUrl: fcmDeepLink,
+      target_url: fcmDeepLink,
+      openUrl: fcmDeepLink,
+      open_url: fcmDeepLink,
+      title,
+      body: message,
+      message
+    }));
     const payload = {
       title,
       body: message,
-      data: normalizeData({
-        ...data,
-        deepLink: fcmDeepLink,
-        deeplink: fcmDeepLink,
-        deep_link: fcmDeepLink,
-        deepLinkUrl: fcmDeepLink,
-        deeplink_url: fcmDeepLink,
-        url: fcmDeepLink,
-        link: fcmDeepLink,
-        targetUrl: fcmDeepLink,
-        target_url: fcmDeepLink,
-        openUrl: fcmDeepLink,
-        open_url: fcmDeepLink
-      })
+      data: dataPayload
     };
 
     const fcmResult = await fcmService.sendToToken(tokenRow.token, payload);
