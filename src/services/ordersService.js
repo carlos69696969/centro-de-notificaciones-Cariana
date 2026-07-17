@@ -1,7 +1,7 @@
 const pool = require("../db/pool");
 const { upsertCustomerFromShopify, getCustomerByShopifyId, getCustomerByEmail } = require("./customerService");
 const { getTemplate } = require("./templateService");
-const { sendToCustomerTokens } = require("./notificationService");
+const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
 const { buildOrderDeepLink, buildReturnDeepLink } = require("./deepLinkService");
 const { closeAbandonedCartsFromOrder } = require("./abandonedCartService");
 const {
@@ -1394,6 +1394,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
 
   const effectiveOrderNumber =
     effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "";
+  const customerEmail = String(effectivePayload.customer?.email || "").trim();
   const sendResult = await withOrderStatusNotificationLock(
     { shopDomain, orderId, orderNumber: effectiveOrderNumber, status: templateCode },
     async () => {
@@ -1409,9 +1410,8 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
         return { sent: 0, failed: 0, total: 0, deduplicated: true, reason: "Duplicate recent order status" };
       }
 
-      return sendToCustomerTokens({
+      const delivery = {
         shopDomain,
-        customerId: customer.id,
         type: "order_event",
         title: copy.title,
         message: copy.message,
@@ -1425,6 +1425,20 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
         }),
         data,
         eventId
+      };
+
+      const primaryResult = await sendToCustomerTokens({
+        ...delivery,
+        customerId: customer.id
+      });
+
+      if (primaryResult.total > 0 || !customerEmail) {
+        return primaryResult;
+      }
+
+      return sendToEmailTokens({
+        ...delivery,
+        email: customerEmail
       });
     }
   );
