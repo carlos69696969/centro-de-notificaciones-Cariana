@@ -638,6 +638,11 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
               if (div.dataset.unread === "1") {
                 try {
                   await markOpened(item.id);
+                  item.opened_at = new Date().toISOString();
+                  div.dataset.unread = "0";
+                  const badge = div.querySelector(".badge.new");
+                  if (badge) badge.remove();
+                  await load();
                 } catch (_error) {
                   // Continue navigation even if mark-open request fails.
                 }
@@ -690,6 +695,12 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
       }
 
       renderHistory(INITIAL_HISTORY, ${safeInitialUnread});
+      window.addEventListener("pageshow", function(event) {
+        if (event.persisted) load();
+      });
+      document.addEventListener("visibilitychange", function() {
+        if (document.visibilityState === "visible") load();
+      });
     </script>
   </body>
 </html>`;

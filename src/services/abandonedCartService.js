@@ -395,6 +395,22 @@ async function runAbandonedCartSweep() {
     if (!nextStage) {
       continue;
     }
+    const previousStage = row.abandoned_stage || null;
+    const sendingStage = `${nextStage}_sending`;
+    const lockResult = await pool.query(
+      `
+      UPDATE checkout_events
+      SET abandoned_stage = $3
+      WHERE id = $1
+        AND abandoned_stage IS NOT DISTINCT FROM $2
+        AND completed_at IS NULL
+      RETURNING id
+      `,
+      [row.id, previousStage, sendingStage]
+    );
+    if (lockResult.rowCount === 0) {
+      continue;
+    }
 
     const customer = row.shopify_customer_id
       ? await getCustomerByShopifyId(row.shop_domain, row.shopify_customer_id)
@@ -453,12 +469,16 @@ async function runAbandonedCartSweep() {
     }
 
     if (delivery.total < 1 && delivery.stored < 1) {
+      await pool.query(
+        `UPDATE checkout_events SET abandoned_stage = $2 WHERE id = $1 AND abandoned_stage = $3`,
+        [row.id, previousStage, sendingStage]
+      );
       continue;
     }
 
     await pool.query(
-      `UPDATE checkout_events SET abandoned_stage = $2 WHERE id = $1`,
-      [row.id, nextStage]
+      `UPDATE checkout_events SET abandoned_stage = $2 WHERE id = $1 AND abandoned_stage = $3`,
+      [row.id, nextStage, sendingStage]
     );
   }
 }
