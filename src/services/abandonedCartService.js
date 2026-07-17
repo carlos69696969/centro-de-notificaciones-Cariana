@@ -2,7 +2,7 @@ const pool = require("../db/pool");
 const { getTemplate } = require("./templateService");
 const { getCustomerByShopifyId } = require("./customerService");
 const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
-const { toAbsoluteStorefrontUrl } = require("./deepLinkService");
+const { buildCartDeepLink, toAbsoluteStorefrontUrl } = require("./deepLinkService");
 
 const DEFAULT_ABANDONED_CART_SETTINGS = {
   stage1DelayMinutes: 60,
@@ -439,6 +439,12 @@ async function runAbandonedCartSweep() {
       productName: copy.productName || "",
       deepLinkType: "cart"
     };
+    const pushDeepLink = buildCartDeepLink({
+      shopDomain: row.shop_domain,
+      checkoutId: row.checkout_id,
+      stage: nextStage,
+      deepLink
+    });
 
     let delivery = { sent: 0, failed: 0, total: 0 };
     if (customer) {
@@ -449,6 +455,7 @@ async function runAbandonedCartSweep() {
         title: copy.title,
         message: copy.message,
         deepLink,
+        pushDeepLink,
         data: payloadData
       });
     }
@@ -463,6 +470,7 @@ async function runAbandonedCartSweep() {
           title: copy.title,
           message: copy.message,
           deepLink,
+          pushDeepLink,
           data: payloadData
         });
       }

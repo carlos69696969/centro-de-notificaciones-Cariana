@@ -2,7 +2,7 @@ const express = require("express");
 const pool = require("../db/pool");
 const env = require("../config/env");
 const { verifyAppProxySignature } = require("../services/shopifyAppProxyVerifier");
-const { buildOrderDeepLink, buildLegacyOrderFallbackDeepLink, toAbsoluteStorefrontUrl } = require("../services/deepLinkService");
+const { buildCartDeepLink, buildOrderDeepLink, buildLegacyOrderFallbackDeepLink, toAbsoluteStorefrontUrl } = require("../services/deepLinkService");
 const { recordAbandonedCartActivity } = require("../services/abandonedCartService");
 
 const router = express.Router();
@@ -320,12 +320,75 @@ async function markOpenedByCampaignContext({ shopDomain, campaignId, targetUrl, 
   );
 }
 
+async function markOpenedByCartContext({ shopDomain, notificationId, checkoutId, stage, shopifyCustomerId }) {
+  const normalizedNotificationId = Number(notificationId || 0);
+  const normalizedCheckoutId = safeTrim(checkoutId);
+  const normalizedStage = safeTrim(stage);
+  const customerContext = await resolveCustomerContext(shopDomain, shopifyCustomerId);
+  const currentCustomerId = Number(customerContext.customerId || 0);
+  const currentCustomerEmail = safeTrim(customerContext.customerEmail).toLowerCase();
+  const effectiveShopDomain = safeTrim(customerContext.effectiveShopDomain || shopDomain);
+
+  if (normalizedNotificationId > 0 && effectiveShopDomain) {
+    const byId = await pool.query(
+      `
+      UPDATE notifications n
+      SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+      WHERE n.id = $1
+        AND n.shop_domain = $2
+        AND n.type = 'abandoned_cart'
+      RETURNING n.id
+      `,
+      [normalizedNotificationId, effectiveShopDomain]
+    );
+    if (byId.rowCount > 0) return;
+  }
+
+  if (!effectiveShopDomain || (!normalizedCheckoutId && !currentCustomerId && !currentCustomerEmail)) return;
+
+  await pool.query(
+    `
+    WITH candidates AS (
+      SELECT n.id
+      FROM notifications n
+      WHERE n.shop_domain = $1
+        AND n.status = 'sent'
+        AND n.opened_at IS NULL
+        AND n.type = 'abandoned_cart'
+        AND (
+          ($2 <> '' AND COALESCE(n.data->>'checkoutId', '') = $2)
+          OR ($4 > 0 AND n.customer_id = $4)
+          OR ($5 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', '')) = $5)
+        )
+        AND ($3 = '' OR COALESCE(n.data->>'stage', '') = $3)
+      ORDER BY n.created_at DESC
+      LIMIT 20
+    )
+    UPDATE notifications n
+    SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+    FROM candidates c
+    WHERE n.id = c.id
+    `,
+    [effectiveShopDomain, normalizedCheckoutId, normalizedStage, currentCustomerId, currentCustomerEmail]
+  );
+}
+
 function resolveNotificationDeepLink({ shopDomain, item }) {
   const rawData = item?.data && typeof item.data === "object" ? item.data : {};
   const type = safeTrim(item?.type);
   const deepLinkType = safeTrim(rawData.deepLinkType || rawData.deeplinkType || rawData.linkType);
   const isOrderLike = ["order_event", "order_manual", "refund_event"].includes(type) || deepLinkType === "order";
+  const isCartLike = type === "abandoned_cart" || deepLinkType === "cart";
   const existing = safeTrim(item?.deep_link);
+
+  if (isCartLike) {
+    return buildCartDeepLink({
+      shopDomain,
+      checkoutId: rawData.checkoutId || rawData.checkout_id || "",
+      stage: rawData.stage || "",
+      deepLink: existing || "/cart"
+    });
+  }
 
   if (!isOrderLike) {
     return existing;
@@ -1702,6 +1765,50 @@ router.get("/open-campaign", requireValidProxy, async (req, res, next) => {
   </head>
   <body>
     <p>Abriendo contenido...</p>
+    <p><a href="${safeTarget}">Continuar</a></p>
+    <script>
+      window.location.replace(${JSON.stringify(targetUrl)});
+    </script>
+  </body>
+</html>`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/open-cart", requireValidProxy, async (req, res, next) => {
+  try {
+    const shopDomain = resolveShopDomain(req);
+    const shopifyCustomerId = resolveCustomerId(req);
+    const notificationId = Number(req.query.id || req.query.notification || req.query.notification_id || 0);
+    const checkoutId = req.query.checkout || req.query.checkout_id || req.query.checkoutId || "";
+    const stage = req.query.stage || "";
+    const targetRaw = req.query.target || req.query.url || "";
+    const targetUrl = toAbsoluteStorefrontUrl(shopDomain, safeTrim(targetRaw) || "/cart");
+
+    await markOpenedByCartContext({
+      shopDomain,
+      notificationId,
+      checkoutId,
+      stage,
+      shopifyCustomerId
+    });
+
+    const safeTarget = escapeHtml(targetUrl);
+    if (!targetUrl || !isAbsoluteUrl(targetUrl)) {
+      return res.status(400).send("Invalid cart target");
+    }
+
+    return res.status(200).send(`<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Abriendo carrito...</title>
+    <meta http-equiv="refresh" content="0;url=${safeTarget}" />
+  </head>
+  <body>
+    <p>Abriendo carrito...</p>
     <p><a href="${safeTarget}">Continuar</a></p>
     <script>
       window.location.replace(${JSON.stringify(targetUrl)});

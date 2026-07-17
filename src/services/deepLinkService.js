@@ -169,11 +169,25 @@ function buildCampaignDeepLink({ shopDomain, deepLink, campaignId }) {
   });
 }
 
+function buildCartDeepLink({ shopDomain, checkoutId, stage, deepLink }) {
+  const targetUrl = safeTrim(deepLink)
+    ? toAbsoluteStorefrontUrl(shopDomain, deepLink)
+    : toAbsoluteStorefrontUrl(shopDomain, "/cart");
+  const bridgeUrl = toAbsoluteShopDomainUrl(shopDomain, "/apps/notificaciones/open-cart");
+
+  return appendQueryParams(bridgeUrl, {
+    checkout: checkoutId,
+    stage,
+    target: targetUrl
+  });
+}
+
 module.exports = {
   buildOrderDeepLink,
   buildLegacyOrderFallbackDeepLink,
   buildReturnDeepLink,
   buildNotificationsDeepLink,
   buildCampaignDeepLink,
+  buildCartDeepLink,
   toAbsoluteStorefrontUrl
 };
