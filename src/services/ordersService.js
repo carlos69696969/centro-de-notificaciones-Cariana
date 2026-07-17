@@ -1432,7 +1432,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
         customerId: customer.id
       });
 
-      if (primaryResult.total > 0 || !customerEmail) {
+      if (primaryResult.total > 0 || primaryResult.stored > 0 || !customerEmail) {
         return primaryResult;
       }
 
@@ -1451,8 +1451,8 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     `,
     [
       eventId,
-      sendResult.total > 0 ? "processed" : "skipped",
-      sendResult.deduplicated ? sendResult.reason : sendResult.total > 0 ? null : "No active tokens"
+      (sendResult.total > 0 || sendResult.stored > 0) ? "processed" : "skipped",
+      sendResult.deduplicated ? sendResult.reason : (sendResult.total > 0 || sendResult.stored > 0) ? null : "No active tokens"
     ]
   );
 
@@ -1731,7 +1731,11 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
     SET status = $2, processed_at = NOW(), error_message = $3
     WHERE id = $1
     `,
-    [eventId, sendResult.total > 0 ? "processed" : "skipped", sendResult.total > 0 ? null : "No active tokens"]
+    [
+      eventId,
+      (sendResult.total > 0 || sendResult.stored > 0) ? "processed" : "skipped",
+      (sendResult.total > 0 || sendResult.stored > 0) ? null : "No active tokens"
+    ]
   );
 
   return sendResult;

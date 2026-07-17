@@ -224,6 +224,28 @@ async function sendToCustomerTokens({
   const tokens = dedupeTokenRowsByToken(tokensResult.rows);
   let sent = 0;
   let failed = 0;
+  let stored = 0;
+
+  if (!tokens.length && customerId) {
+    await insertNotificationRecord({
+      shopDomain,
+      customerId,
+      tokenId: null,
+      eventId,
+      campaignId,
+      type,
+      title,
+      message,
+      deepLink,
+      data: {
+        ...data,
+        deliveryMode: "notification_center"
+      },
+      status: "sent",
+      fcmMessageId: null
+    });
+    stored += 1;
+  }
 
   for (const tokenRow of tokens) {
     const fcmDeepLink = pushDeepLink || deepLink || "";
@@ -290,7 +312,7 @@ async function sendToCustomerTokens({
     }
   }
 
-  return { sent, failed, total: tokens.length };
+  return { sent, failed, stored, total: tokens.length };
 }
 
 async function sendToEmailTokens({
@@ -307,7 +329,7 @@ async function sendToEmailTokens({
 }) {
   const normalizedEmail = String(email || "").trim().toLowerCase();
   if (!normalizedEmail) {
-    return { sent: 0, failed: 0, total: 0 };
+    return { sent: 0, failed: 0, stored: 0, total: 0 };
   }
 
   const exactShopTokens = await pool.query(
@@ -326,6 +348,7 @@ async function sendToEmailTokens({
   );
 
   let tokens = dedupeTokenRowsByToken(exactShopTokens.rows);
+  let historyCustomerId = tokens.find((tokenRow) => Number(tokenRow.customer_id || 0) > 0)?.customer_id || null;
   if (!tokens.length) {
     // Fallback: when a merchant changed store domain during setup, try matching by
     // customer email on active tokens from the same merchant database.
@@ -343,9 +366,46 @@ async function sendToEmailTokens({
       [normalizedEmail]
     );
     tokens = dedupeTokenRowsByToken(crossShopTokens.rows);
+    historyCustomerId = tokens.find((tokenRow) => Number(tokenRow.customer_id || 0) > 0)?.customer_id || null;
+  }
+  if (!historyCustomerId) {
+    const customerMatch = await pool.query(
+      `
+      SELECT id
+      FROM customers
+      WHERE LOWER(COALESCE(email, '')) = $1
+      ORDER BY CASE WHEN shop_domain = $2 THEN 0 ELSE 1 END, updated_at DESC
+      LIMIT 1
+      `,
+      [normalizedEmail, shopDomain]
+    );
+    historyCustomerId = customerMatch.rows[0]?.id || null;
   }
   let sent = 0;
   let failed = 0;
+  let stored = 0;
+
+  if (!tokens.length) {
+    await insertNotificationRecord({
+      shopDomain,
+      customerId: historyCustomerId || null,
+      tokenId: null,
+      eventId,
+      campaignId,
+      type,
+      title,
+      message,
+      deepLink,
+      data: {
+        ...data,
+        customerEmail: data?.customerEmail || normalizedEmail,
+        deliveryMode: "notification_center"
+      },
+      status: "sent",
+      fcmMessageId: null
+    });
+    stored += 1;
+  }
 
   for (const tokenRow of tokens) {
     const fcmDeepLink = pushDeepLink || deepLink || "";
@@ -412,7 +472,7 @@ async function sendToEmailTokens({
     }
   }
 
-  return { sent, failed, total: tokens.length };
+  return { sent, failed, stored, total: tokens.length };
 }
 
 async function sendToAudience({

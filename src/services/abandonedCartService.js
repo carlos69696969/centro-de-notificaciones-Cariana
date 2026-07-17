@@ -437,7 +437,7 @@ async function runAbandonedCartSweep() {
       });
     }
 
-    if (delivery.total < 1) {
+    if (delivery.total < 1 && delivery.stored < 1) {
       const checkoutEmail = String(row.email || row.payload?.email || "").trim();
       if (checkoutEmail) {
         delivery = await sendToEmailTokens({
@@ -452,7 +452,7 @@ async function runAbandonedCartSweep() {
       }
     }
 
-    if (delivery.total < 1) {
+    if (delivery.total < 1 && delivery.stored < 1) {
       continue;
     }
 

@@ -807,7 +807,7 @@ async function processReturnEvent({ shopDomain, payload }) {
       eventId: null
     });
 
-    if (primaryResult.total > 0 || !eventEmail) {
+    if (primaryResult.total > 0 || primaryResult.stored > 0 || !eventEmail) {
       return primaryResult;
     }
   }
