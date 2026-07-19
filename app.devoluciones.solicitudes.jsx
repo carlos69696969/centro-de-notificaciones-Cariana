@@ -3314,7 +3314,9 @@ function CourierOrderCard({
     : styles.courierBadgeAttempt;
   const statusBadgeClass = isAdminReprogrammed
     ? styles.courierBadgeStatusReprogrammed
-    : ["no_entregado", "rechazada", "no_recibido"].includes(normalizedVisibleStatus)
+    : normalizedVisibleStatus === "no_entregado"
+      ? styles.courierBadgeStatusNotFound
+    : ["rechazada", "no_recibido"].includes(normalizedVisibleStatus)
       ? styles.courierBadgeStatusFailed
     : ["entregado", "recibido", "recibida"].includes(normalizedVisibleStatus)
       ? styles.courierBadgeStatusSuccess

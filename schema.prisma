@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model ReturnRequest {
+  id                Int          @id @default(autoincrement())
+  shop              String
+  shopifyOrderId    String
+  orderNumber       String
+  customerName      String
+  customerEmail     String
+  customerPhone     String?
+  returnMethod      String
+  returnCost        Float        @default(0)
+  estimatedRefund   Float        @default(0)
+  finalRefund       Float        @default(0)
+  status            String       @default("pendiente")
+  requiresReview    Boolean      @default(false)
+  rejectionReason   String?
+  receivedAt        DateTime?
+  refundedAt        DateTime?
+  shopifyRefundId   String?
+  refundError       String?
+  refundedSubtotal  Float        @default(0)
+  branchAddress     String?
+  branchInstructions String?
+  branchHours       String?
+  pickupInstructions String?
+  pickupHours       String?
+  pickupDate        String?
+  pickupTimeSlot    String?
+  pickupNotes       String?
+  limitDate         DateTime?
+  pickupFullName    String?
+  pickupPhone       String?
+  pickupAddress     String?
+  pickupNeighborhood String?
+  pickupCity        String?
+  pickupState       String?
+  pickupPostalCode  String?
+  pickupReferences  String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  items             ReturnItem[]
+
+  @@index([shop, status, createdAt])
+  @@index([shop, returnMethod, status, createdAt])
+  @@index([shop, orderNumber])
+}
+
+model ReturnItem {
+  id              Int           @id @default(autoincrement())
+  returnRequestId Int
+  lineItemId      String?
+  productId       String
+  variantId       String?
+  title           String
+  quantity        Int
+  reason          String
+  details         String?
+  photoDataUrl    String?
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+}
+
+model CourierEvent {
+  id          Int      @id @default(autoincrement())
+  shop        String
+  requestId   String
+  orderNumber String?
+  status      String
+  attempt     Int?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([shop, requestId, createdAt])
+}
+
+model Courier {
+  id        Int      @id @default(autoincrement())
+  shop      String
+  name      String
+  code      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([shop, code])
+  @@index([shop, createdAt])
+}
+
+model CourierActivity {
+  id          Int      @id @default(autoincrement())
+  shop        String
+  courierId   Int
+  courierName String
+  requestId   String
+  orderNumber String?
+  action      String
+  routeId     String?
+  createdAt   DateTime @default(now())
+
+  @@index([shop, courierId, createdAt])
+  @@index([shop, requestId, createdAt])
+  @@index([shop, courierId, routeId, createdAt])
+}
+
+model CourierRouteSnapshot {
+  id             Int      @id @default(autoincrement())
+  shop           String
+  courierId      Int
+  courierName    String
+  routeId        String
+  dateKey        String
+  startedAt      DateTime?
+  finishedAt     DateTime @default(now())
+  orders         Json
+  remainingCount Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  @@unique([shop, routeId])
+  @@index([shop, courierId, finishedAt])
+  @@index([shop, courierId, dateKey])
+}
+
+model ReturnSettings {
+  id                  Int      @id @default(autoincrement())
+  shop                String   @unique
+  pickupCost          Float    @default(100)
+  returnWindowDays    Int      @default(30)
+  returnReasons       String   @default("")
+  evidenceReasons     String   @default("")
+  branchInstructions  String   @default("Entrega el paquete sellado con tu numero de pedido.")
+  branchAddress       String   @default("Sucursal principal por definir")
+  branchHours         String   @default("Lunes a Viernes de 9:00 a 18:00")
+  pickupInstructions  String   @default("Ten el paquete listo y sellado para recoleccion.")
+  pickupHours         String   @default("Lunes a Viernes de 9:00 a 18:00")
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+}
+
+model PushDevice {
+  id             Int      @id @default(autoincrement())
+  shop           String
+  token          String   @unique
+  customerId     String?
+  customerEmail  String?
+  platform       String   @default("android")
+  packageName    String?
+  androidVersion String?
+  deviceId       String?
+  isActive       Boolean  @default(true)
+  lastSeenAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([shop, customerEmail])
+  @@index([shop, customerId])
+  @@index([shop, isActive])
+}

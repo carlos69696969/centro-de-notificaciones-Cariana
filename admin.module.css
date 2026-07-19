@@ -1,0 +1,1139 @@
+﻿.wrap {
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+}
+
+.card {
+  border: 1px solid #e1e3e5;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  padding: 16px;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+  max-width: 980px;
+}
+
+.grid2 {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #202223;
+}
+
+.help {
+  font-weight: 500;
+  color: #6d7175;
+  font-size: 13px;
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  border: 1px solid #e1e3e5;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: #fff;
+  color: #202223;
+  outline: none;
+}
+
+.textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: rgba(0, 91, 211, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 91, 211, 0.12);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.maintenanceStats {
+  border: 1px solid #e1e3e5;
+  border-radius: 12px;
+  background: #fafbfb;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.statRow {
+  margin: 0;
+  font-size: 13px;
+  color: #202223;
+  font-weight: 700;
+}
+
+.btn {
+  appearance: none;
+  border: 1px solid #e1e3e5;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  background: #fff;
+  color: #202223;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  border-color: transparent;
+  background: #005bd3;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.btnDanger {
+  border-color: transparent;
+  background: #c4322a;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.btnWarning {
+  border-color: transparent;
+  background: #ff8c00;
+  color: #111827;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  font-weight: 800;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reqGrid {
+  display: grid;
+  gap: 14px;
+}
+
+.reqHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.reqTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid #e1e3e5;
+  border-radius: 999px;
+  background: #fafbfb;
+  font-size: 13px;
+  color: #202223;
+}
+
+.statusDefault {
+  color: #202223;
+}
+
+.statusReview {
+  color: #d63384;
+}
+
+.statusApproved {
+  color: #0047ab;
+}
+
+.statusRejected {
+  color: #b42318;
+}
+
+.returnedToCustomerStatus {
+  color: #39ff14;
+  font-weight: 800;
+}
+
+.statusReceived {
+  color: #a97900;
+}
+
+.statusAttemptFailed {
+  color: #ff8c00;
+}
+
+.statusPendingReturn {
+  color: #b42318;
+}
+
+.statusRefunded {
+  color: #008060;
+}
+
+.statusDenied {
+  color: #b42318;
+}
+
+.meta {
+  margin: 6px 0 0;
+  color: #6d7175;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.divider {
+  height: 1px;
+  background: #e1e3e5;
+  margin: 12px 0;
+}
+
+.kv {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.kvRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.kvKey {
+  color: #6d7175;
+  font-weight: 700;
+}
+
+.kvVal {
+  color: #202223;
+  font-weight: 700;
+}
+
+.details {
+  margin-top: 10px;
+  border-top: 1px solid #e1e3e5;
+  padding-top: 10px;
+}
+
+.summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.productList {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.orderDetailTitle {
+  margin: 12px 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #202223;
+}
+
+.productItem {
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e1e3e5;
+}
+
+.productItem:last-child {
+  margin-bottom: 0;
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.productItemHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.productThumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #e1e3e5;
+  background: #f6f6f7;
+}
+
+.productThumbPlaceholder {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  border: 1px dashed #d2d5d8;
+  background: #fafbfb;
+}
+
+.productCopy {
+  min-width: 0;
+}
+
+.productLineTitle {
+  margin: 0;
+  color: #202223;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.productLineMeta {
+  margin: 4px 0 0;
+  color: #4f5560;
+  font-size: 13px;
+}
+
+.evidencePhotos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.evidenceLink {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  color: #005bd3;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: zoom-in;
+  text-align: left;
+}
+
+.evidencePhoto {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #e1e3e5;
+  background: #f6f6f7;
+}
+
+.imageButton {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: zoom-in;
+  line-height: 0;
+}
+
+.imageViewerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 9999;
+}
+
+.imageViewerDialog {
+  max-width: min(92vw, 980px);
+  max-height: 92vh;
+  background: #0b1220;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+
+.imageViewerToolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.imageViewerBtn {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.imageViewerZoom {
+  color: #d1d5db;
+  font-size: 12px;
+  min-width: 46px;
+  text-align: center;
+}
+
+.imageViewerStage {
+  overflow: hidden;
+  border-radius: 8px;
+  max-height: calc(92vh - 74px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.imageViewerImg {
+  display: block;
+  max-width: 100%;
+  max-height: calc(92vh - 74px);
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  object-fit: contain;
+  touch-action: none;
+  user-select: none;
+  transition: transform 80ms linear;
+}
+
+.statusForm {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.statusForm .select {
+  width: 240px;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.actionRight {
+  margin-left: auto;
+}
+
+
+.historyActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.historySelectAllLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #202223;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.historySelectRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: #202223;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.historyCardSelected {
+  border-color: rgba(0, 91, 211, 0.55);
+  box-shadow: 0 0 0 2px rgba(0, 91, 211, 0.16);
+}
+
+.rejectForm {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.rejectForm .input {
+  width: 320px;
+}
+
+.quickReasonActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.quickReasonBtn {
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+
+.quickReasonOpenBtn {
+  background: #f3f4f6;
+}
+
+.rejectForm .textarea {
+  width: min(760px, 100%);
+  min-height: 100px;
+}
+
+.reasonModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.reasonModal {
+  width: min(760px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  display: grid;
+  gap: 10px;
+}
+
+.reasonModalTitle {
+  margin: 0;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.reasonOptionCard {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #e1e3e5;
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.reasonOptionCard:hover {
+  border-color: rgba(0, 91, 211, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 91, 211, 0.1);
+}
+
+.reasonOptionLabel {
+  color: #202223;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.reasonOptionText {
+  color: #4b5563;
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.reasonModalActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.errorMsg {
+  margin: 8px 0;
+  color: #b42318;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.attemptWarnMsg {
+  margin: 8px 0;
+  color: #a85b00;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.reasonHistory {
+  margin: 10px 0 6px;
+  padding: 10px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  background: #fafbfb;
+}
+
+.reasonHistoryTitle {
+  margin: 0 0 6px;
+  color: #202223;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.reasonHistoryList {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.reasonHistoryItem {
+  margin: 4px 0;
+  color: #4f5560;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.reasonHistoryMessage {
+  color: #202223;
+}
+
+.statusTimelineCurrent {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  background: #fafbfb;
+}
+
+.statusTimelineTitle {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #6d7175;
+  font-weight: 700;
+}
+
+.statusTimelineCurrentLine {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 14px;
+  color: #202223;
+}
+
+.statusTimelineList {
+  margin-top: 8px;
+  border: 1px solid #e1e3e5;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.statusTimelineItem {
+  padding: 10px;
+  border-bottom: 1px solid #e1e3e5;
+  background: #fff;
+}
+
+.statusTimelineItem:last-child {
+  border-bottom: 0;
+}
+
+.statusTimelineItemTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #202223;
+}
+
+.statusTimelineItemAt {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #6d7175;
+}
+
+.statusTimelineItemNote {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #202223;
+}
+
+.timelineToneReview {
+  color: #ff2df1;
+  font-weight: 800;
+}
+
+.timelineToneApproved {
+  color: #0047ab;
+  font-weight: 800;
+}
+
+.timelineToneAttempt {
+  color: #ff8c00;
+  font-weight: 800;
+}
+
+.timelineToneRejected {
+  color: #b42318;
+  font-weight: 800;
+}
+
+.timelineToneReceived {
+  color: #a97900;
+  font-weight: 800;
+}
+
+.timelineTonePending {
+  color: #b42318;
+  font-weight: 800;
+}
+
+.timelineToneDenied {
+  color: #b42318;
+  font-weight: 800;
+}
+
+.timelineToneRefunded {
+  color: #008060;
+  font-weight: 800;
+}
+
+.successMsg {
+  margin: 8px 0;
+  color: #027a48;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.noticeMuted {
+  margin: 0 0 12px;
+  color: #6d7175;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.courierGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.courierCard {
+  border: 1px solid #e5e7eb;
+  border-left: 4px solid #6b7280;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 14px 10px;
+  display: grid;
+  gap: 4px;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+
+.courierCardDelivery {
+  border-left-color: #047857;
+}
+
+.courierCardReturn {
+  border-left-color: #2563eb;
+}
+
+.courierHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.courierOrderNumber {
+  margin: 4px 0 0;
+  color: #111827;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.courierCustomerName {
+  margin: 0;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.courierBadgeDelivery,
+.courierBadgeStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.courierBadgeDelivery {
+  background: #ecfdf3;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+}
+
+.courierBadgeReturn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+
+.courierBadgeStatus {
+  background: #f9fafb;
+  border: 1px solid #d1d5db;
+  color: #6b7280;
+}
+
+.courierOrderBadgeGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.courierOrderSequence {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 26px;
+  border: 1px solid #8eb8ff;
+  border-radius: 50%;
+  background: #eaf2ff;
+  color: #005bd3;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.courierStatusGroup {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.courierBadgeAttempt {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.courierBadgeAttemptWarning {
+  background: #fff5ea;
+  border-color: #ffb86b;
+  color: #b45309;
+}
+
+.courierBadgeStatusFailed {
+  background: #fff1f1;
+  border-color: #d9364f;
+  color: #c5283d;
+}
+
+.courierBadgeStatusNotFound {
+  background: #fff7ed;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.courierBadgeStatusSuccess {
+  background: #ecfdf3;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.courierBadgeStatusRoute {
+  background: #e9f1ff;
+  border-color: #005bd3;
+  color: #005bd3;
+}
+
+.courierBadgeStatusReprogrammed {
+  background: #fff5e6;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.courierOrdersHeader {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.courierOrdersCount {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 14px;
+  border: 1px solid #8eb8ff;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #005bd3;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.courierField,
+.courierAddress {
+  margin: 0;
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.courierAddress {
+  color: #111827;
+  font-weight: 400;
+}
+
+.courierHistoryDetails {
+  margin-top: 4px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 8px;
+}
+
+.courierHistorySummary {
+  width: fit-content;
+  cursor: pointer;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.courierHistorySummary::-webkit-details-marker {
+  display: none;
+}
+
+.courierHistoryList {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.courierHistoryItem {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-radius: 8px;
+  background: #f9fafb;
+  padding: 8px 10px;
+  color: #111827;
+  font-size: 13px;
+}
+
+.courierHistoryItem span {
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+.courierHistoryDirectory {
+  display: grid;
+  gap: 14px;
+}
+
+.courierHistoryDirectoryList,
+.courierCalendar {
+  display: grid;
+  gap: 12px;
+}
+
+.courierHistoryHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.courierHistoryHeader h3 {
+  margin: 0;
+}
+
+.courierHistoryCounters {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.courierHistoryCounter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 112px;
+  min-height: 30px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1px solid #8eb8ff;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #005bd3;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.courierHistoryDirectorySummary {
+  width: fit-content;
+  list-style: none;
+  text-decoration: none;
+}
+
+.courierCalendar {
+  margin-top: 14px;
+  grid-template-columns: 1fr;
+}
+
+.courierCalendarDay {
+  display: block;
+  border: 1px solid #e1e3e5;
+  border-radius: 12px;
+  background: #fafbfb;
+  color: #202223;
+  font-weight: 800;
+  padding: 12px;
+  text-decoration: none;
+  text-transform: capitalize;
+}
+
+.courierCalendarDay:hover {
+  border-color: #005bd3;
+  background: #f3f7ff;
+}
+
+.courierHistoryDateTitle {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.courierHistoryBackLink {
+  width: fit-content;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.courierHistoryDirectorySummary::-webkit-details-marker {
+  display: none;
+}
+
+.courierHistoryDirectory[open] .courierHistoryDirectorySummary {
+  margin-bottom: 14px;
+}
+
+.couriersLayout {
+  display: grid;
+  gap: 14px;
+  max-width: 760px;
+}
+
+.couriersLayout > button {
+  width: fit-content;
+}
+
+.courierCreateForm {
+  display: grid;
+  gap: 14px;
+}
+
+.courierCodeField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.courierDirectory {
+  display: grid;
+  gap: 10px;
+}
+
+.courierDirectoryCard {
+  border: 1px solid #e1e3e5;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.courierDirectorySummary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.courierDirectorySummary span {
+  color: #6d7175;
+  font-weight: 700;
+}
+
+.courierDirectoryCode {
+  border-top: 1px solid #e1e3e5;
+  padding: 14px 16px;
+  background: #fafbfb;
+  display: grid;
+  gap: 12px;
+}
+
+.courierDirectoryCode form {
+  width: fit-content;
+}
+
+@media (max-width: 720px) {
+  .grid2 { grid-template-columns: 1fr; }
+  .statusForm .select { width: 100%; }
+  .rejectForm .input { width: 100%; }
+  .courierCodeField { grid-template-columns: 1fr; }
+}
