@@ -708,6 +708,66 @@ function fallbackTemplateFor(templateCode, payload) {
   };
 }
 
+function buildReturnEventDedupeKey({ payload, templateCode, returnReference }) {
+  const explicitKey =
+    payload.event_dedupe_key ||
+    payload.eventDedupeKey ||
+    payload.idempotency_key ||
+    payload.idempotencyKey ||
+    "";
+  const cleanExplicitKey = String(explicitKey || "").trim();
+  if (cleanExplicitKey) return cleanExplicitKey;
+
+  if (templateCode === "return_expired" && returnReference) {
+    const requestId = payload.return_request_id || payload.returnRequestId || payload.return_id || payload.returnId || "";
+    const referencePart = String(requestId || returnReference).trim();
+    return referencePart ? `return_expired:${referencePart}` : "";
+  }
+
+  return "";
+}
+
+async function findDuplicateReturnEvent({ shopDomain, dedupeKey, templateCode, returnReference }) {
+  if (dedupeKey) {
+    const result = await pool.query(
+      `
+      SELECT id
+      FROM returns_events
+      WHERE shop_domain = $1
+        AND (
+          payload->>'event_dedupe_key' = $2
+          OR payload->>'eventDedupeKey' = $2
+          OR payload->>'idempotency_key' = $2
+          OR payload->>'idempotencyKey' = $2
+        )
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [shopDomain, dedupeKey]
+    );
+    if (result.rows[0]?.id) return result.rows[0].id;
+  }
+
+  if (templateCode === "return_expired" && returnReference) {
+    const result = await pool.query(
+      `
+      SELECT id
+      FROM returns_events
+      WHERE shop_domain = $1
+        AND status IN ('return_expired', 'mark_never_arrived', 'no_devuelto')
+        AND COALESCE(return_reference, '') = $2
+        AND created_at >= NOW() - INTERVAL '14 days'
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [shopDomain, String(returnReference)]
+    );
+    if (result.rows[0]?.id) return result.rows[0].id;
+  }
+
+  return null;
+}
+
 async function processReturnEvent({ shopDomain, payload }) {
   const { templateCode, normalizedStatus } = resolveTemplateCodeFromReturnPayload(payload);
   const returnReference =
@@ -721,6 +781,17 @@ async function processReturnEvent({ shopDomain, payload }) {
     payload.customer?.id ||
     null;
   const normalizedCustomerId = rawCustomerId ? Number(rawCustomerId) || null : null;
+  const dedupeKey = buildReturnEventDedupeKey({ payload, templateCode, returnReference });
+  const duplicateEventId = await findDuplicateReturnEvent({
+    shopDomain,
+    dedupeKey,
+    templateCode,
+    returnReference
+  });
+
+  if (duplicateEventId) {
+    return { skipped: true, reason: "Duplicate return event", eventId: duplicateEventId };
+  }
 
   const eventInsert = await pool.query(
     `
@@ -736,13 +807,14 @@ async function processReturnEvent({ shopDomain, payload }) {
       JSON.stringify(payload)
     ]
   );
+  const eventId = eventInsert.rows[0].id;
 
   if (!templateCode) {
-    return { skipped: true, reason: "Unknown status", eventId: eventInsert.rows[0].id };
+    return { skipped: true, reason: "Unknown status", eventId };
   }
 
   if (templateCode === "refund_completed") {
-    return { skipped: true, reason: "Refund completed notifications are disabled", eventId: eventInsert.rows[0].id };
+    return { skipped: true, reason: "Refund completed notifications are disabled", eventId };
   }
 
   const eventEmail = extractEventEmail(payload);
@@ -753,7 +825,7 @@ async function processReturnEvent({ shopDomain, payload }) {
   const dbTemplate = await getTemplate(shopDomain, templateCode);
   const template = dbTemplate || fallbackTemplateFor(templateCode, payload);
   if (!template) {
-    return { skipped: true, reason: "Template not found", eventId: eventInsert.rows[0].id };
+    return { skipped: true, reason: "Template not found", eventId };
   }
 
   const premiumCopy = buildReturnPremiumTemplate({
@@ -804,7 +876,7 @@ async function processReturnEvent({ shopDomain, payload }) {
       deepLink: returnDeepLink,
       pushDeepLink,
       data: notificationData,
-      eventId: null
+      eventId
     });
 
     if (primaryResult.total > 0 || primaryResult.stored > 0 || !eventEmail) {
@@ -822,11 +894,11 @@ async function processReturnEvent({ shopDomain, payload }) {
       deepLink: returnDeepLink,
       pushDeepLink,
       data: notificationData,
-      eventId: null
+      eventId
     });
   }
 
-  return { skipped: true, reason: "Customer not found", eventId: eventInsert.rows[0].id };
+  return { skipped: true, reason: "Customer not found", eventId };
 }
 
 module.exports = {
