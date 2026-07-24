@@ -739,11 +739,13 @@ async function hasRecentOrderStatusNotification({
   orderId,
   orderNumber,
   status,
+  attemptCount = null,
   minutes = ORDER_STATUS_DEDUPE_WINDOW_MINUTES
 }) {
   const normalizedOrderId = parseLegacyNumericId(orderId);
   const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
   const normalizedStatus = normalizeManualStatus(status);
+  const normalizedAttemptCount = Math.max(0, Number(attemptCount || 0) || 0);
 
   if (!shopDomain || !normalizedStatus || (!normalizedOrderId && !normalizedOrderNumber)) {
     return false;
@@ -758,6 +760,10 @@ async function hasRecentOrderStatusNotification({
       AND created_at >= NOW() - ($5::int * INTERVAL '1 minute')
       AND COALESCE(data->>'status', '') = $4
       AND (
+        $6::int <= 0
+        OR NULLIF(regexp_replace(COALESCE(data->>'attemptCount', ''), '\\D', '', 'g'), '')::int = $6::int
+      )
+      AND (
         ($2::bigint IS NOT NULL AND NULLIF(regexp_replace(COALESCE(data->>'orderId', ''), '\\D', '', 'g'), '')::bigint = $2::bigint)
         OR ($3 <> '' AND regexp_replace(COALESCE(data->>'orderNumber', ''), '\\D', '', 'g') = $3)
       )
@@ -768,17 +774,19 @@ async function hasRecentOrderStatusNotification({
       normalizedOrderId || null,
       normalizedOrderNumber,
       normalizedStatus,
-      Math.max(1, Number(minutes) || ORDER_STATUS_DEDUPE_WINDOW_MINUTES)
+      Math.max(1, Number(minutes) || ORDER_STATUS_DEDUPE_WINDOW_MINUTES),
+      normalizedAttemptCount
     ]
   );
 
   return result.rowCount > 0;
 }
 
-async function withOrderStatusNotificationLock({ shopDomain, orderId, orderNumber, status }, callback) {
+async function withOrderStatusNotificationLock({ shopDomain, orderId, orderNumber, status, attemptCount = null }, callback) {
   const normalizedOrderId = parseLegacyNumericId(orderId);
   const normalizedOrderNumber = normalizeOrderNumber(orderNumber);
   const normalizedStatus = normalizeManualStatus(status);
+  const normalizedAttemptCount = Math.max(0, Number(attemptCount || 0) || 0);
   const orderReference = normalizedOrderId || normalizedOrderNumber;
   if (
     !shopDomain ||
@@ -789,7 +797,11 @@ async function withOrderStatusNotificationLock({ shopDomain, orderId, orderNumbe
     return callback();
   }
 
-  const lockKey = `order-status:${shopDomain}:${orderReference}:${normalizedStatus}`;
+  const attemptKey =
+    normalizedStatus === "order_in_transit" && normalizedAttemptCount > 0
+      ? `:${normalizedAttemptCount}`
+      : "";
+  const lockKey = `order-status:${shopDomain}:${orderReference}:${normalizedStatus}${attemptKey}`;
   const client = await pool.connect();
   try {
     await client.query("SELECT pg_advisory_lock(hashtext($1))", [lockKey]);
@@ -1377,11 +1389,16 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     fallbackTitle: template.title,
     fallbackMessage: template.message
   });
+  const webhookAttemptCount = Math.max(
+    0,
+    Number(payloadWithSettings?.attemptCount ?? payloadWithSettings?.attempt_count ?? payloadWithSettings?.attempt ?? 0) || 0
+  );
 
   const data = {
     orderId,
     orderNumber: effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "",
     status: templateCode,
+    attemptCount: webhookAttemptCount,
     statusLabel: copy.statusLabel,
     productName: copy.productsInline || "",
     productNames: copy.productNames || [],
@@ -1395,7 +1412,7 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
     effectivePayload.order_number || context.orderNumber || existingMap?.order_number || "";
   const customerEmail = String(effectivePayload.customer?.email || "").trim();
   const sendResult = await withOrderStatusNotificationLock(
-    { shopDomain, orderId, orderNumber: effectiveOrderNumber, status: templateCode },
+    { shopDomain, orderId, orderNumber: effectiveOrderNumber, status: templateCode, attemptCount: webhookAttemptCount },
     async () => {
       const duplicated =
         DEDUPED_ORDER_STATUS_CODES.has(templateCode) &&
@@ -1403,7 +1420,8 @@ async function processOrderWebhook({ topic, shopDomain, payload, webhookId }) {
           shopDomain,
           orderId,
           orderNumber: effectiveOrderNumber,
-          status: templateCode
+          status: templateCode,
+          attemptCount: webhookAttemptCount
         }));
       if (duplicated) {
         return { sent: 0, failed: 0, total: 0, deduplicated: true, reason: "Duplicate recent order status" };
@@ -1548,7 +1566,7 @@ async function sendManualOrderStatus({
   });
 
   return withOrderStatusNotificationLock(
-    { shopDomain, orderId, orderNumber, status: templateCode },
+    { shopDomain, orderId, orderNumber, status: templateCode, attemptCount },
     async () => {
       const duplicated =
         DEDUPED_ORDER_STATUS_CODES.has(templateCode) &&
@@ -1556,7 +1574,8 @@ async function sendManualOrderStatus({
           shopDomain,
           orderId,
           orderNumber,
-          status: templateCode
+          status: templateCode,
+          attemptCount
         }));
       if (duplicated) {
         return { sent: 0, failed: 0, total: 0, deduplicated: true, reason: "Duplicate recent order status" };
