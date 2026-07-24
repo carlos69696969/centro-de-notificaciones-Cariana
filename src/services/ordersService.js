@@ -138,20 +138,19 @@ function resolveTemplateCodeFromOrder(topic, payload, existingMap) {
       return "order_delivered";
     }
     if (payload.fulfillment_status === "fulfilled") {
-      return "order_in_transit";
+      return "order_shipped";
     }
 
-    // Local delivery can stay with null fulfillment_status when merchant marks
-    // "ready for delivery". In that case, the second update after "preparing"
-    // should move to "in transit".
+    // Shopify can mark local delivery as prepared before the courier actually
+    // starts the route. Keep "in transit" reserved for the courier portal.
     if (hasLocalDeliverySignal(payload) && existingMap?.last_status === "order_preparing") {
-      return "order_in_transit";
+      return "order_preparing";
     }
 
     return "order_preparing";
   }
   if (topic === LOCAL_DELIVERY_READY_TOPIC) {
-    return "order_in_transit";
+    return "order_preparing";
   }
   return null;
 }
