@@ -478,13 +478,12 @@ function renderItemsHtml(items) {
     .join("");
 }
 
-function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread = 0, homeUrl = "/" }) {
+function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread = 0 }) {
   const safeShop = JSON.stringify(shop || "");
   const safeCustomerId = JSON.stringify(customerId || "");
   const safeInitialHistory = JSON.stringify(initialHistory || []);
   const safeInitialUnread = Number(initialUnread) || 0;
   const safeDisplayTimeZone = JSON.stringify(DISPLAY_TIME_ZONE);
-  const safeHomeUrl = escapeHtml(homeUrl || "/");
   const serverSummary = `Total: ${initialHistory.length} | No leidas: ${safeInitialUnread}`;
   const serverItems = renderItemsHtml(initialHistory);
 
@@ -517,33 +516,6 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
       h1 {
         font-size: 22px;
         margin: 0 0 4px;
-      }
-      .home-action {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        min-height: 30px;
-        margin: 0 0 6px;
-        padding: 4px 7px;
-        border-radius: 8px;
-        background: var(--brand);
-        color: #fff;
-        font-size: 14px;
-        font-weight: 700;
-        line-height: 1;
-        text-decoration: none;
-        box-sizing: border-box;
-      }
-      .home-action:active {
-        transform: translateY(1px);
-      }
-      .home-action-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 32px;
-        line-height: 0.72;
-        transform: translateY(-5px);
       }
       .muted {
         color: var(--muted);
@@ -609,10 +581,6 @@ function renderShellHtml({ shop, customerId, initialHistory = [], initialUnread 
   <body>
     <div class="wrap">
       <h1>Notificaciones</h1>
-      <a class="home-action" href="${safeHomeUrl}" aria-label="Ir al inicio de la tienda">
-        <span class="home-action-icon" aria-hidden="true">←</span>
-        <span>Inicio</span>
-      </a>
       <div class="list" id="list">${serverItems}</div>
     </div>
 
@@ -1842,8 +1810,7 @@ router.get("/", requireValidProxy, async (req, res) => {
       shop: shopDomain,
       customerId: shopifyCustomerId,
       initialHistory: initial.history,
-      initialUnread: initial.unread,
-      homeUrl: toAbsoluteStorefrontUrl(shopDomain, "/")
+      initialUnread: initial.unread
     })
   );
 });
