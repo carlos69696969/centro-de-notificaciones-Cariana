@@ -1153,7 +1153,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     a.href = url;
     a.id = "cariana-noti-bell";
     a.setAttribute("aria-label", "Notificaciones");
-    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-left:6px;margin-right:6px;text-decoration:none;color:inherit;flex:0 0 auto;vertical-align:middle;";
+    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:32px;height:36px;margin-left:0;margin-right:6px;text-decoration:none;color:inherit;flex:0 0 auto;vertical-align:middle;";
 
     var icon = document.createElement("span");
     icon.textContent = "\uD83D\uDD14";
@@ -1213,10 +1213,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       'header summary[aria-label*="buscar" i]',
       "header .header__icon--search",
       "header .search-modal__button",
-      "header .search__button",
-      "header .icon-search",
-      "header svg.icon-search",
-      'header [class*="search" i]'
+      "header .search__button"
     ];
 
     for (var i = 0; i < selectors.length; i++) {
@@ -1234,10 +1231,11 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     var search = findSearchTarget();
     if (!search || !search.parentElement) return false;
 
-    if (bell.parentElement !== search.parentElement || bell.previousSibling !== search) {
-      search.parentElement.insertBefore(bell, search.nextSibling);
+    if (bell.parentElement === search.parentElement && bell.nextElementSibling === search) {
+      return true;
     }
 
+    search.parentElement.insertBefore(bell, search);
     return true;
   }
 
