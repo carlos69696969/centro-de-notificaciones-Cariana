@@ -1153,7 +1153,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     a.href = url;
     a.id = "cariana-noti-bell";
     a.setAttribute("aria-label", "Notificaciones");
-    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:32px;height:36px;margin-left:0;margin-right:6px;text-decoration:none;color:inherit;flex:0 0 auto;vertical-align:middle;";
+    a.style.cssText = "position:absolute;display:inline-flex;align-items:center;justify-content:center;width:32px;height:36px;margin:0;text-decoration:none;color:inherit;flex:0 0 auto;vertical-align:middle;z-index:30;";
 
     var icon = document.createElement("span");
     icon.textContent = "\uD83D\uDD14";
@@ -1229,13 +1229,31 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
 
   function placeBellNearSearch(bell) {
     var search = findSearchTarget();
-    if (!search || !search.parentElement) return false;
+    if (!search || !search.parentElement || !search.getBoundingClientRect) return false;
 
-    if (bell.parentElement === search.parentElement && bell.nextElementSibling === search) {
-      return true;
+    var header = search.closest ? search.closest("header") : null;
+    var anchor = header || search.parentElement;
+    if (!anchor || !anchor.getBoundingClientRect) return false;
+
+    var anchorStyle = window.getComputedStyle ? window.getComputedStyle(anchor) : null;
+    if (anchorStyle && anchorStyle.position === "static") {
+      anchor.style.position = "relative";
     }
 
-    search.parentElement.insertBefore(bell, search);
+    if (bell.parentElement !== anchor) {
+      anchor.appendChild(bell);
+    }
+
+    var searchRect = search.getBoundingClientRect();
+    var anchorRect = anchor.getBoundingClientRect();
+    var left = Math.max(4, Math.round(searchRect.left - anchorRect.left - 44));
+    var top = Math.round(searchRect.top - anchorRect.top + searchRect.height / 2);
+
+    bell.style.setProperty("left", left + "px", "important");
+    bell.style.setProperty("top", top + "px", "important");
+    bell.style.setProperty("transform", "translateY(-50%)", "important");
+    bell.style.setProperty("margin", "0", "important");
+
     return true;
   }
 
