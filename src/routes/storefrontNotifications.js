@@ -1135,7 +1135,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     badge.style.setProperty("height", "18px", "important");
     badge.style.setProperty("padding", "0 4px", "important");
     badge.style.setProperty("border-radius", "999px", "important");
-    badge.style.setProperty("background", "#ef4444", "important");
+    badge.style.setProperty("background", "#000000", "important");
     badge.style.setProperty("color", "#ffffff", "important");
     badge.style.setProperty("font-size", "11px", "important");
     badge.style.setProperty("font-family", "Arial, sans-serif", "important");
@@ -1153,11 +1153,11 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     a.href = url;
     a.id = "cariana-noti-bell";
     a.setAttribute("aria-label", "Notificaciones");
-    a.style.cssText = "position:absolute;display:inline-flex;align-items:center;justify-content:center;width:32px;height:36px;margin:0;text-decoration:none;color:inherit;flex:0 0 auto;vertical-align:middle;z-index:30;";
+    a.style.cssText = "position:absolute;display:inline-flex;align-items:center;justify-content:center;width:32px;height:36px;margin:0;text-decoration:none;color:#000000;flex:0 0 auto;vertical-align:middle;z-index:30;";
 
     var icon = document.createElement("span");
-    icon.textContent = "\uD83D\uDD14";
-    icon.style.cssText = "font-size:22px;line-height:1;display:inline-block;";
+    icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" style="width:23px;height:23px;display:block;" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
+    icon.style.cssText = "line-height:1;display:inline-flex;color:#000000;";
     a.appendChild(icon);
 
     updateBadge(unread);
