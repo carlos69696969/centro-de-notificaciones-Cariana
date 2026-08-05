@@ -1153,7 +1153,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     a.href = url;
     a.id = "cariana-noti-bell";
     a.setAttribute("aria-label", "Notificaciones");
-    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-left:10px;text-decoration:none;color:inherit;flex:0 0 auto;";
+    a.style.cssText = "position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;margin-left:6px;margin-right:6px;text-decoration:none;color:inherit;flex:0 0 auto;vertical-align:middle;";
 
     var icon = document.createElement("span");
     icon.textContent = "\uD83D\uDD14";
@@ -1184,6 +1184,63 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     return null;
   }
 
+  function getVisibleHeaderIcon(node) {
+    if (!node || !node.closest) return null;
+    var header = node.closest("header");
+    if (!header) return null;
+
+    var icon = node.closest('a, button, summary, [role="button"], .header__icon');
+    if (!icon || !header.contains(icon)) return null;
+
+    if (icon.id === "cariana-noti-bell") return null;
+    if (icon.closest && icon.closest("#cariana-noti-bell")) return null;
+
+    if (icon.getBoundingClientRect) {
+      var rect = icon.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) return null;
+    }
+
+    return icon;
+  }
+
+  function findSearchTarget() {
+    var selectors = [
+      'header a[href*="/search"]',
+      'header a[href*="search"]',
+      'header button[aria-label*="search" i]',
+      'header button[aria-label*="buscar" i]',
+      'header summary[aria-label*="search" i]',
+      'header summary[aria-label*="buscar" i]',
+      "header .header__icon--search",
+      "header .search-modal__button",
+      "header .search__button",
+      "header .icon-search",
+      "header svg.icon-search",
+      'header [class*="search" i]'
+    ];
+
+    for (var i = 0; i < selectors.length; i++) {
+      var nodes = document.querySelectorAll(selectors[i]);
+      for (var j = 0; j < nodes.length; j++) {
+        var icon = getVisibleHeaderIcon(nodes[j]);
+        if (icon) return icon;
+      }
+    }
+
+    return null;
+  }
+
+  function placeBellNearSearch(bell) {
+    var search = findSearchTarget();
+    if (!search || !search.parentElement) return false;
+
+    if (bell.parentElement !== search.parentElement || bell.previousSibling !== search) {
+      search.parentElement.insertBefore(bell, search.nextSibling);
+    }
+
+    return true;
+  }
+
   function removeBellElement() {
     var nodes = document.querySelectorAll("#cariana-noti-bell, #cariana-noti-badge");
     for (var i = 0; i < nodes.length; i++) {
@@ -1206,6 +1263,10 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     var cart = document.querySelector('a[href*="/cart"], .header__icon--cart, .icon-cart');
 
     if (existing) {
+      if (placeBellNearSearch(existing)) {
+        return true;
+      }
+
       if (cart && cart.parentElement && existing.parentElement !== cart.parentElement) {
         cart.parentElement.insertBefore(existing, cart);
       } else if (!cart && existing.parentElement !== target) {
@@ -1215,6 +1276,10 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     }
 
     var bell = createBellElement();
+    if (placeBellNearSearch(bell)) {
+      return true;
+    }
+
     if (cart && cart.parentElement) {
       cart.parentElement.insertBefore(bell, cart);
     } else {
