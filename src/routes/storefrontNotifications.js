@@ -1513,9 +1513,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       scheduleEnsure();
       closeBlankBellPanel();
       scheduleBlankTopBlockCleanup();
-      if (source && source.indexOf("add") !== -1) {
-        fetchCartAndTrack(source);
-      }
+      fetchCartAndTrack(source || "cart_change");
     }, 700);
   }
 
@@ -1567,7 +1565,6 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(snapshot) {
         if (!snapshot) return;
-        if (Number(snapshot.item_count || 0) < 1) return;
         sendCartEvent(snapshot, source);
       })
       .catch(function() {});

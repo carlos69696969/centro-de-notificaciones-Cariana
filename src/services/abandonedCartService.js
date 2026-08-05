@@ -167,6 +167,16 @@ function buildCartEventPayload(payload) {
   };
 }
 
+function hasActiveCartItems(cartEvent) {
+  const itemCount = Number(cartEvent?.item_count || 0) || 0;
+  if (itemCount > 0) {
+    return true;
+  }
+
+  const items = Array.isArray(cartEvent?.items) ? cartEvent.items : [];
+  return items.some((item) => Number(item?.quantity || 0) > 0);
+}
+
 async function recordAbandonedCartActivity({
   shopDomain,
   cartToken,
@@ -197,6 +207,41 @@ async function recordAbandonedCartActivity({
   }
 
   const effectiveEmail = String(email || cartEvent.email || "").trim().toLowerCase() || null;
+
+  if (!hasActiveCartItems(cartEvent)) {
+    const closeResult = await pool.query(
+      `
+      UPDATE checkout_events
+      SET
+        completed_at = NOW(),
+        abandoned_stage = NULL,
+        payload = $6::jsonb
+      WHERE shop_domain = $1
+        AND completed_at IS NULL
+        AND (
+          ($2 <> '' AND COALESCE(checkout_id, '') = $2)
+          OR ($3 <> '' AND COALESCE(cart_token, '') = $3)
+          OR ($4::bigint > 0 AND shopify_customer_id = $4)
+          OR ($5 <> '' AND LOWER(COALESCE(email, '')) = $5)
+        )
+      `,
+      [
+        normalizedShopDomain,
+        syntheticCheckoutId,
+        normalizedToken,
+        normalizedCustomerId,
+        effectiveEmail || "",
+        JSON.stringify(cartEvent)
+      ]
+    );
+
+    return {
+      tracked: true,
+      cleared: true,
+      closed: closeResult.rowCount || 0,
+      checkoutId: syntheticCheckoutId
+    };
+  }
 
   await pool.query(
     `
