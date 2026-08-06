@@ -173,8 +173,21 @@ function hasActiveCartItems(cartEvent) {
     return true;
   }
 
-  const items = Array.isArray(cartEvent?.items) ? cartEvent.items : [];
-  return items.some((item) => Number(item?.quantity || 0) > 0);
+  const items = [
+    ...(Array.isArray(cartEvent?.items) ? cartEvent.items : []),
+    ...(Array.isArray(cartEvent?.line_items) ? cartEvent.line_items : []),
+    ...(Array.isArray(cartEvent?.lineItems) ? cartEvent.lineItems : [])
+  ];
+
+  return items.some((item) => {
+    if (!item || typeof item !== "object") {
+      return false;
+    }
+    if (item.quantity == null) {
+      return true;
+    }
+    return Number(item.quantity || 0) > 0;
+  });
 }
 
 async function recordAbandonedCartActivity({
@@ -196,17 +209,18 @@ async function recordAbandonedCartActivity({
   });
   const normalizedToken = String(cartToken || cartEvent.token || "").trim();
   const normalizedCustomerId = Number(shopifyCustomerId || 0);
+  const effectiveEmail = String(email || cartEvent.email || "").trim().toLowerCase() || null;
   const syntheticCheckoutId = normalizedToken
     ? `cart:${normalizedToken}`
     : normalizedCustomerId > 0
       ? `cart:customer:${normalizedCustomerId}`
+      : effectiveEmail
+        ? `cart:email:${effectiveEmail}`
       : "";
 
   if (!syntheticCheckoutId) {
     return { tracked: false, reason: "missing_cart_identity" };
   }
-
-  const effectiveEmail = String(email || cartEvent.email || "").trim().toLowerCase() || null;
 
   if (!hasActiveCartItems(cartEvent)) {
     const closeResult = await pool.query(
@@ -419,6 +433,21 @@ async function runAbandonedCartSweep() {
   const settingsCache = new Map();
 
   for (const row of rows.rows) {
+    if (!hasActiveCartItems(row.payload || {})) {
+      await pool.query(
+        `
+        UPDATE checkout_events
+        SET
+          completed_at = NOW(),
+          abandoned_stage = NULL
+        WHERE id = $1
+          AND completed_at IS NULL
+        `,
+        [row.id]
+      );
+      continue;
+    }
+
     if (!settingsCache.has(row.shop_domain)) {
       const settings = await getAbandonedCartSettings(row.shop_domain);
       settingsCache.set(row.shop_domain, settings);

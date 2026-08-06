@@ -1009,6 +1009,7 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   var ensureTimer = 0;
   var blankPanelCleanupTimer = 0;
   var hideStorefrontBell = false;
+  var cartIdentityCacheKey = "cariana_cart_identity_v1:" + shopCacheKey;
 
   function readBadgeCache() {
     try {
@@ -1034,6 +1035,44 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
           customerHint: customerHint || ""
         })
       );
+    } catch (_err) {}
+  }
+
+  function readCartIdentityCache() {
+    try {
+      if (!window.localStorage) return { token: "", email: "", customerId: "" };
+      var raw = window.localStorage.getItem(cartIdentityCacheKey);
+      if (!raw) return { token: "", email: "", customerId: "" };
+      var parsed = JSON.parse(raw);
+      return {
+        token: String(parsed && parsed.token || "").trim(),
+        email: String(parsed && parsed.email || "").trim().toLowerCase(),
+        customerId: normalizeCustomerId(parsed && parsed.customerId)
+      };
+    } catch (_err) {
+      return { token: "", email: "", customerId: "" };
+    }
+  }
+
+  function writeCartIdentityCache(identity) {
+    try {
+      if (!window.localStorage) return;
+      window.localStorage.setItem(
+        cartIdentityCacheKey,
+        JSON.stringify({
+          token: String(identity && identity.token || "").trim(),
+          email: String(identity && identity.email || "").trim().toLowerCase(),
+          customerId: normalizeCustomerId(identity && identity.customerId)
+        })
+      );
+    } catch (_err) {}
+  }
+
+  function clearCartIdentityCache() {
+    try {
+      if (window.localStorage) {
+        window.localStorage.removeItem(cartIdentityCacheKey);
+      }
     } catch (_err) {}
   }
 
@@ -1354,6 +1393,15 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     return /\\/cart\\/(add|change|update|clear)(\\.js)?(\\?|$)/i.test(requestUrl);
   }
 
+  function isCartPageUrl(value) {
+    try {
+      var parsed = new URL(String(value || window.location.href), window.location.origin);
+      return /^\\/cart\\/?$/i.test(parsed.pathname);
+    } catch (_err) {
+      return /^\\/cart\\/?$/i.test(String(window.location.pathname || ""));
+    }
+  }
+
   function hideElement(node) {
     if (!node || node === document.body || node === document.documentElement) return;
     node.setAttribute("hidden", "hidden");
@@ -1530,20 +1578,69 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     return signature;
   }
 
+  function hasActiveCartItems(snapshot) {
+    var itemCount = Number(snapshot && snapshot.item_count || 0);
+    if (itemCount > 0) return true;
+
+    var items = Array.isArray(snapshot && snapshot.items) ? snapshot.items : [];
+    for (var i = 0; i < items.length; i++) {
+      if (Number(items[i] && items[i].quantity || 0) > 0) return true;
+    }
+
+    return false;
+  }
+
+  function prepareCartSnapshotForTracking(snapshot) {
+    var source = snapshot && typeof snapshot === "object" ? snapshot : {};
+    var prepared = Object.assign({}, source);
+    var cached = readCartIdentityCache();
+    var active = hasActiveCartItems(prepared);
+
+    if (!prepared.token && !prepared.cart_token && !active && cached.token) {
+      prepared.token = cached.token;
+    }
+
+    if (!prepared.email && !prepared.customer_email && !active && cached.email) {
+      prepared.email = cached.email;
+    }
+
+    return {
+      snapshot: prepared,
+      cached,
+      active
+    };
+  }
+
   function sendCartEvent(snapshot, source) {
     ensureCustomerHint();
+    var preparedCart = prepareCartSnapshotForTracking(snapshot || {});
+    var normalizedSnapshot = preparedCart.snapshot;
+    var effectiveCustomerId = customerHint || preparedCart.cached.customerId || "";
+    var effectiveEmail = String(
+      normalizedSnapshot && (normalizedSnapshot.email || normalizedSnapshot.customer_email) || preparedCart.cached.email || ""
+    ).trim().toLowerCase();
+    var effectiveCartToken = String(normalizedSnapshot && (normalizedSnapshot.token || normalizedSnapshot.cart_token) || "").trim();
+
     var eventBody = {
       source: source || "storefront_add_to_cart",
-      customerId: customerHint || "",
-      cartToken: String(snapshot && (snapshot.token || snapshot.cart_token) || ""),
-      email: String(snapshot && (snapshot.email || snapshot.customer_email) || ""),
-      cart: snapshot || {}
+      customerId: effectiveCustomerId,
+      cartToken: effectiveCartToken,
+      email: effectiveEmail,
+      cart: normalizedSnapshot || {}
     };
-    if (!eventBody.cartToken && !eventBody.customerId) {
+    if (!eventBody.cartToken && !eventBody.customerId && !eventBody.email) {
       return;
     }
 
-    var hash = hashCartSnapshot(snapshot || {});
+    if (preparedCart.active) {
+      writeCartIdentityCache({
+        token: eventBody.cartToken,
+        email: eventBody.email,
+        customerId: eventBody.customerId
+      });
+    }
+
+    var hash = hashCartSnapshot(normalizedSnapshot || {});
     var now = Date.now();
     if (hash && hash === lastCartEventHash && now - lastCartEventAt < 15000) {
       return;
@@ -1557,7 +1654,13 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(eventBody),
       keepalive: true
-    }).catch(function() {});
+    })
+      .then(function(response) {
+        if (response && response.ok && !preparedCart.active) {
+          clearCartIdentityCache();
+        }
+      })
+      .catch(function() {});
   }
 
   function fetchCartAndTrack(source) {
@@ -1573,15 +1676,31 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
   function hookAddToCartActions() {
     document.addEventListener("submit", function(event) {
       var form = event && event.target;
-      if (!form || !form.action || form.action.indexOf("/cart/add") === -1) return;
-      setTimeout(function() { fetchCartAndTrack("form_submit"); }, 850);
+      if (!form || !form.action) return;
+      if (form.action.indexOf("/cart/add") !== -1) {
+        setTimeout(function() { fetchCartAndTrack("form_submit"); }, 850);
+        return;
+      }
+      if (isCartMutationUrl(form.action) || /\\/cart(\\?|$)/i.test(String(form.action || ""))) {
+        setTimeout(function() { fetchCartAndTrack("cart_form_submit"); }, 1200);
+        setTimeout(function() { fetchCartAndTrack("cart_form_submit_late"); }, 2200);
+      }
     }, true);
 
     document.addEventListener("click", function(event) {
       if (!event || !event.target || !event.target.closest) return;
       var addButton = event.target.closest('button[name="add"],input[name="add"],button[data-add-to-cart],button[data-action="add-to-cart"]');
-      if (!addButton) return;
-      setTimeout(function() { fetchCartAndTrack("button_click"); }, 900);
+      if (addButton) {
+        setTimeout(function() { fetchCartAndTrack("button_click"); }, 900);
+        return;
+      }
+
+      var cartMutationLink = event.target.closest('a[href*="/cart/change"],a[href*="/cart/update"],a[href*="/cart/clear"]');
+      var cartMutationButton = event.target.closest('button[name="updates[]"],button[name="update"],button[data-cart-remove],button[data-cart-update],button[aria-label*="eliminar" i],button[aria-label*="remove" i]');
+      if (!cartMutationLink && !cartMutationButton) return;
+
+      setTimeout(function() { fetchCartAndTrack("cart_remove_click"); }, 900);
+      setTimeout(function() { fetchCartAndTrack("cart_remove_click_late"); }, 1800);
     }, true);
 
     if (window.fetch) {
@@ -1665,6 +1784,10 @@ router.get("/widget.js", requireValidProxy, async (req, res, next) => {
     ensureCustomerHint();
     runEnsure();
     hookAddToCartActions();
+    if (isCartPageUrl()) {
+      setTimeout(function() { fetchCartAndTrack("cart_page_view"); }, 350);
+      setTimeout(function() { fetchCartAndTrack("cart_page_view_late"); }, 1400);
+    }
     watchDomChanges();
     watchNavigation();
     refreshBadge();
