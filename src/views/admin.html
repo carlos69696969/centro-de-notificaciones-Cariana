@@ -143,6 +143,25 @@
         font-size: 14px;
         white-space: nowrap;
       }
+      .field-stack {
+        display: grid;
+        gap: 6px;
+      }
+      .field-label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .campaign-schedule-grid {
+        display: grid;
+        grid-template-columns: minmax(160px, 1fr) 78px 78px 86px auto auto;
+        gap: 8px;
+        align-items: end;
+      }
+      .campaign-schedule-grid input,
+      .campaign-schedule-grid select {
+        min-height: 42px;
+      }
       .duration-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -224,7 +243,8 @@
       }
       @media (max-width: 900px) {
         .grid,
-        .row {
+        .row,
+        .campaign-schedule-grid {
           grid-template-columns: 1fr;
         }
         .duration-grid {
@@ -453,6 +473,36 @@
         return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
       }
 
+      function toScheduleParts(isoValue) {
+        const value = toDateTimeLocal(isoValue);
+        if (!value) {
+          return { date: "", hour: "", minute: "", meridiem: "AM" };
+        }
+        const [datePart, timePart = ""] = value.split("T");
+        const [hourPart = "", minutePart = ""] = timePart.split(":");
+        const hour24 = Number(hourPart);
+        const meridiem = hour24 >= 12 ? "PM" : "AM";
+        const hour12 = hour24 % 12 || 12;
+        return {
+          date: datePart || "",
+          hour: String(hour12),
+          minute: String(Number(minutePart || 0)).padStart(2, "0"),
+          meridiem
+        };
+      }
+
+      function buildScheduleIso(datePart, hourPart, minutePart, meridiemPart) {
+        const dateValue = String(datePart || "").trim();
+        const hourValue = Number(hourPart || 0);
+        const minuteValue = Number(minutePart || 0);
+        const meridiem = String(meridiemPart || "AM").toUpperCase() === "PM" ? "PM" : "AM";
+        if (!dateValue || !Number.isFinite(hourValue) || !Number.isFinite(minuteValue)) return null;
+        if (hourValue < 1 || hourValue > 12 || minuteValue < 0 || minuteValue > 59) return null;
+        const hour24 = meridiem === "PM" ? (hourValue % 12) + 12 : hourValue % 12;
+        const pad = (n) => String(n).padStart(2, "0");
+        return new Date(`${dateValue}T${pad(hour24)}:${pad(minuteValue)}`).toISOString();
+      }
+
       function getCampaignStatusMeta(status) {
         const map = {
           scheduled: { label: "Campaña activa", cls: "active", button: "Campaña activa" },
@@ -494,6 +544,7 @@
         const createDisabled = campaignId > 0 ? "disabled" : "";
         const createLabel = campaignId > 0 ? meta.button : "Crear campaña";
         const repeatConfig = getRepeatConfig(campaign?.audience_filters);
+        const scheduleParts = toScheduleParts(campaign?.scheduled_at);
 
         block.innerHTML = `
           <div class="campaign-top">
@@ -502,17 +553,34 @@
             <button class="btn-danger btn-inline campaign-delete-btn">${deleteLabel}</button>
           </div>
           <div class="row">
-            <input class="c-name" placeholder="Nombre de campaña (opcional)" value="${String(campaign?.name || "").replace(/"/g, "&quot;")}" />
             <select class="c-audience">${createAudienceOptions(campaign?.audience_type || "all_users")}</select>
           </div>
           <div class="row">
-            <input class="c-title" placeholder="Titulo (opcional)" value="${String(campaign?.title || "").replace(/"/g, "&quot;")}" />
+            <input class="c-title" placeholder="Titulo (opcional)" value="${String(campaign?.title || campaign?.name || "").replace(/"/g, "&quot;")}" />
             <input class="c-deeplink" placeholder="Deep link (opcional)" value="${String(campaign?.deep_link || "").replace(/"/g, "&quot;")}" />
           </div>
           <textarea class="c-message" rows="3" placeholder="Mensaje de la notificacion">${String(campaign?.message || "")}</textarea>
           <div class="row">
-            <div class="row" style="grid-template-columns: 1fr auto auto; gap: 8px;">
-              <input class="c-schedule" type="datetime-local" value="${toDateTimeLocal(campaign?.scheduled_at)}" />
+            <div class="campaign-schedule-grid">
+              <label class="field-stack">
+                <span class="field-label">Fecha de envio</span>
+                <input class="c-schedule-date" type="date" value="${scheduleParts.date}" />
+              </label>
+              <label class="field-stack">
+                <span class="field-label">Hora</span>
+                <input class="c-schedule-hour" type="number" min="1" max="12" step="1" placeholder="12" value="${scheduleParts.hour}" />
+              </label>
+              <label class="field-stack">
+                <span class="field-label">Min</span>
+                <input class="c-schedule-minute" type="number" min="0" max="59" step="1" placeholder="00" value="${scheduleParts.minute}" />
+              </label>
+              <label class="field-stack">
+                <span class="field-label">AM/PM</span>
+                <select class="c-schedule-meridiem" aria-label="AM o PM">
+                  <option value="AM" ${scheduleParts.meridiem === "AM" ? "selected" : ""}>AM</option>
+                  <option value="PM" ${scheduleParts.meridiem === "PM" ? "selected" : ""}>PM</option>
+                </select>
+              </label>
               <label class="inline-check">
                 <input class="c-recurring" type="checkbox" ${campaign?.audience_filters?.recurring ? "checked" : ""} />
                 Repetir
@@ -561,11 +629,17 @@
       }
 
       function getBlockPayload(block) {
-        const schedule = block.querySelector(".c-schedule")?.value || "";
+        const schedule = buildScheduleIso(
+          block.querySelector(".c-schedule-date")?.value,
+          block.querySelector(".c-schedule-hour")?.value,
+          block.querySelector(".c-schedule-minute")?.value,
+          block.querySelector(".c-schedule-meridiem")?.value
+        );
+        const title = block.querySelector(".c-title")?.value || "";
         return {
           shopDomain: cfg().shopDomain,
-          name: block.querySelector(".c-name")?.value || "",
-          title: block.querySelector(".c-title")?.value || "",
+          name: title,
+          title,
           message: block.querySelector(".c-message")?.value || "",
           deepLink: block.querySelector(".c-deeplink")?.value || null,
           audienceType: block.querySelector(".c-audience")?.value || "all_users",
@@ -574,7 +648,7 @@
             repeatEveryValue: Number(block.querySelector(".c-repeat-value")?.value || 0),
             repeatEveryUnit: block.querySelector(".c-repeat-unit")?.value || "hours"
           },
-          scheduledAt: schedule ? new Date(schedule).toISOString() : null
+          scheduledAt: schedule
         };
       }
 
