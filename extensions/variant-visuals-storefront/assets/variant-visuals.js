@@ -12,6 +12,16 @@
     }
   }
 
+  function installStyles() {
+    if (document.getElementById("cariana-variant-visuals-style")) return;
+    var style = document.createElement("style");
+    style.id = "cariana-variant-visuals-style";
+    style.textContent =
+      '[data-cariana-variant-visuals-filtered="hidden"]{display:none!important;visibility:hidden!important;}' +
+      '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}';
+    document.head.appendChild(style);
+  }
+
   function normalize(value) {
     return String(value || "")
       .trim()
@@ -69,10 +79,35 @@
   }
 
   function mediaContainer(node) {
-    return (
-      node.closest(".product__media-item, .product-media-container, .thumbnail-list__item, .product__media-list > *, .slider__slide, li") ||
-      node
-    );
+    var container =
+      node.closest(
+        [
+          ".product__media-item",
+          ".product-media-container",
+          ".product-gallery__media",
+          ".media-gallery__item",
+          ".thumbnail-list__item",
+          ".product__media-list > *",
+          ".slider__slide",
+          "[data-product-media]",
+          "[data-media-id]",
+          "product-media",
+          "li"
+        ].join(", ")
+      ) || node;
+
+    var current = container;
+    while (current && current.parentElement && current.parentElement !== document.body) {
+      var parent = current.parentElement;
+      var parentText = [parent.tagName, parent.className || "", parent.id || ""].join(" ").toLowerCase();
+      var looksLikeMediaList = /media|gallery|slider|thumbnail|carousel|grid/.test(parentText);
+      var hasSiblingItems = parent.children && parent.children.length > 1;
+
+      if (looksLikeMediaList && hasSiblingItems) return current;
+      current = parent;
+    }
+
+    return container;
   }
 
   function matchingNodesForMedia(media) {
@@ -96,6 +131,8 @@
   }
 
   function applyFilter() {
+    installStyles();
+
     var config = parseJson("[data-cariana-variant-visuals-config]");
     var media = parseJson("[data-cariana-variant-visuals-media]") || [];
     if (!config || !media.length) return;
@@ -128,7 +165,13 @@
 
       var shouldShow = Boolean(allowed[itemId]);
       container.hidden = !shouldShow;
-      container.style.display = shouldShow ? "" : "none";
+      if (shouldShow) {
+        container.style.removeProperty("display");
+        container.style.removeProperty("visibility");
+      } else {
+        container.style.setProperty("display", "none", "important");
+        container.style.setProperty("visibility", "hidden", "important");
+      }
       container.setAttribute("data-cariana-variant-visuals-filtered", shouldShow ? "visible" : "hidden");
     });
   }
