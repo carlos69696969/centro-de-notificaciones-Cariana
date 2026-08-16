@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v28";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v29";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -44,6 +44,7 @@
       '[data-cariana-variant-visuals-filtered="hidden"]{display:none!important;visibility:hidden!important;}' +
       '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
       "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
+      '[data-cariana-variant-visuals-option-unavailable="true"]{opacity:.32!important;pointer-events:none!important;filter:grayscale(1);}' +
       ".cariana-variant-visuals-gallery{display:block!important;width:100%;min-height:var(--cariana-variant-visuals-min-height,0px);margin:0 0 24px;transition:opacity .16s ease;}" +
       ".cariana-variant-visuals-gallery[data-cariana-updating='true']{opacity:.98;}" +
       ".cariana-variant-visuals-gallery__track{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}" +
@@ -132,6 +133,191 @@
 
     var firstKey = Object.keys(groups)[0];
     return firstKey ? groups[firstKey] : null;
+  }
+
+  function variantOptionValue(variant, optionName) {
+    var normalizedName = normalize(optionName);
+    var selected = variant && variant.selectedOptions;
+    if (!selected || !selected.length) return "";
+
+    for (var index = 0; index < selected.length; index += 1) {
+      if (normalize(selected[index].name) === normalizedName) return String(selected[index].value || "").trim();
+    }
+
+    return "";
+  }
+
+  function variantMatchesSelectedOptions(variant, options, colorOptionName) {
+    var normalizedColorName = normalize(colorOptionName || "Color");
+    for (var optionName in options) {
+      if (!Object.prototype.hasOwnProperty.call(options, optionName)) continue;
+      if (optionName === normalizedColorName) continue;
+
+      var selectedValue = options[optionName];
+      if (!selectedValue) continue;
+
+      var variantValue = "";
+      var selected = variant.selectedOptions || [];
+      for (var index = 0; index < selected.length; index += 1) {
+        if (normalize(selected[index].name) === optionName) {
+          variantValue = selected[index].value;
+          break;
+        }
+      }
+
+      if (variantValue && normalize(variantValue) !== normalize(selectedValue)) return false;
+    }
+
+    return true;
+  }
+
+  function availableColorMap(config, variants, options) {
+    var map = {};
+    var colorOptionName = config.colorOptionName || "Color";
+
+    if (!variants || !variants.length) {
+      Object.keys(config.groups || {}).forEach(function (color) {
+        map[normalize(color)] = true;
+        if (config.groups[color].label) map[normalize(config.groups[color].label)] = true;
+      });
+      return map;
+    }
+
+    variants.forEach(function (variant) {
+      if (variant.available === false) return;
+      if (!variantMatchesSelectedOptions(variant, options, colorOptionName)) return;
+
+      var color = variantOptionValue(variant, colorOptionName);
+      if (color) map[normalize(color)] = true;
+    });
+
+    return map;
+  }
+
+  function optionControlValue(node) {
+    return String(node.value || node.getAttribute("data-variant-option") || node.textContent || "").trim();
+  }
+
+  function optionControlWrapper(node) {
+    if (!node) return null;
+    if (node.id) {
+      var label = document.querySelector('label[for="' + cssEscape(node.id) + '"]');
+      if (label) return label;
+    }
+    return (
+      node.closest("label") ||
+      node.closest(".variant-option__button-label") ||
+      node.closest(".variant-option__button") ||
+      node.closest(".swatch-input__label") ||
+      node.closest("[data-variant-option]") ||
+      node
+    );
+  }
+
+  function colorOptionControls(colorOptionName) {
+    var normalizedColorName = normalize(colorOptionName || "Color");
+    var controls = [];
+
+    document
+      .querySelectorAll(
+        [
+          'input[type="radio"][name^="options["]',
+          'input[type="radio"][data-option-name]',
+          "[data-variant-option]"
+        ].join(", ")
+      )
+      .forEach(function (node) {
+        var optionName = optionNameFromInput(node);
+        if (normalize(optionName) !== normalizedColorName) return;
+
+        controls.push({
+          node: node,
+          value: optionControlValue(node),
+          wrapper: optionControlWrapper(node)
+        });
+      });
+
+    document.querySelectorAll("fieldset.variant-option").forEach(function (fieldset) {
+      var legend = fieldset.querySelector("legend");
+      var optionName = legend && legend.childNodes[0] ? legend.childNodes[0].textContent : legend && legend.textContent;
+      if (normalize(optionName) !== normalizedColorName) return;
+
+      fieldset.querySelectorAll('input[type="radio"]').forEach(function (node) {
+        if (
+          controls.some(function (control) {
+            return control.node === node;
+          })
+        ) {
+          return;
+        }
+        controls.push({
+          node: node,
+          value: optionControlValue(node),
+          wrapper: optionControlWrapper(node)
+        });
+      });
+    });
+
+    return controls;
+  }
+
+  function setColorControlAvailable(control, available) {
+    if (!control || !control.node) return;
+
+    control.node.disabled = !available;
+    control.node.setAttribute("aria-disabled", available ? "false" : "true");
+    control.node.setAttribute("data-cariana-variant-visuals-option-unavailable", available ? "false" : "true");
+
+    if (control.wrapper) {
+      control.wrapper.setAttribute("aria-disabled", available ? "false" : "true");
+      control.wrapper.setAttribute("data-cariana-variant-visuals-option-unavailable", available ? "false" : "true");
+    }
+  }
+
+  function chooseColorControl(controls) {
+    var current = controls.find(function (control) {
+      return control.node.checked || control.node.getAttribute("aria-selected") === "true" || control.node.classList.contains("is-selected");
+    });
+    if (current && current.node.disabled !== true) return false;
+
+    var next = controls.find(function (control) {
+      return control.node.disabled !== true;
+    });
+    if (!next) return false;
+
+    if (next.node.tagName === "INPUT") {
+      next.node.checked = true;
+      next.node.dispatchEvent(new Event("input", { bubbles: true }));
+      next.node.dispatchEvent(new Event("change", { bubbles: true }));
+      if (next.wrapper && next.wrapper.click) next.wrapper.click();
+      return true;
+    }
+
+    if (next.node.click) {
+      next.node.click();
+      return true;
+    }
+
+    return false;
+  }
+
+  function applyVariantOptionAvailability(config, variants) {
+    if (!config || !variants || !variants.length) return false;
+
+    var options = selectedOptions();
+    var colorOptionName = config.colorOptionName || "Color";
+    var allowedColors = availableColorMap(config, variants, options);
+    var controls = colorOptionControls(colorOptionName);
+    if (!controls.length) return false;
+
+    controls.forEach(function (control) {
+      var colorKey = normalize(control.value);
+      var group = (config.groups || {})[control.value];
+      var labelKey = group && group.label ? normalize(group.label) : "";
+      setColorControlAvailable(control, Boolean(allowedColors[colorKey] || allowedColors[labelKey]));
+    });
+
+    return chooseColorControl(controls);
   }
 
   function sourceGallery() {
@@ -633,14 +819,17 @@
 
     var config = parseJson("[data-cariana-variant-visuals-config]");
     var media = parseJson("[data-cariana-variant-visuals-media]") || [];
+    var variants = parseJson("[data-cariana-variant-visuals-variants]") || [];
     if (!config || !media.length) {
       showDebug({
         loaded: true,
         version: SCRIPT_VERSION,
         hasConfig: Boolean(config),
         mediaCount: media.length,
+        variantCount: variants.length,
         configScriptNodes: document.querySelectorAll("[data-cariana-variant-visuals-config]").length,
         mediaScriptNodes: document.querySelectorAll("[data-cariana-variant-visuals-media]").length,
+        variantScriptNodes: document.querySelectorAll("[data-cariana-variant-visuals-variants]").length,
         productMediaNodes: document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length,
         slideshowSlides: document.querySelectorAll("slideshow-slide").length
       });
@@ -648,6 +837,7 @@
       return;
     }
 
+    var adjustedSelection = applyVariantOptionAvailability(config, variants);
     var group = findActiveGroup(config);
     if (!group || !group.mediaIds || !group.mediaIds.length) {
       showDebug({
@@ -655,9 +845,11 @@
         version: SCRIPT_VERSION,
         hasConfig: true,
         mediaCount: media.length,
+        variantCount: variants.length,
         groups: Object.keys(config.groups || {}),
         selectedOptions: selectedOptions(),
         selectedVariantId: selectedVariantId(),
+        adjustedSelection: adjustedSelection,
         groupFound: Boolean(group),
         productMediaNodes: document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length,
         slideshowSlides: document.querySelectorAll("slideshow-slide").length
@@ -690,11 +882,13 @@
       version: SCRIPT_VERSION,
       hasConfig: true,
       mediaCount: media.length,
+      variantCount: variants.length,
       groups: Object.keys(config.groups || {}),
       activeGroup: group.label || "",
       activeGroupMediaIds: group.mediaIds || [],
       selectedOptions: selectedOptions(),
       selectedVariantId: selectedVariantId(),
+      adjustedSelection: adjustedSelection,
       allowedNumericIds: Object.keys(allowed),
       replacementMediaCount: selectedReplacementMedia.length,
       replacementMedia: selectedReplacementMedia.map(function (item) {
