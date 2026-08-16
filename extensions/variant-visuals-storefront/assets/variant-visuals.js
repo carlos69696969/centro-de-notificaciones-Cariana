@@ -14,6 +14,23 @@
     }
   }
 
+  function debugEnabled() {
+    return /[?&]carianaVisualDebug=1\b/.test(window.location.search || "");
+  }
+
+  function showDebug(details) {
+    if (!debugEnabled() || !document.body) return;
+    var node = document.getElementById("cariana-variant-visuals-debug");
+    if (!node) {
+      node = document.createElement("pre");
+      node.id = "cariana-variant-visuals-debug";
+      node.style.cssText =
+        "position:fixed;z-index:2147483647;left:8px;bottom:8px;max-width:92vw;max-height:45vh;overflow:auto;background:#111827;color:#d1fae5;padding:10px;border-radius:6px;font:12px/1.35 monospace;white-space:pre-wrap;";
+      document.body.appendChild(node);
+    }
+    node.textContent = JSON.stringify(details, null, 2);
+  }
+
   function installStyles() {
     if (document.getElementById("cariana-variant-visuals-style")) return;
     var style = document.createElement("style");
@@ -267,7 +284,9 @@
       allowedSet[id] = true;
     });
 
+    var count = 0;
     document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").forEach(function (mediaNode) {
+      count += 1;
       var id = numericId(mediaNode.getAttribute("data-media-id"));
       var show = Boolean(allowedSet[id]);
       var item = closestMediaItem(mediaNode);
@@ -283,6 +302,7 @@
         item.style.setProperty("visibility", "hidden", "important");
       }
     });
+    return count;
   }
 
   function syncCarouselControls(allowedIds) {
@@ -328,17 +348,58 @@
 
     var config = parseJson("[data-cariana-variant-visuals-config]");
     var media = parseJson("[data-cariana-variant-visuals-media]") || [];
-    if (!config || !media.length) return;
+    if (!config || !media.length) {
+      showDebug({
+        loaded: true,
+        hasConfig: Boolean(config),
+        mediaCount: media.length,
+        configScriptNodes: document.querySelectorAll("[data-cariana-variant-visuals-config]").length,
+        mediaScriptNodes: document.querySelectorAll("[data-cariana-variant-visuals-media]").length,
+        productMediaNodes: document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length,
+        slideshowSlides: document.querySelectorAll("slideshow-slide").length
+      });
+      return;
+    }
 
     var group = findActiveGroup(config);
-    if (!group || !group.mediaIds || !group.mediaIds.length) return;
+    if (!group || !group.mediaIds || !group.mediaIds.length) {
+      showDebug({
+        loaded: true,
+        hasConfig: true,
+        mediaCount: media.length,
+        groups: Object.keys(config.groups || {}),
+        selectedOptions: selectedOptions(),
+        selectedVariantId: selectedVariantId(),
+        groupFound: Boolean(group),
+        productMediaNodes: document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length,
+        slideshowSlides: document.querySelectorAll("slideshow-slide").length
+      });
+      return;
+    }
 
     var allowed = {};
     group.mediaIds.forEach(function (id) {
       allowed[numericId(id)] = true;
     });
 
-    if (applyNativeGalleryFilter(allowed)) {
+    var productMediaNodeCount = document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length;
+    var result = applyNativeGalleryFilter(allowed);
+    showDebug({
+      loaded: true,
+      hasConfig: true,
+      mediaCount: media.length,
+      groups: Object.keys(config.groups || {}),
+      activeGroup: group.label || "",
+      activeGroupMediaIds: group.mediaIds || [],
+      selectedOptions: selectedOptions(),
+      selectedVariantId: selectedVariantId(),
+      allowedNumericIds: Object.keys(allowed),
+      productMediaNodes: productMediaNodeCount,
+      slideshowSlides: document.querySelectorAll("slideshow-slide").length,
+      nativeFilterApplied: Boolean(result)
+    });
+
+    if (result) {
       setOriginalGalleryHidden(false);
       return;
     }
