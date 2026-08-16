@@ -79,35 +79,21 @@
   }
 
   function mediaContainer(node) {
-    var container =
+    return (
       node.closest(
         [
           ".product__media-item",
-          ".product-media-container",
           ".product-gallery__media",
           ".media-gallery__item",
           ".thumbnail-list__item",
           ".product__media-list > *",
           ".slider__slide",
-          "[data-product-media]",
-          "[data-media-id]",
-          "product-media",
           "li"
         ].join(", ")
-      ) || node;
-
-    var current = container;
-    while (current && current.parentElement && current.parentElement !== document.body) {
-      var parent = current.parentElement;
-      var parentText = [parent.tagName, parent.className || "", parent.id || ""].join(" ").toLowerCase();
-      var looksLikeMediaList = /media|gallery|slider|thumbnail|carousel|grid/.test(parentText);
-      var hasSiblingItems = parent.children && parent.children.length > 1;
-
-      if (looksLikeMediaList && hasSiblingItems) return current;
-      current = parent;
-    }
-
-    return container;
+      ) ||
+      node.closest(".product-media-container, [data-product-media], product-media") ||
+      node
+    );
   }
 
   function matchingNodesForMedia(media) {
