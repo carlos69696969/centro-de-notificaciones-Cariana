@@ -31,7 +31,7 @@ const env = {
   databaseUrl: required("DATABASE_URL"),
   shopifyApiKey: process.env.SHOPIFY_API_KEY || "",
   shopifyApiSecret: process.env.SHOPIFY_API_SECRET || "",
-  shopifyScopes: normalizeScopes(process.env.SHOPIFY_SCOPES, ["read_products", "write_products", "read_themes", "write_themes"]),
+  shopifyScopes: normalizeScopes(process.env.SHOPIFY_SCOPES, ["read_products", "write_products"]),
   shopifyAppUrl: process.env.SHOPIFY_APP_URL || "http://localhost:3000",
   shopifyStorefrontBaseUrl: process.env.SHOPIFY_STOREFRONT_BASE_URL || "",
   returnsPortalUrl: process.env.RETURNS_PORTAL_URL || "",
