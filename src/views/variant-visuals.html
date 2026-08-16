@@ -236,11 +236,9 @@
       }
 
       .color-card {
-        padding: 8px;
+        padding: 8px 10px;
         display: grid;
-        grid-template-columns: minmax(130px, 1fr) auto 32px;
-        align-items: center;
-        gap: 8px;
+        gap: 6px;
       }
 
       .color-head {
@@ -249,6 +247,16 @@
         align-items: center;
         min-width: 0;
         flex: 1;
+      }
+
+      .color-swatch-picker {
+        position: relative;
+        display: inline-grid;
+        place-items: center;
+        width: 22px;
+        height: 22px;
+        flex: 0 0 22px;
+        cursor: pointer;
       }
 
       .swatch {
@@ -272,11 +280,13 @@
       }
 
       .color-card input[type="color"] {
-        width: 32px;
-        height: 32px;
-        min-height: 32px;
-        padding: 2px;
-        flex: 0 0 32px;
+        position: absolute;
+        inset: 0;
+        width: 22px;
+        height: 22px;
+        min-height: 22px;
+        padding: 0;
+        opacity: 0;
         cursor: pointer;
       }
 
@@ -323,25 +333,6 @@
         font-size: 13px;
         font-weight: 800;
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
-      }
-
-      .media-actions {
-        position: absolute;
-        right: 8px;
-        bottom: 8px;
-        display: flex;
-        gap: 4px;
-      }
-
-      .media-actions button {
-        width: 28px;
-        height: 28px;
-        min-height: 28px;
-        padding: 0;
-        border-radius: 50%;
-        background: rgba(17, 24, 39, 0.88);
-        color: #fff;
-        line-height: 1;
       }
 
       .pill-row {
@@ -835,16 +826,17 @@
           card.className = "color-card";
           card.innerHTML = `
             <div class="color-head">
-              <span class="swatch" style="background:${escapeHtml(group.hex || "#667085")}"></span>
+              <label class="color-swatch-picker" aria-label="Editar color ${escapeHtml(group.label || color)}">
+                <span class="swatch" style="background:${escapeHtml(group.hex || "#667085")}"></span>
+                <input type="color" value="${escapeHtml(group.hex || "#667085")}" data-color-picker="${escapeHtml(color)}" />
+              </label>
               <button type="button" class="color-button ${state.activeColor === color ? "secondary" : "ghost"}" data-color="${escapeHtml(color)}">
                 ${escapeHtml(group.label || color)}
               </button>
             </div>
             <div class="pill-row">
-              <span class="pill">${group.variantIds?.length || 0} variantes</span>
               <span class="pill">${group.mediaIds?.length || 0} imagenes</span>
             </div>
-            <input type="color" value="${escapeHtml(group.hex || "#667085")}" data-color-picker="${escapeHtml(color)}" aria-label="Editar color ${escapeHtml(group.label || color)}" />
           `;
 
           grid.append(card);
@@ -861,6 +853,9 @@
         });
 
         grid.querySelectorAll("[data-color-picker]").forEach((node) => {
+          node.addEventListener("click", (event) => {
+            event.stopPropagation();
+          });
           node.addEventListener("input", (event) => {
             state.config.groups[event.currentTarget.dataset.color].hex = event.currentTarget.value;
             renderColors();
@@ -887,14 +882,6 @@
             <input type="checkbox" ${selected.has(media.id) ? "checked" : ""} data-media-id="${escapeHtml(media.id)}" />
             <img src="${media.url}" alt="">
             ${order >= 0 ? `<span class="media-order">${order + 1}</span>` : ""}
-            ${
-              order >= 0
-                ? `<div class="media-actions">
-                    <button type="button" data-move-media="${escapeHtml(media.id)}" data-direction="-1" aria-label="Mover antes">↑</button>
-                    <button type="button" data-move-media="${escapeHtml(media.id)}" data-direction="1" aria-label="Mover despues">↓</button>
-                  </div>`
-                : ""
-            }
           `;
           mediaGrid.append(card);
         }
@@ -914,13 +901,6 @@
           });
         });
 
-        mediaGrid.querySelectorAll("[data-move-media]").forEach((button) => {
-          button.addEventListener("click", (event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            moveMedia(event.currentTarget.dataset.moveMedia, Number(event.currentTarget.dataset.direction));
-          });
-        });
       }
 
       function toggleMedia(mediaId, checked) {
@@ -933,23 +913,6 @@
             ? current
             : [...current, mediaId]
           : current.filter((id) => id !== mediaId);
-        renderMedia();
-        renderColors();
-        renderSummary();
-      }
-
-      function moveMedia(mediaId, direction) {
-        const group = state.config.groups?.[state.activeColor];
-        if (!group?.mediaIds?.length) return;
-
-        const current = [...group.mediaIds];
-        const index = current.indexOf(mediaId);
-        const nextIndex = index + direction;
-        if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return;
-
-        const [item] = current.splice(index, 1);
-        current.splice(nextIndex, 0, item);
-        group.mediaIds = current;
         renderMedia();
         renderColors();
         renderSummary();
