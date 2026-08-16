@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v24";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v25";
 
   function parseJson(selector) {
     var node = document.querySelector(selector);
@@ -40,10 +40,12 @@
       '[data-cariana-variant-visuals-filtered="hidden"]{display:none!important;visibility:hidden!important;}' +
       '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
       "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
-      ".cariana-variant-visuals-gallery{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;margin:0 0 24px;}" +
+      ".cariana-variant-visuals-gallery{display:block!important;width:100%;margin:0 0 24px;}" +
+      ".cariana-variant-visuals-gallery__track{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}" +
       ".cariana-variant-visuals-gallery__item{margin:0;min-width:0;}" +
       ".cariana-variant-visuals-gallery__image{display:block;width:100%;height:auto;object-fit:contain;}" +
-      "@media(max-width:749px){.cariana-variant-visuals-gallery{grid-template-columns:1fr;gap:12px;}}";
+      ".cariana-variant-visuals-gallery__dots{display:none;}" +
+      "@media(max-width:749px){.cariana-variant-visuals-gallery{margin:0 0 18px;}.cariana-variant-visuals-gallery__track{display:flex!important;grid-template-columns:none;gap:0;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;}.cariana-variant-visuals-gallery__track::-webkit-scrollbar{display:none;}.cariana-variant-visuals-gallery__item{flex:0 0 100%;scroll-snap-align:start;}.cariana-variant-visuals-gallery__dots{display:flex!important;justify-content:center;align-items:center;gap:7px;margin:10px 0 0;}.cariana-variant-visuals-gallery__dot{appearance:none;border:0;border-radius:50%;width:8px;height:8px;padding:0;background:#c7c7c7;}.cariana-variant-visuals-gallery__dot[aria-current='true']{background:#333;}}";
     document.head.appendChild(style);
   }
 
@@ -209,6 +211,40 @@
     return wrapper;
   }
 
+  function syncReplacementCarouselDots(gallery) {
+    var track = gallery && gallery.querySelector(".cariana-variant-visuals-gallery__track");
+    var dots = gallery ? Array.from(gallery.querySelectorAll(".cariana-variant-visuals-gallery__dot")) : [];
+    if (!track || !dots.length) return;
+
+    var index = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+    dots.forEach(function (dot, dotIndex) {
+      dot.setAttribute("aria-current", dotIndex === index ? "true" : "false");
+    });
+  }
+
+  function bindReplacementCarousel(gallery) {
+    var track = gallery && gallery.querySelector(".cariana-variant-visuals-gallery__track");
+    if (!track || track.getAttribute("data-cariana-carousel-bound") === "true") return;
+
+    track.setAttribute("data-cariana-carousel-bound", "true");
+    track.addEventListener(
+      "scroll",
+      function () {
+        window.clearTimeout(track.CarianaVariantVisualsDotsTimer);
+        track.CarianaVariantVisualsDotsTimer = window.setTimeout(function () {
+          syncReplacementCarouselDots(gallery);
+        }, 60);
+      },
+      { passive: true }
+    );
+
+    Array.from(gallery.querySelectorAll(".cariana-variant-visuals-gallery__dot")).forEach(function (dot, index) {
+      dot.addEventListener("click", function () {
+        track.scrollTo({ left: track.clientWidth * index, behavior: "smooth" });
+      });
+    });
+  }
+
   function renderReplacementGallery(media, group) {
     var nativeWrapper = commonGalleryWrapper(media);
     if (!nativeWrapper || !nativeWrapper.parentElement) return false;
@@ -223,6 +259,12 @@
     });
     if (!selectedMedia.length) return false;
 
+    var renderKey = selectedMedia
+      .map(function (item) {
+        return numericId(item.id || item.gid);
+      })
+      .join(",");
+
     var gallery = document.querySelector(".cariana-variant-visuals-gallery");
     if (!gallery) {
       gallery = document.createElement("div");
@@ -233,22 +275,44 @@
       nativeWrapper.parentElement.insertBefore(gallery, nativeWrapper);
     }
 
-    gallery.innerHTML = "";
-    selectedMedia.forEach(function (item) {
-      var figure = document.createElement("figure");
-      var image = document.createElement("img");
-      figure.className = "cariana-variant-visuals-gallery__item";
-      image.className = "cariana-variant-visuals-gallery__image";
-      image.src = item.src;
-      image.alt = item.alt || "";
-      image.loading = "lazy";
-      figure.appendChild(image);
-      gallery.appendChild(figure);
-    });
+    if (gallery.getAttribute("data-cariana-render-key") !== renderKey) {
+      var track = document.createElement("div");
+      var dots = document.createElement("div");
+
+      gallery.innerHTML = "";
+      gallery.setAttribute("data-cariana-render-key", renderKey);
+      track.className = "cariana-variant-visuals-gallery__track";
+      dots.className = "cariana-variant-visuals-gallery__dots";
+
+      selectedMedia.forEach(function (item, index) {
+        var figure = document.createElement("figure");
+        var image = document.createElement("img");
+        var dot = document.createElement("button");
+
+        figure.className = "cariana-variant-visuals-gallery__item";
+        image.className = "cariana-variant-visuals-gallery__image";
+        image.src = item.src;
+        image.alt = item.alt || "";
+        image.loading = index === 0 ? "eager" : "lazy";
+        figure.appendChild(image);
+        track.appendChild(figure);
+
+        dot.className = "cariana-variant-visuals-gallery__dot";
+        dot.type = "button";
+        dot.setAttribute("aria-label", "Imagen " + (index + 1));
+        dot.setAttribute("aria-current", index === 0 ? "true" : "false");
+        dots.appendChild(dot);
+      });
+
+      gallery.appendChild(track);
+      gallery.appendChild(dots);
+      bindReplacementCarousel(gallery);
+    }
 
     gallery.hidden = false;
     gallery.style.removeProperty("display");
     hideNativeGallery(media, true);
+    syncReplacementCarouselDots(gallery);
     return true;
   }
 
@@ -257,7 +321,7 @@
     if (!gallery) return false;
 
     gallery.hidden = false;
-    gallery.style.setProperty("display", "grid", "important");
+    gallery.style.setProperty("display", "block", "important");
     gallery.style.setProperty("visibility", "visible", "important");
 
     var node = gallery.parentElement;
