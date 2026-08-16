@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v27";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v28";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -301,9 +301,17 @@
       allowed[numericId(id)] = true;
     });
 
-    var selectedMedia = media.filter(function (item) {
-      return Boolean(allowed[numericId(item.id || item.gid)]);
+    var mediaById = {};
+    media.forEach(function (item) {
+      mediaById[numericId(item.id || item.gid)] = item;
     });
+
+    var selectedMedia = (group.mediaIds || [])
+      .map(function (id) {
+        return mediaById[numericId(id)];
+      })
+      .filter(Boolean);
+
     if (!selectedMedia.length) return false;
 
     var renderKey = selectedMedia
@@ -668,9 +676,15 @@
     var nativeFilterResult = applyNativeGalleryFilter(allowed);
     var imageKeyNodeCount = applyImageKeyFilter(media, Object.keys(allowed));
     var result = replacementRendered || nativeFilterResult || imageKeyNodeCount > 0;
-    var selectedReplacementMedia = media.filter(function (item) {
-      return Boolean(allowed[numericId(item.id || item.gid)]);
+    var debugMediaById = {};
+    media.forEach(function (item) {
+      debugMediaById[numericId(item.id || item.gid)] = item;
     });
+    var selectedReplacementMedia = (group.mediaIds || [])
+      .map(function (id) {
+        return debugMediaById[numericId(id)];
+      })
+      .filter(Boolean);
     showDebug({
       loaded: true,
       version: SCRIPT_VERSION,

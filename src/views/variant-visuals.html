@@ -253,8 +253,8 @@
         position: relative;
         overflow: hidden;
         padding: 8px;
-        display: grid;
-        gap: 6px;
+        display: block;
+        cursor: pointer;
       }
 
       .media-card.selected {
@@ -272,9 +272,39 @@
         accent-color: var(--accent);
       }
 
-      .media-card small {
-        color: var(--muted);
-        word-break: break-word;
+      .media-order {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 800;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.22);
+      }
+
+      .media-actions {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        display: flex;
+        gap: 4px;
+      }
+
+      .media-actions button {
+        width: 28px;
+        height: 28px;
+        min-height: 28px;
+        padding: 0;
+        border-radius: 50%;
+        background: rgba(17, 24, 39, 0.88);
+        color: #fff;
+        line-height: 1;
       }
 
       .pill-row {
@@ -864,16 +894,26 @@
         mediaGrid.innerHTML = "";
 
         const group = state.config.groups?.[state.activeColor];
-        const selected = new Set(group?.mediaIds || []);
+        const selectedIds = group?.mediaIds || [];
+        const selected = new Set(selectedIds);
 
         for (const media of state.product.media || []) {
-          const label = media.alt || media.id.split("/").pop();
-          const card = document.createElement("label");
+          const order = selectedIds.indexOf(media.id);
+          const card = document.createElement("div");
           card.className = `media-card ${selected.has(media.id) ? "selected" : ""}`;
+          card.dataset.mediaId = media.id;
           card.innerHTML = `
             <input type="checkbox" ${selected.has(media.id) ? "checked" : ""} data-media-id="${escapeHtml(media.id)}" />
             <img src="${media.url}" alt="">
-            <small>${escapeHtml(label)}</small>
+            ${order >= 0 ? `<span class="media-order">${order + 1}</span>` : ""}
+            ${
+              order >= 0
+                ? `<div class="media-actions">
+                    <button type="button" data-move-media="${escapeHtml(media.id)}" data-direction="-1" aria-label="Mover antes">↑</button>
+                    <button type="button" data-move-media="${escapeHtml(media.id)}" data-direction="1" aria-label="Mover despues">↓</button>
+                  </div>`
+                : ""
+            }
           `;
           mediaGrid.append(card);
         }
@@ -883,16 +923,52 @@
             toggleMedia(event.currentTarget.dataset.mediaId, event.currentTarget.checked);
           });
         });
+
+        mediaGrid.querySelectorAll(".media-card").forEach((card) => {
+          card.addEventListener("click", (event) => {
+            if (event.target.closest("button") || event.target.matches("input")) return;
+            const mediaId = event.currentTarget.dataset.mediaId;
+            const isSelected = state.config.groups?.[state.activeColor]?.mediaIds?.includes(mediaId);
+            toggleMedia(mediaId, !isSelected);
+          });
+        });
+
+        mediaGrid.querySelectorAll("[data-move-media]").forEach((button) => {
+          button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            moveMedia(event.currentTarget.dataset.moveMedia, Number(event.currentTarget.dataset.direction));
+          });
+        });
       }
 
       function toggleMedia(mediaId, checked) {
         const group = state.config.groups?.[state.activeColor];
         if (!group) return;
 
-        const next = new Set(group.mediaIds || []);
-        if (checked) next.add(mediaId);
-        else next.delete(mediaId);
-        group.mediaIds = Array.from(next);
+        const current = group.mediaIds || [];
+        group.mediaIds = checked
+          ? current.includes(mediaId)
+            ? current
+            : [...current, mediaId]
+          : current.filter((id) => id !== mediaId);
+        renderMedia();
+        renderColors();
+        renderSummary();
+      }
+
+      function moveMedia(mediaId, direction) {
+        const group = state.config.groups?.[state.activeColor];
+        if (!group?.mediaIds?.length) return;
+
+        const current = [...group.mediaIds];
+        const index = current.indexOf(mediaId);
+        const nextIndex = index + direction;
+        if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return;
+
+        const [item] = current.splice(index, 1);
+        current.splice(nextIndex, 0, item);
+        group.mediaIds = current;
         renderMedia();
         renderColors();
         renderSummary();
