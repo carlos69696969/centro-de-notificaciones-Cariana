@@ -94,8 +94,7 @@
       .panel,
       .product-card,
       .color-card,
-      .media-card,
-      .summary-card {
+      .media-card {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -142,7 +141,7 @@
 
       .layout {
         display: grid;
-        grid-template-columns: minmax(260px, 330px) minmax(0, 1fr) minmax(280px, 340px);
+        grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
         gap: 14px;
         align-items: start;
       }
@@ -337,25 +336,6 @@
         color: #b42318;
       }
 
-      .summary-card {
-        padding: 10px;
-        display: grid;
-        gap: 8px;
-      }
-
-      pre {
-        margin: 0;
-        white-space: pre-wrap;
-        word-break: break-word;
-        background: #111827;
-        color: #e5e7eb;
-        border-radius: 8px;
-        padding: 10px;
-        max-height: 320px;
-        overflow: auto;
-        font-size: 12px;
-      }
-
       @media (max-width: 1100px) {
         .layout {
           grid-template-columns: 1fr;
@@ -388,6 +368,7 @@
         </div>
         <button id="saveConfig" disabled>Guardar en Shopify</button>
       </section>
+      <div id="saveStatus" class="status"></div>
 
       <section class="layout">
         <aside class="panel">
@@ -448,12 +429,6 @@
           </div>
         </section>
 
-        <aside class="panel">
-          <h2>Resumen para tienda</h2>
-          <div id="summary" class="stack"></div>
-          <pre id="jsonPreview">{}</pre>
-          <div id="saveStatus" class="status"></div>
-        </aside>
       </section>
     </main>
 
@@ -975,26 +950,7 @@
       }
 
       function renderSummary() {
-        const summary = $("summary");
-        summary.innerHTML = "";
-
-        for (const [color, group] of Object.entries(state.config.groups || {})) {
-          const card = document.createElement("div");
-          card.className = "summary-card";
-          card.innerHTML = `
-            <div class="inline">
-              <span class="swatch" style="background:${escapeHtml(group.hex || "#667085")}"></span>
-              <strong>${escapeHtml(group.label || color)}</strong>
-            </div>
-            <div class="pill-row">
-              <span class="pill">${group.variantIds?.length || 0} variantes</span>
-              <span class="pill">${group.mediaIds?.length || 0} imagenes</span>
-            </div>
-          `;
-          summary.append(card);
-        }
-
-        $("jsonPreview").textContent = JSON.stringify(state.config, null, 2);
+        return;
       }
 
       function rebuildColors() {
