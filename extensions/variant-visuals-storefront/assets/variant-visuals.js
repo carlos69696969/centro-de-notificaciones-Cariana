@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v29";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v30";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -45,6 +45,8 @@
       '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
       "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
       '[data-cariana-variant-visuals-option-unavailable="true"]{opacity:.32!important;pointer-events:none!important;filter:grayscale(1);}' +
+      '[data-cariana-variant-visuals-option-soldout="true"]{opacity:.55!important;position:relative!important;}' +
+      'button[data-cariana-variant-visuals-option-soldout="true"]::after,label[data-cariana-variant-visuals-option-soldout="true"]::after,[role="button"][data-cariana-variant-visuals-option-soldout="true"]::after,.variant-option__button-label[data-cariana-variant-visuals-option-soldout="true"]::after,.swatch-input__label[data-cariana-variant-visuals-option-soldout="true"]::after{content:"";position:absolute;left:10%;right:10%;top:50%;border-top:2px solid currentColor;transform:rotate(-14deg);pointer-events:none;}' +
       ".cariana-variant-visuals-gallery{display:block!important;width:100%;min-height:var(--cariana-variant-visuals-min-height,0px);margin:0 0 24px;transition:opacity .16s ease;}" +
       ".cariana-variant-visuals-gallery[data-cariana-updating='true']{opacity:.98;}" +
       ".cariana-variant-visuals-gallery__track{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}" +
@@ -147,11 +149,15 @@
     return "";
   }
 
-  function variantMatchesSelectedOptions(variant, options, colorOptionName) {
-    var normalizedColorName = normalize(colorOptionName || "Color");
+  function variantMatchesSelectedOptions(variant, options, ignoredOptionNames) {
+    var ignored = {};
+    (Array.isArray(ignoredOptionNames) ? ignoredOptionNames : [ignoredOptionNames]).forEach(function (optionName) {
+      if (optionName) ignored[normalize(optionName)] = true;
+    });
+
     for (var optionName in options) {
       if (!Object.prototype.hasOwnProperty.call(options, optionName)) continue;
-      if (optionName === normalizedColorName) continue;
+      if (ignored[optionName]) continue;
 
       var selectedValue = options[optionName];
       if (!selectedValue) continue;
@@ -171,24 +177,25 @@
     return true;
   }
 
-  function availableColorMap(config, variants, options) {
+  function optionStatusMap(variants, options, targetOptionName, ignoredOptionNames) {
     var map = {};
-    var colorOptionName = config.colorOptionName || "Color";
-
     if (!variants || !variants.length) {
-      Object.keys(config.groups || {}).forEach(function (color) {
-        map[normalize(color)] = true;
-        if (config.groups[color].label) map[normalize(config.groups[color].label)] = true;
-      });
       return map;
     }
 
-    variants.forEach(function (variant) {
-      if (variant.available === false) return;
-      if (!variantMatchesSelectedOptions(variant, options, colorOptionName)) return;
+    var ignored = Array.isArray(ignoredOptionNames) ? ignoredOptionNames.slice() : [ignoredOptionNames];
+    ignored.push(targetOptionName);
 
-      var color = variantOptionValue(variant, colorOptionName);
-      if (color) map[normalize(color)] = true;
+    variants.forEach(function (variant) {
+      if (!variantMatchesSelectedOptions(variant, options, ignored)) return;
+
+      var value = variantOptionValue(variant, targetOptionName);
+      var key = normalize(value);
+      if (!key) return;
+
+      if (!map[key]) map[key] = { exists: false, available: false };
+      map[key].exists = true;
+      if (variant.available !== false) map[key].available = true;
     });
 
     return map;
@@ -214,8 +221,8 @@
     );
   }
 
-  function colorOptionControls(colorOptionName) {
-    var normalizedColorName = normalize(colorOptionName || "Color");
+  function optionControls(optionName) {
+    var normalizedOptionName = normalize(optionName || "");
     var controls = [];
 
     document
@@ -227,8 +234,8 @@
         ].join(", ")
       )
       .forEach(function (node) {
-        var optionName = optionNameFromInput(node);
-        if (normalize(optionName) !== normalizedColorName) return;
+        var inputOptionName = optionNameFromInput(node);
+        if (normalize(inputOptionName) !== normalizedOptionName) return;
 
         controls.push({
           node: node,
@@ -239,8 +246,8 @@
 
     document.querySelectorAll("fieldset.variant-option").forEach(function (fieldset) {
       var legend = fieldset.querySelector("legend");
-      var optionName = legend && legend.childNodes[0] ? legend.childNodes[0].textContent : legend && legend.textContent;
-      if (normalize(optionName) !== normalizedColorName) return;
+      var fieldsetOptionName = legend && legend.childNodes[0] ? legend.childNodes[0].textContent : legend && legend.textContent;
+      if (normalize(fieldsetOptionName) !== normalizedOptionName) return;
 
       fieldset.querySelectorAll('input[type="radio"]').forEach(function (node) {
         if (
@@ -261,16 +268,25 @@
     return controls;
   }
 
-  function setColorControlAvailable(control, available) {
+  function setOptionControlStatus(control, status) {
     if (!control || !control.node) return;
 
-    control.node.disabled = !available;
-    control.node.setAttribute("aria-disabled", available ? "false" : "true");
-    control.node.setAttribute("data-cariana-variant-visuals-option-unavailable", available ? "false" : "true");
+    var exists = !status || status.exists !== false;
+    var available = !status || status.available !== false;
+    var unavailable = !exists;
+    var soldout = exists && !available;
+
+    control.node.disabled = unavailable;
+    control.node.setAttribute("aria-disabled", unavailable ? "true" : "false");
+    control.node.setAttribute("data-cariana-variant-visuals-option-unavailable", unavailable ? "true" : "false");
+    control.node.setAttribute("data-cariana-variant-visuals-option-soldout", soldout ? "true" : "false");
+    control.node.setAttribute("title", soldout ? "Agotado" : "");
 
     if (control.wrapper) {
-      control.wrapper.setAttribute("aria-disabled", available ? "false" : "true");
-      control.wrapper.setAttribute("data-cariana-variant-visuals-option-unavailable", available ? "false" : "true");
+      control.wrapper.setAttribute("aria-disabled", unavailable ? "true" : "false");
+      control.wrapper.setAttribute("data-cariana-variant-visuals-option-unavailable", unavailable ? "true" : "false");
+      control.wrapper.setAttribute("data-cariana-variant-visuals-option-soldout", soldout ? "true" : "false");
+      control.wrapper.setAttribute("title", soldout ? "Agotado" : "");
     }
   }
 
@@ -306,18 +322,25 @@
 
     var options = selectedOptions();
     var colorOptionName = config.colorOptionName || "Color";
-    var allowedColors = availableColorMap(config, variants, options);
-    var controls = colorOptionControls(colorOptionName);
-    if (!controls.length) return false;
+    var sizeOptionName = config.sizeOptionName || "Talla";
+    var colorStatuses = optionStatusMap(variants, options, colorOptionName, []);
+    var colorControls = optionControls(colorOptionName);
+    var sizeStatuses = optionStatusMap(variants, options, sizeOptionName, [colorOptionName]);
+    var sizeControls = optionControls(sizeOptionName);
 
-    controls.forEach(function (control) {
+    colorControls.forEach(function (control) {
       var colorKey = normalize(control.value);
       var group = (config.groups || {})[control.value];
       var labelKey = group && group.label ? normalize(group.label) : "";
-      setColorControlAvailable(control, Boolean(allowedColors[colorKey] || allowedColors[labelKey]));
+      setOptionControlStatus(control, colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false });
     });
 
-    return chooseColorControl(controls);
+    sizeControls.forEach(function (control) {
+      var sizeKey = normalize(control.value);
+      setOptionControlStatus(control, sizeStatuses[sizeKey] || { exists: false, available: false });
+    });
+
+    return chooseColorControl(colorControls) || chooseColorControl(sizeControls);
   }
 
   function sourceGallery() {
