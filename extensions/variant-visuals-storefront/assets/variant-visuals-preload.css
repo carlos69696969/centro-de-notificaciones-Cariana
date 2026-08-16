@@ -1,0 +1,7 @@
+html:not(.cariana-variant-visuals-ready) .product-information__media .rio-media-gallery,
+html:not(.cariana-variant-visuals-ready) .product-information__media media-gallery,
+html:not(.cariana-variant-visuals-ready) [data-testid="product-information-media"] .rio-media-gallery,
+html:not(.cariana-variant-visuals-ready) [data-testid="product-information-media"] media-gallery {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
