@@ -38,7 +38,11 @@
     style.textContent =
       '[data-cariana-variant-visuals-filtered="hidden"]{display:none!important;visibility:hidden!important;}' +
       '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
-      ".cariana-variant-visuals-gallery{display:none!important;}";
+      "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
+      ".cariana-variant-visuals-gallery{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;margin:0 0 24px;}" +
+      ".cariana-variant-visuals-gallery__item{margin:0;min-width:0;}" +
+      ".cariana-variant-visuals-gallery__image{display:block;width:100%;height:auto;object-fit:contain;}" +
+      "@media(max-width:749px){.cariana-variant-visuals-gallery{grid-template-columns:1fr;gap:12px;}}";
     document.head.appendChild(style);
   }
 
@@ -167,8 +171,7 @@
           image.closest("[data-testid='media-gallery-grid']") ||
           image.closest(".media-gallery__grid") ||
           image.closest(".product__media-list") ||
-          image.closest(".product-information__media") ||
-          image.closest("section");
+          image.closest(".product-information__media");
         if (wrapper && wrappers.indexOf(wrapper) < 0 && !wrapper.classList.contains("cariana-variant-visuals-gallery")) {
           wrappers.push(wrapper);
         }
@@ -181,6 +184,61 @@
       wrappers[0] ||
       sourceGallery()
     );
+  }
+
+  function hideNativeGallery(media, hidden) {
+    var wrapper = commonGalleryWrapper(media);
+    if (!wrapper) return null;
+
+    wrapper.setAttribute("data-cariana-variant-visuals-native", hidden ? "hidden" : "visible");
+    if (hidden) {
+      wrapper.style.setProperty("display", "none", "important");
+      wrapper.style.setProperty("visibility", "hidden", "important");
+    } else {
+      wrapper.style.removeProperty("display");
+      wrapper.style.removeProperty("visibility");
+    }
+    return wrapper;
+  }
+
+  function renderReplacementGallery(media, group) {
+    var nativeWrapper = commonGalleryWrapper(media);
+    if (!nativeWrapper || !nativeWrapper.parentElement) return false;
+
+    var allowed = {};
+    (group.mediaIds || []).forEach(function (id) {
+      allowed[numericId(id)] = true;
+    });
+
+    var selectedMedia = media.filter(function (item) {
+      return Boolean(allowed[numericId(item.id || item.gid)]);
+    });
+    if (!selectedMedia.length) return false;
+
+    var gallery = document.querySelector(".cariana-variant-visuals-gallery");
+    if (!gallery) {
+      gallery = document.createElement("div");
+      gallery.className = "cariana-variant-visuals-gallery";
+      nativeWrapper.parentElement.insertBefore(gallery, nativeWrapper);
+    }
+
+    gallery.innerHTML = "";
+    selectedMedia.forEach(function (item) {
+      var figure = document.createElement("figure");
+      var image = document.createElement("img");
+      figure.className = "cariana-variant-visuals-gallery__item";
+      image.className = "cariana-variant-visuals-gallery__image";
+      image.src = item.src;
+      image.alt = item.alt || "";
+      image.loading = "lazy";
+      figure.appendChild(image);
+      gallery.appendChild(figure);
+    });
+
+    gallery.hidden = false;
+    gallery.style.removeProperty("display");
+    hideNativeGallery(media, true);
+    return true;
   }
 
   function originalGalleries() {
@@ -427,9 +485,10 @@
       allowed[numericId(id)] = true;
     });
 
+    var replacementRendered = renderReplacementGallery(media, group);
     var productMediaNodeCount = document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length;
-    var result = applyNativeGalleryFilter(allowed);
-    var imageKeyNodeCount = applyImageKeyFilter(media, Object.keys(allowed));
+    var result = replacementRendered || applyNativeGalleryFilter(allowed);
+    var imageKeyNodeCount = replacementRendered ? 0 : applyImageKeyFilter(media, Object.keys(allowed));
     showDebug({
       loaded: true,
       hasConfig: true,
@@ -443,7 +502,8 @@
       productMediaNodes: productMediaNodeCount,
       imageKeyNodes: imageKeyNodeCount,
       slideshowSlides: document.querySelectorAll("slideshow-slide").length,
-      nativeFilterApplied: Boolean(result)
+      nativeFilterApplied: Boolean(result),
+      replacementGallery: replacementRendered
     });
 
     if (result) {
