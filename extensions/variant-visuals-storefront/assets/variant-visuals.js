@@ -40,16 +40,40 @@
   }
 
   function optionNameFromInput(input) {
-    var raw = input.getAttribute("name") || input.getAttribute("aria-label") || "";
+    var raw = input.getAttribute("data-option-name") || input.getAttribute("name") || input.getAttribute("aria-label") || "";
     var match = raw.match(/options\[(.+?)\]/i);
     return match ? match[1] : raw;
   }
 
   function selectedOptions() {
     var result = {};
-    document.querySelectorAll('select[name^="options["], input[type="radio"][name^="options["]:checked').forEach(function (input) {
-      result[normalize(optionNameFromInput(input))] = input.value;
+    document
+      .querySelectorAll(
+        [
+          'select[name^="options["]',
+          "select.variant-option__select",
+          'input[type="radio"][name^="options["]:checked',
+          'input[type="radio"][data-option-name]:checked',
+          'input[type="radio"][data-current-checked="true"]',
+          '[data-variant-option][aria-selected="true"]',
+          '[data-variant-option].is-selected'
+        ].join(", ")
+      )
+      .forEach(function (input) {
+        var optionName = optionNameFromInput(input);
+        var value = input.value || input.getAttribute("data-variant-option") || input.textContent;
+        if (optionName && value) result[normalize(optionName)] = value.trim();
+      });
+
+    document.querySelectorAll("fieldset.variant-option").forEach(function (fieldset) {
+      var legend = fieldset.querySelector("legend");
+      var checked = fieldset.querySelector('input[type="radio"]:checked, input[data-current-checked="true"]');
+      if (!legend || !checked) return;
+
+      var optionName = legend.childNodes[0] ? legend.childNodes[0].textContent : legend.textContent;
+      if (optionName && checked.value) result[normalize(optionName)] = checked.value;
     });
+
     return result;
   }
 
@@ -60,14 +84,6 @@
 
   function findActiveGroup(config) {
     var groups = config.groups || {};
-    var variantId = selectedVariantId();
-    if (variantId) {
-      for (var color in groups) {
-        var variants = groups[color].variantIds || [];
-        if (variants.some(function (id) { return numericId(id) === variantId; })) return groups[color];
-      }
-    }
-
     var options = selectedOptions();
     var colorValue = options[normalize(config.colorOptionName || "Color")];
     if (colorValue) {
@@ -75,6 +91,14 @@
         if (normalize(colorName) === normalize(colorValue) || normalize(groups[colorName].label) === normalize(colorValue)) {
           return groups[colorName];
         }
+      }
+    }
+
+    var variantId = selectedVariantId();
+    if (variantId) {
+      for (var color in groups) {
+        var variants = groups[color].variantIds || [];
+        if (variants.some(function (id) { return numericId(id) === variantId; })) return groups[color];
       }
     }
 
