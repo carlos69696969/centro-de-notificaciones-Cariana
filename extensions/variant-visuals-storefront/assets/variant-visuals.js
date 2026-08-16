@@ -278,6 +278,17 @@
     );
   }
 
+  function closestImageItem(imageNode) {
+    return (
+      imageNode.closest("slideshow-slide") ||
+      imageNode.closest("li") ||
+      imageNode.closest(".product-media-container") ||
+      imageNode.closest(".product-media") ||
+      imageNode.closest("picture") ||
+      imageNode
+    );
+  }
+
   function applyDirectMediaFilter(allowedIds) {
     var allowedSet = {};
     allowedIds.forEach(function (id) {
@@ -302,6 +313,40 @@
         item.style.setProperty("visibility", "hidden", "important");
       }
     });
+    return count;
+  }
+
+  function applyImageKeyFilter(media, allowedIds) {
+    var allowedSet = {};
+    var seenItems = [];
+    var count = 0;
+
+    allowedIds.forEach(function (id) {
+      allowedSet[id] = true;
+    });
+
+    media.forEach(function (item) {
+      var id = numericId(item.id || item.gid);
+      var show = Boolean(allowedSet[id]);
+      imageNodesForMedia(item).forEach(function (imageNode) {
+        var visualItem = closestImageItem(imageNode);
+        if (seenItems.indexOf(visualItem) >= 0) return;
+        seenItems.push(visualItem);
+        count += 1;
+
+        visualItem.hidden = !show;
+        visualItem.setAttribute("aria-hidden", show ? "false" : "true");
+        visualItem.setAttribute("data-cariana-variant-visuals-filtered", show ? "visible" : "hidden");
+        if (show) {
+          visualItem.style.removeProperty("display");
+          visualItem.style.removeProperty("visibility");
+        } else {
+          visualItem.style.setProperty("display", "none", "important");
+          visualItem.style.setProperty("visibility", "hidden", "important");
+        }
+      });
+    });
+
     return count;
   }
 
@@ -384,6 +429,7 @@
 
     var productMediaNodeCount = document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length;
     var result = applyNativeGalleryFilter(allowed);
+    var imageKeyNodeCount = applyImageKeyFilter(media, Object.keys(allowed));
     showDebug({
       loaded: true,
       hasConfig: true,
@@ -395,6 +441,7 @@
       selectedVariantId: selectedVariantId(),
       allowedNumericIds: Object.keys(allowed),
       productMediaNodes: productMediaNodeCount,
+      imageKeyNodes: imageKeyNodeCount,
       slideshowSlides: document.querySelectorAll("slideshow-slide").length,
       nativeFilterApplied: Boolean(result)
     });
