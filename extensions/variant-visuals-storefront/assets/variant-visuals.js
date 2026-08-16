@@ -6,7 +6,9 @@
     var node = document.querySelector(selector);
     if (!node) return null;
     try {
-      return JSON.parse(node.textContent || "null");
+      var parsed = JSON.parse(node.textContent || "null");
+      if (typeof parsed === "string") parsed = JSON.parse(parsed || "null");
+      return parsed;
     } catch (_error) {
       return null;
     }
@@ -244,8 +246,43 @@
       "{display:revert!important;visibility:visible!important;}";
 
     if (document.body) document.body.classList.add("cariana-variant-visuals-active");
+    applyDirectMediaFilter(allowedIds);
     syncCarouselControls(allowedIds);
     return true;
+  }
+
+  function closestMediaItem(mediaNode) {
+    return (
+      mediaNode.closest("slideshow-slide") ||
+      mediaNode.closest("li") ||
+      mediaNode.closest(".product-media-container") ||
+      mediaNode.closest(".product__media-item") ||
+      mediaNode
+    );
+  }
+
+  function applyDirectMediaFilter(allowedIds) {
+    var allowedSet = {};
+    allowedIds.forEach(function (id) {
+      allowedSet[id] = true;
+    });
+
+    document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").forEach(function (mediaNode) {
+      var id = numericId(mediaNode.getAttribute("data-media-id"));
+      var show = Boolean(allowedSet[id]);
+      var item = closestMediaItem(mediaNode);
+
+      item.hidden = !show;
+      item.setAttribute("aria-hidden", show ? "false" : "true");
+      item.setAttribute("data-cariana-variant-visuals-filtered", show ? "visible" : "hidden");
+      if (show) {
+        item.style.removeProperty("display");
+        item.style.removeProperty("visibility");
+      } else {
+        item.style.setProperty("display", "none", "important");
+        item.style.setProperty("visibility", "hidden", "important");
+      }
+    });
   }
 
   function syncCarouselControls(allowedIds) {
@@ -319,5 +356,6 @@
   document.addEventListener("variant:change", scheduleFilter, true);
   document.addEventListener("shopify:section:load", scheduleFilter, true);
   window.addEventListener("popstate", scheduleFilter);
+  new MutationObserver(scheduleFilter).observe(document.documentElement, { childList: true, subtree: true });
   scheduleFilter();
 })();
