@@ -18,12 +18,16 @@ const ordersRoutes = require("./routes/orders");
 const returnSettingsRoutes = require("./routes/returnSettings");
 const storefrontNotificationsRoutes = require("./routes/storefrontNotifications");
 const abandonedCartRoutes = require("./routes/abandonedCart");
+const variantVisualsRoutes = require("./routes/variantVisuals");
 
 const app = express();
 const APP_LINK_DOMAIN = "app.cariana.mx";
 const SHOP_DOMAIN = "www.cariana.mx";
-const PLAY_APP_SIGNING_SHA256 =
-  "C3:10:44:A6:80:8C:D7:C3:97:22:C6:21:BF:64:82:8C:A9:51:67:30:93:83:DE:62:B5:6B:3A:3F:72:56:69:00";
+const APP_LINK_SHA256_CERT_FINGERPRINTS = [
+  "C3:10:44:A6:80:8C:D7:C3:97:22:C6:21:BF:64:82:8C:A9:51:67:30:93:83:DE:62:B5:6B:3A:3F:72:56:69:00",
+  "93:E7:AA:11:1D:A5:4F:95:EE:8C:2C:85:6A:21:78:3C:3F:FC:40:DD:ED:E5:0B:65:89:88:51:51:C1:9A:2A:4B",
+  "11:82:74:13:F1:BE:85:D8:14:B9:2F:B9:E5:B1:E5:A7:D3:3A:66:94:E0:FE:3E:52:28:ED:42:87:83:86:CE:F4",
+];
 
 function normalizeHost(hostHeader) {
   return String(hostHeader || "")
@@ -39,7 +43,7 @@ app.get("/.well-known/assetlinks.json", (_req, res) => {
       target: {
         namespace: "android_app",
         package_name: "com.carlosjuarez.cariana",
-        sha256_cert_fingerprints: [PLAY_APP_SIGNING_SHA256],
+        sha256_cert_fingerprints: APP_LINK_SHA256_CERT_FINGERPRINTS,
       },
     },
   ]);
@@ -66,9 +70,18 @@ app.use("/api/returns", requireInternalApiKey, returnsRoutes);
 app.use("/api/orders", requireInternalApiKey, ordersRoutes);
 app.use("/api/return-settings", requireInternalApiKey, returnSettingsRoutes);
 app.use("/api/abandoned-cart", requireInternalApiKey, abandonedCartRoutes);
+app.use("/api/variant-visuals", requireInternalApiKey, variantVisualsRoutes);
 app.use("/proxy/notifications", storefrontNotificationsRoutes);
 app.use("/proxy/returns", returnsRoutes);
 app.use("/proxy/orders", ordersRoutes);
+
+app.get("/finanzas", (_req, res) => {
+  res.sendFile(path.join(__dirname, "views", "finanzas.html"));
+});
+
+app.get("/variant-visuals", (_req, res) => {
+  res.sendFile(path.join(__dirname, "views", "variant-visuals.html"));
+});
 
 app.get("/", (_req, res) => {
   res.sendFile(path.join(__dirname, "views", "admin.html"));

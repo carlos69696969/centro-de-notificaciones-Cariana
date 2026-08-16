@@ -10,13 +10,28 @@ function required(name) {
   return value;
 }
 
+function normalizeScopes(value, requiredScopes = []) {
+  const scopes = new Set(
+    String(value || "")
+      .split(",")
+      .map((scope) => scope.trim())
+      .filter(Boolean)
+  );
+
+  for (const scope of requiredScopes) {
+    scopes.add(scope);
+  }
+
+  return Array.from(scopes).join(",");
+}
+
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 3000),
   databaseUrl: required("DATABASE_URL"),
   shopifyApiKey: process.env.SHOPIFY_API_KEY || "",
   shopifyApiSecret: process.env.SHOPIFY_API_SECRET || "",
-  shopifyScopes: process.env.SHOPIFY_SCOPES || "",
+  shopifyScopes: normalizeScopes(process.env.SHOPIFY_SCOPES, ["read_products", "write_products"]),
   shopifyAppUrl: process.env.SHOPIFY_APP_URL || "http://localhost:3000",
   shopifyStorefrontBaseUrl: process.env.SHOPIFY_STOREFRONT_BASE_URL || "",
   returnsPortalUrl: process.env.RETURNS_PORTAL_URL || "",

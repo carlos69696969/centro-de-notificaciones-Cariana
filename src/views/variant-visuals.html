@@ -1,0 +1,1005 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CARIANA Visual Variants</title>
+    <style>
+      :root {
+        --bg: #f5f6f8;
+        --surface: #ffffff;
+        --surface-soft: #f9fafb;
+        --text: #202124;
+        --muted: #667085;
+        --border: #d9dee7;
+        --primary: #111827;
+        --accent: #f04455;
+        --ok: #047857;
+        --warn: #b45309;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        border-radius: 8px;
+        background: var(--primary);
+        color: #fff;
+        min-height: 40px;
+        padding: 0 14px;
+        cursor: pointer;
+        font-weight: 700;
+      }
+
+      button.secondary {
+        background: #475467;
+      }
+
+      button.ghost {
+        background: #fff;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-height: 40px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px 10px;
+        background: #fff;
+        color: var(--text);
+      }
+
+      label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .shell {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 18px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .topbar,
+      .panel,
+      .product-card,
+      .color-card,
+      .media-card,
+      .summary-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+
+      .topbar {
+        padding: 14px;
+        display: grid;
+        grid-template-columns: minmax(190px, 260px) minmax(180px, 1fr) auto;
+        gap: 10px;
+        align-items: end;
+      }
+
+      .title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: 24px;
+        line-height: 1.1;
+      }
+
+      h2 {
+        font-size: 17px;
+      }
+
+      h3 {
+        font-size: 15px;
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(260px, 330px) minmax(0, 1fr) minmax(280px, 340px);
+        gap: 14px;
+        align-items: start;
+      }
+
+      .panel {
+        padding: 14px;
+        display: grid;
+        gap: 12px;
+      }
+
+      .stack {
+        display: grid;
+        gap: 10px;
+      }
+
+      .inline {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .product-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .product-card {
+        padding: 8px;
+        display: grid;
+        grid-template-columns: 54px 1fr;
+        gap: 10px;
+        cursor: pointer;
+        text-align: left;
+        background: #fff;
+        color: var(--text);
+        min-height: auto;
+        font-weight: 400;
+      }
+
+      .product-card img,
+      .media-card img {
+        width: 100%;
+        aspect-ratio: 1;
+        object-fit: cover;
+        background: #eef1f5;
+        border-radius: 6px;
+      }
+
+      .product-card strong {
+        display: block;
+        font-size: 13px;
+      }
+
+      .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .color-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .color-card {
+        padding: 10px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .color-head {
+        display: grid;
+        grid-template-columns: 34px 1fr auto;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .swatch {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.18);
+        box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+      }
+
+      .preset-grid {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        gap: 6px;
+      }
+
+      .preset {
+        width: 24px;
+        height: 24px;
+        min-height: 24px;
+        padding: 0;
+        border-radius: 50%;
+        border: 1px solid rgba(0, 0, 0, 0.18);
+      }
+
+      .media-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+        gap: 10px;
+      }
+
+      .media-card {
+        position: relative;
+        overflow: hidden;
+        padding: 8px;
+        display: grid;
+        gap: 6px;
+      }
+
+      .media-card.selected {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(240, 68, 85, 0.16);
+      }
+
+      .media-card input {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        width: 18px;
+        height: 18px;
+        min-height: 18px;
+        accent-color: var(--accent);
+      }
+
+      .media-card small {
+        color: var(--muted);
+        word-break: break-word;
+      }
+
+      .pill-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .pill {
+        border: 1px solid var(--border);
+        background: var(--surface-soft);
+        color: var(--text);
+        border-radius: 999px;
+        padding: 5px 9px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .status {
+        min-height: 22px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .status.ok {
+        color: var(--ok);
+      }
+
+      .status.error {
+        color: #b42318;
+      }
+
+      .summary-card {
+        padding: 10px;
+        display: grid;
+        gap: 8px;
+      }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #111827;
+        color: #e5e7eb;
+        border-radius: 8px;
+        padding: 10px;
+        max-height: 320px;
+        overflow: auto;
+        font-size: 12px;
+      }
+
+      @media (max-width: 1100px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="topbar">
+        <label>
+          Tienda
+          <input id="shopDomain" placeholder="cariana-3.myshopify.com" />
+        </label>
+        <label>
+          API interna
+          <input id="apiKey" placeholder="APP_INTERNAL_API_KEY" type="password" />
+        </label>
+        <button id="saveConnection" class="secondary">Guardar conexion</button>
+      </section>
+
+      <section class="title-row">
+        <div>
+          <h1>Visual Variants CARIANA</h1>
+          <div class="muted">Colores, tallas e imagenes agrupadas por producto</div>
+        </div>
+        <button id="saveConfig" disabled>Guardar en Shopify</button>
+      </section>
+
+      <section class="layout">
+        <aside class="panel">
+          <h2>Producto</h2>
+          <div class="stack">
+            <label>
+              Buscar por titulo, handle, ID o URL
+              <input id="productSearch" placeholder="Ej. blusa roja o /products/blusa-roja" />
+            </label>
+            <div class="inline">
+              <button id="searchProducts" class="ghost">Buscar</button>
+              <button id="loadProduct" class="secondary">Cargar directo</button>
+            </div>
+            <div id="searchStatus" class="status"></div>
+            <div id="productList" class="product-list"></div>
+          </div>
+        </aside>
+
+        <section class="panel">
+          <div class="title-row">
+            <div>
+              <h2 id="productTitle">Sin producto cargado</h2>
+              <div id="productMeta" class="muted"></div>
+            </div>
+          </div>
+
+          <div class="settings-grid">
+            <label>
+              Opcion de color
+              <select id="colorOption"></select>
+            </label>
+            <label>
+              Opcion de talla
+              <select id="sizeOption"></select>
+            </label>
+          </div>
+
+          <div class="panel" style="padding: 12px; background: var(--surface-soft)">
+            <div class="title-row">
+              <h3>Colores detectados</h3>
+              <div class="inline">
+                <button id="autoAssignMedia" class="ghost">Desde variantes</button>
+                <button id="buildColors" class="ghost">Actualizar colores</button>
+              </div>
+            </div>
+            <div id="colorGrid" class="color-grid"></div>
+          </div>
+
+          <div class="panel" style="padding: 12px; background: var(--surface-soft)">
+            <div class="title-row">
+              <h3 id="mediaTitle">Imagenes</h3>
+              <div class="inline">
+                <button id="selectAllMedia" class="ghost">Todo</button>
+                <button id="clearMedia" class="ghost">Limpiar</button>
+              </div>
+            </div>
+            <div id="mediaGrid" class="media-grid"></div>
+          </div>
+        </section>
+
+        <aside class="panel">
+          <h2>Resumen para tienda</h2>
+          <div id="summary" class="stack"></div>
+          <pre id="jsonPreview">{}</pre>
+          <div id="saveStatus" class="status"></div>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      const COLOR_PRESETS = [
+        "#111111",
+        "#ffffff",
+        "#d92d20",
+        "#b42318",
+        "#ec4a0a",
+        "#f79009",
+        "#fdb022",
+        "#12b76a",
+        "#027a48",
+        "#0ba5ec",
+        "#175cd3",
+        "#3538cd",
+        "#7a5af8",
+        "#c11574",
+        "#667085",
+        "#b6926a"
+      ];
+
+      const state = {
+        product: null,
+        config: {
+          version: 1,
+          colorOptionName: "Color",
+          sizeOptionName: "Talla",
+          groups: {}
+        },
+        activeColor: ""
+      };
+
+      const $ = (id) => document.getElementById(id);
+
+      function connection() {
+        return {
+          shopDomain: $("shopDomain").value.trim(),
+          apiKey: $("apiKey").value.trim()
+        };
+      }
+
+      function saveConnection() {
+        localStorage.setItem("carianaVariantVisualsShop", $("shopDomain").value.trim());
+        localStorage.setItem("carianaVariantVisualsKey", $("apiKey").value.trim());
+        setStatus("searchStatus", "Conexion guardada.", "ok");
+      }
+
+      function loadConnection() {
+        $("shopDomain").value = localStorage.getItem("carianaVariantVisualsShop") || "";
+        $("apiKey").value = localStorage.getItem("carianaVariantVisualsKey") || "";
+      }
+
+      function productInputFromUrlParams(params) {
+        const directKeys = [
+          "product",
+          "productId",
+          "product_id",
+          "id",
+          "resourceId",
+          "resource_id",
+          "resource_ids",
+          "selected",
+          "ids"
+        ];
+
+        for (const key of directKeys) {
+          const values = params.getAll(key).flatMap((value) => String(value || "").split(","));
+          const productValue = values.find((value) => /gid:\/\/shopify\/Product\/\d+|\b\d{8,}\b/.test(value));
+          if (productValue) return productValue.trim();
+        }
+
+        for (const value of params.values()) {
+          const match = String(value || "").match(/gid:\/\/shopify\/Product\/\d+|\b\d{8,}\b/);
+          if (match) return match[0];
+        }
+
+        return "";
+      }
+
+      async function hydrateFromAdminLink() {
+        const params = new URLSearchParams(window.location.search);
+        const shop = params.get("shop") || params.get("shopDomain") || "";
+        const productInput = productInputFromUrlParams(params);
+
+        if (shop) {
+          $("shopDomain").value = shop;
+          localStorage.setItem("carianaVariantVisualsShop", shop);
+        }
+
+        if (!productInput) return;
+
+        $("productSearch").value = productInput;
+
+        if (!$("apiKey").value.trim()) {
+          setStatus("searchStatus", "Producto detectado desde Shopify. Pega la API interna y presiona Cargar directo.", "ok");
+          return;
+        }
+
+        await loadProduct(productInput);
+      }
+
+      async function api(path, options = {}) {
+        const { shopDomain, apiKey } = connection();
+        if (!shopDomain || !apiKey) {
+          throw new Error("Falta tienda o API interna.");
+        }
+
+        const joiner = path.includes("?") ? "&" : "?";
+        const response = await fetch(`${path}${joiner}shop=${encodeURIComponent(shopDomain)}`, {
+          ...options,
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            ...(options.headers || {})
+          }
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || payload.detail || `Error ${response.status}`);
+        }
+
+        return payload;
+      }
+
+      function setStatus(id, message, tone = "") {
+        const node = $(id);
+        node.textContent = message || "";
+        node.className = `status ${tone}`.trim();
+      }
+
+      function optionValues(optionName) {
+        const option = state.product?.options?.find(
+          (item) => item.name.toLowerCase() === String(optionName || "").toLowerCase()
+        );
+        if (option?.values?.length) return option.values;
+
+        const values = new Set();
+        for (const variant of state.product?.variants || []) {
+          const selected = variant.selectedOptions.find(
+            (item) => item.name.toLowerCase() === String(optionName || "").toLowerCase()
+          );
+          if (selected?.value) values.add(selected.value);
+        }
+
+        return Array.from(values);
+      }
+
+      function renderProductSearch(products) {
+        $("productList").innerHTML = "";
+
+        for (const product of products) {
+          const button = document.createElement("button");
+          button.className = "product-card";
+          button.type = "button";
+          button.innerHTML = `
+            <img src="${product.imageUrl || ""}" alt="">
+            <span>
+              <strong>${escapeHtml(product.title)}</strong>
+              <small class="muted">${escapeHtml(product.handle)} · ${product.totalVariants} variantes</small>
+            </span>
+          `;
+          button.addEventListener("click", () => loadProduct(product.id));
+          $("productList").append(button);
+        }
+      }
+
+      async function searchProducts() {
+        try {
+          setStatus("searchStatus", "Buscando...");
+          const query = $("productSearch").value.trim();
+          const payload = await api(`/api/variant-visuals/products/search?query=${encodeURIComponent(query)}`);
+          renderProductSearch(payload.products || []);
+          setStatus("searchStatus", `${payload.products?.length || 0} productos encontrados.`, "ok");
+        } catch (error) {
+          setStatus("searchStatus", error.message, "error");
+        }
+      }
+
+      async function loadProduct(input = $("productSearch").value.trim()) {
+        try {
+          setStatus("searchStatus", "Cargando producto...");
+          const payload = await api(`/api/variant-visuals/product?product=${encodeURIComponent(input)}`);
+          state.product = payload.product;
+          state.config = payload.savedConfig || buildDefaultConfig(payload.product);
+          seedVariantImagesByColor(state.config, payload.product, true);
+          state.activeColor = Object.keys(state.config.groups || {})[0] || "";
+          renderProduct();
+          setStatus("searchStatus", "Producto cargado.", "ok");
+        } catch (error) {
+          setStatus("searchStatus", error.message, "error");
+        }
+      }
+
+      function buildDefaultConfig(product) {
+        const colorOption = guessOption(product, ["color", "colour", "tono"]);
+        const sizeOption = guessOption(product, ["talla", "size", "tamano", "tamaño"]);
+        const config = {
+          version: 1,
+          colorOptionName: colorOption || product.options?.[0]?.name || "Color",
+          sizeOptionName: sizeOption || product.options?.[1]?.name || "Talla",
+          groups: {}
+        };
+
+        for (const value of optionValuesFromProduct(product, config.colorOptionName)) {
+          config.groups[value] = {
+            label: value,
+            hex: guessColorHex(value),
+            mediaIds: [],
+            variantIds: []
+          };
+        }
+
+        for (const variant of product.variants || []) {
+          const color = variant.selectedOptions.find(
+            (option) => option.name.toLowerCase() === config.colorOptionName.toLowerCase()
+          )?.value;
+          if (color && config.groups[color]) {
+            config.groups[color].variantIds.push(variant.id);
+          }
+        }
+
+        seedVariantImagesByColor(config, product, false);
+        return config;
+      }
+
+      function imageKey(url) {
+        try {
+          const parsed = new URL(url);
+          return parsed.pathname.split("/").pop().toLowerCase();
+        } catch (_error) {
+          return String(url || "").split("?")[0].split("/").pop().toLowerCase();
+        }
+      }
+
+      function findProductMediaForVariantImage(product, variantImage) {
+        if (!variantImage?.url) return null;
+
+        const variantKey = imageKey(variantImage.url);
+        return (product.media || []).find((media) => {
+          return media.id === variantImage.id || imageKey(media.url) === variantKey;
+        });
+      }
+
+      function variantColorValue(variant, colorOptionName) {
+        return variant.selectedOptions.find(
+          (option) => option.name.toLowerCase() === String(colorOptionName || "").toLowerCase()
+        )?.value;
+      }
+
+      function seedVariantImagesByColor(config, product, onlyEmpty) {
+        if (!config?.groups || !product) return 0;
+
+        let added = 0;
+        for (const [color, group] of Object.entries(config.groups)) {
+          if (onlyEmpty && group.mediaIds?.length) continue;
+
+          const mediaIds = new Set(group.mediaIds || []);
+          for (const variant of product.variants || []) {
+            if (variantColorValue(variant, config.colorOptionName) !== color) continue;
+
+            const media = findProductMediaForVariantImage(product, variant.image);
+            if (media?.id && !mediaIds.has(media.id)) {
+              mediaIds.add(media.id);
+              added += 1;
+            }
+          }
+
+          group.mediaIds = Array.from(mediaIds);
+        }
+
+        return added;
+      }
+
+      function optionValuesFromProduct(product, optionName) {
+        const option = product.options?.find((item) => item.name.toLowerCase() === optionName.toLowerCase());
+        if (option?.values?.length) return option.values;
+        return [];
+      }
+
+      function guessOption(product, names) {
+        const normalized = names.map(normalizeText);
+        return product.options?.find((option) => normalized.includes(normalizeText(option.name)))?.name || "";
+      }
+
+      function normalizeText(value) {
+        return String(value || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim();
+      }
+
+      function guessColorHex(value) {
+        const key = normalizeText(value);
+        const colors = {
+          blanco: "#ffffff",
+          white: "#ffffff",
+          negro: "#111111",
+          black: "#111111",
+          rojo: "#d92d20",
+          red: "#d92d20",
+          vino: "#7a271a",
+          azul: "#175cd3",
+          blue: "#175cd3",
+          marino: "#101828",
+          verde: "#027a48",
+          green: "#027a48",
+          amarillo: "#fdb022",
+          yellow: "#fdb022",
+          rosa: "#e31b54",
+          pink: "#e31b54",
+          beige: "#d6bb98",
+          cafe: "#7a5c3e",
+          marron: "#7a5c3e",
+          gris: "#667085",
+          gray: "#667085",
+          morado: "#7a5af8",
+          naranja: "#ec4a0a"
+        };
+        return colors[key] || "#667085";
+      }
+
+      function renderProduct() {
+        const product = state.product;
+        $("saveConfig").disabled = !product;
+        $("productTitle").textContent = product.title;
+        $("productMeta").textContent = `${product.handle} · ${product.variants.length} variantes · ${product.media.length} imagenes`;
+
+        renderOptionSelects();
+        ensureGroupsFromOptions();
+        renderColors();
+        renderMedia();
+        renderSummary();
+      }
+
+      function renderOptionSelects() {
+        const options = state.product.options || [];
+        $("colorOption").innerHTML = options.map(optionTemplate).join("");
+        $("sizeOption").innerHTML = options.map(optionTemplate).join("");
+        $("colorOption").value = state.config.colorOptionName || options[0]?.name || "";
+        $("sizeOption").value = state.config.sizeOptionName || options[1]?.name || "";
+      }
+
+      function optionTemplate(option) {
+        return `<option value="${escapeHtml(option.name)}">${escapeHtml(option.name)}</option>`;
+      }
+
+      function ensureGroupsFromOptions() {
+        const colorValues = optionValues(state.config.colorOptionName);
+        state.config.groups = state.config.groups || {};
+
+        for (const color of colorValues) {
+          if (!state.config.groups[color]) {
+            state.config.groups[color] = {
+              label: color,
+              hex: guessColorHex(color),
+              mediaIds: [],
+              variantIds: []
+            };
+          }
+
+          state.config.groups[color].variantIds = (state.product.variants || [])
+            .filter((variant) =>
+              variant.selectedOptions.some(
+                (option) =>
+                  option.name.toLowerCase() === state.config.colorOptionName.toLowerCase() &&
+                  option.value === color
+              )
+            )
+            .map((variant) => variant.id);
+
+          seedVariantImagesByColor(state.config, state.product, true);
+        }
+
+        if (!state.activeColor || !state.config.groups[state.activeColor]) {
+          state.activeColor = colorValues[0] || Object.keys(state.config.groups)[0] || "";
+        }
+      }
+
+      function renderColors() {
+        const grid = $("colorGrid");
+        grid.innerHTML = "";
+
+        for (const [color, group] of Object.entries(state.config.groups || {})) {
+          const card = document.createElement("div");
+          card.className = "color-card";
+          card.innerHTML = `
+            <div class="color-head">
+              <span class="swatch" style="background:${escapeHtml(group.hex || "#667085")}"></span>
+              <button type="button" class="${state.activeColor === color ? "secondary" : "ghost"}" data-color="${escapeHtml(color)}">
+                ${escapeHtml(group.label || color)}
+              </button>
+              <input type="color" value="${escapeHtml(group.hex || "#667085")}" data-color-picker="${escapeHtml(color)}" />
+            </div>
+            <div class="preset-grid">
+              ${COLOR_PRESETS.map(
+                (hex) => `<button type="button" class="preset" data-preset="${hex}" data-color="${escapeHtml(color)}" style="background:${hex}" aria-label="${hex}"></button>`
+              ).join("")}
+            </div>
+            <div class="pill-row">
+              <span class="pill">${group.variantIds?.length || 0} variantes</span>
+              <span class="pill">${group.mediaIds?.length || 0} imagenes</span>
+            </div>
+          `;
+
+          grid.append(card);
+        }
+
+        grid.querySelectorAll("[data-color]").forEach((node) => {
+          node.addEventListener("click", (event) => {
+            const color = event.currentTarget.dataset.color;
+            if (event.currentTarget.dataset.preset) {
+              state.config.groups[color].hex = event.currentTarget.dataset.preset;
+            } else {
+              state.activeColor = color;
+            }
+            renderColors();
+            renderMedia();
+            renderSummary();
+          });
+        });
+
+        grid.querySelectorAll("[data-color-picker]").forEach((node) => {
+          node.addEventListener("input", (event) => {
+            state.config.groups[event.currentTarget.dataset.color].hex = event.currentTarget.value;
+            renderColors();
+            renderSummary();
+          });
+        });
+      }
+
+      function renderMedia() {
+        $("mediaTitle").textContent = state.activeColor ? `Imagenes para ${state.activeColor}` : "Imagenes";
+        const mediaGrid = $("mediaGrid");
+        mediaGrid.innerHTML = "";
+
+        const group = state.config.groups?.[state.activeColor];
+        const selected = new Set(group?.mediaIds || []);
+
+        for (const media of state.product.media || []) {
+          const label = media.alt || media.id.split("/").pop();
+          const card = document.createElement("label");
+          card.className = `media-card ${selected.has(media.id) ? "selected" : ""}`;
+          card.innerHTML = `
+            <input type="checkbox" ${selected.has(media.id) ? "checked" : ""} data-media-id="${escapeHtml(media.id)}" />
+            <img src="${media.url}" alt="">
+            <small>${escapeHtml(label)}</small>
+          `;
+          mediaGrid.append(card);
+        }
+
+        mediaGrid.querySelectorAll("[data-media-id]").forEach((input) => {
+          input.addEventListener("change", (event) => {
+            toggleMedia(event.currentTarget.dataset.mediaId, event.currentTarget.checked);
+          });
+        });
+      }
+
+      function toggleMedia(mediaId, checked) {
+        const group = state.config.groups?.[state.activeColor];
+        if (!group) return;
+
+        const next = new Set(group.mediaIds || []);
+        if (checked) next.add(mediaId);
+        else next.delete(mediaId);
+        group.mediaIds = Array.from(next);
+        renderMedia();
+        renderColors();
+        renderSummary();
+      }
+
+      function renderSummary() {
+        const summary = $("summary");
+        summary.innerHTML = "";
+
+        for (const [color, group] of Object.entries(state.config.groups || {})) {
+          const card = document.createElement("div");
+          card.className = "summary-card";
+          card.innerHTML = `
+            <div class="inline">
+              <span class="swatch" style="background:${escapeHtml(group.hex || "#667085")}"></span>
+              <strong>${escapeHtml(group.label || color)}</strong>
+            </div>
+            <div class="pill-row">
+              <span class="pill">${group.variantIds?.length || 0} variantes</span>
+              <span class="pill">${group.mediaIds?.length || 0} imagenes</span>
+            </div>
+          `;
+          summary.append(card);
+        }
+
+        $("jsonPreview").textContent = JSON.stringify(state.config, null, 2);
+      }
+
+      function rebuildColors() {
+        state.config.colorOptionName = $("colorOption").value;
+        state.config.sizeOptionName = $("sizeOption").value;
+        ensureGroupsFromOptions();
+        renderColors();
+        renderMedia();
+        renderSummary();
+      }
+
+      function autoAssignMediaFromVariants() {
+        const added = seedVariantImagesByColor(state.config, state.product, false);
+        renderColors();
+        renderMedia();
+        renderSummary();
+        setStatus(
+          "saveStatus",
+          added
+            ? `${added} imagenes agregadas desde las variantes. Guarda para mandarlo a Shopify.`
+            : "No encontre imagenes nuevas asignadas a variantes.",
+          added ? "ok" : "error"
+        );
+      }
+
+      function setAllMedia(checked) {
+        const group = state.config.groups?.[state.activeColor];
+        if (!group) return;
+        group.mediaIds = checked ? (state.product.media || []).map((media) => media.id) : [];
+        renderMedia();
+        renderColors();
+        renderSummary();
+      }
+
+      async function saveConfig() {
+        try {
+          if (!state.product) return;
+          setStatus("saveStatus", "Guardando en Shopify...");
+          state.config.colorOptionName = $("colorOption").value;
+          state.config.sizeOptionName = $("sizeOption").value;
+
+          await api("/api/variant-visuals/product", {
+            method: "POST",
+            body: JSON.stringify({
+              productId: state.product.id,
+              config: state.config
+            })
+          });
+
+          setStatus("saveStatus", "Configuracion guardada en la app y en metafield de Shopify.", "ok");
+        } catch (error) {
+          setStatus("saveStatus", error.message, "error");
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      $("saveConnection").addEventListener("click", saveConnection);
+      $("searchProducts").addEventListener("click", searchProducts);
+      $("loadProduct").addEventListener("click", () => loadProduct());
+      $("autoAssignMedia").addEventListener("click", autoAssignMediaFromVariants);
+      $("buildColors").addEventListener("click", rebuildColors);
+      $("colorOption").addEventListener("change", rebuildColors);
+      $("sizeOption").addEventListener("change", rebuildColors);
+      $("selectAllMedia").addEventListener("click", () => setAllMedia(true));
+      $("clearMedia").addEventListener("click", () => setAllMedia(false));
+      $("saveConfig").addEventListener("click", saveConfig);
+      $("productSearch").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") searchProducts();
+      });
+
+      loadConnection();
+      hydrateFromAdminLink().catch((error) => {
+        setStatus("searchStatus", error.message, "error");
+      });
+    </script>
+  </body>
+</html>

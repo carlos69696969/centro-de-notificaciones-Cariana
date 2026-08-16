@@ -1,0 +1,10 @@
+[[extensions]]
+name = "t:name"
+description = "Abre la configuracion visual de variantes para el producto actual."
+handle = "variant-visuals-product-link"
+type = "admin_link"
+uid = "e34488f6-fe70-44f0-a072-2e90f32d41a5"
+
+[[extensions.targeting]]
+target = "admin.product.action.link"
+url = "/variant-visuals"
