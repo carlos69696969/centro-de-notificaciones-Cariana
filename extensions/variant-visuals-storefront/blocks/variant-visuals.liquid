@@ -1,0 +1,32 @@
+{% if request.page_type == 'product' and product %}
+  {% assign variant_visuals_config = product.metafields.cariana_visuals.variant_image_map.value %}
+  {% if variant_visuals_config != blank %}
+    <script type="application/json" data-cariana-variant-visuals-config>
+      {{ variant_visuals_config | json }}
+    </script>
+    <script type="application/json" data-cariana-variant-visuals-media>
+      [
+        {% for media in product.media %}
+          {
+            "id": "{{ media.id }}",
+            "gid": "gid://shopify/MediaImage/{{ media.id }}",
+            "alt": {{ media.alt | json }},
+            "src": {{ media.preview_image | image_url: width: 2048 | json }}
+          }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      ]
+    </script>
+  {% endif %}
+{% endif %}
+
+{% schema %}
+{
+  "name": "Visual variants",
+  "target": "body",
+  "javascript": "variant-visuals.js",
+  "enabled_on": {
+    "templates": ["product"]
+  },
+  "settings": []
+}
+{% endschema %}
