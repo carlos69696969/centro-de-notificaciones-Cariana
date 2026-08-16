@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v32";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v33";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -46,7 +46,7 @@
       "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
       '[data-cariana-variant-visuals-option-unavailable="true"]{opacity:.32!important;pointer-events:none!important;filter:grayscale(1);}' +
       '[data-cariana-variant-visuals-option-soldout="true"]{opacity:.55!important;position:relative!important;}' +
-      '[data-cariana-variant-visuals-color-option="true"]{box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(17,24,39,.42)!important;border-color:rgba(17,24,39,.45)!important;}' +
+      '[data-cariana-variant-visuals-color-option="true"]{border:2px solid rgba(17,24,39,.62)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.85),0 0 0 2px #fff!important;outline:2px solid rgba(17,24,39,.28)!important;outline-offset:1px!important;}' +
       'button[data-cariana-variant-visuals-option-soldout="true"]::after,label[data-cariana-variant-visuals-option-soldout="true"]::after,[role="button"][data-cariana-variant-visuals-option-soldout="true"]::after,.variant-option__button-label[data-cariana-variant-visuals-option-soldout="true"]::after,.swatch-input__label[data-cariana-variant-visuals-option-soldout="true"]::after{content:"";position:absolute;left:10%;right:10%;top:50%;border-top:2px solid currentColor;transform:rotate(-14deg);pointer-events:none;}' +
       ".cariana-variant-visuals-gallery{display:block!important;width:100%;min-height:var(--cariana-variant-visuals-min-height,0px);margin:0 0 24px;transition:opacity .16s ease;}" +
       ".cariana-variant-visuals-gallery[data-cariana-updating='true']{opacity:.98;}" +
