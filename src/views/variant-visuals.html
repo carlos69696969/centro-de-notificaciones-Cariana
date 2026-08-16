@@ -90,7 +90,7 @@
         gap: 14px;
       }
 
-      .topbar,
+      .connection-panel,
       .panel,
       .product-card,
       .color-card,
@@ -100,8 +100,36 @@
         border-radius: 8px;
       }
 
+      .connection-panel summary {
+        min-height: 46px;
+        padding: 0 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--text);
+        cursor: pointer;
+        font-weight: 800;
+        list-style: none;
+      }
+
+      .connection-panel summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .connection-panel summary::after {
+        content: "Abrir";
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .connection-panel[open] summary::after {
+        content: "Cerrar";
+      }
+
       .topbar {
-        padding: 14px;
+        padding: 0 14px 14px;
         display: grid;
         grid-template-columns: minmax(190px, 260px) minmax(180px, 1fr) auto;
         gap: 10px;
@@ -141,7 +169,7 @@
 
       .layout {
         display: grid;
-        grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+        grid-template-columns: 1fr;
         gap: 14px;
         align-items: start;
       }
@@ -209,7 +237,8 @@
 
       .color-card {
         padding: 8px;
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(130px, 1fr) auto 32px;
         align-items: center;
         gap: 8px;
       }
@@ -239,6 +268,7 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        text-align: left;
       }
 
       .color-card input[type="color"] {
@@ -357,17 +387,23 @@
   </head>
   <body>
     <main class="shell">
-      <section class="topbar">
-        <label>
-          Tienda
-          <input id="shopDomain" placeholder="cariana-3.myshopify.com" />
-        </label>
-        <label>
-          API interna
-          <input id="apiKey" placeholder="APP_INTERNAL_API_KEY" type="password" />
-        </label>
-        <button id="saveConnection" class="secondary">Guardar conexion</button>
-      </section>
+      <details class="connection-panel">
+        <summary>
+          <span>Tienda</span>
+          <span id="connectionSummary" class="muted"></span>
+        </summary>
+        <section class="topbar">
+          <label>
+            Tienda
+            <input id="shopDomain" placeholder="cariana-3.myshopify.com" />
+          </label>
+          <label>
+            API interna
+            <input id="apiKey" placeholder="APP_INTERNAL_API_KEY" type="password" />
+          </label>
+          <button id="saveConnection" class="secondary">Guardar conexion</button>
+        </section>
+      </details>
 
       <section class="title-row">
         <div>
@@ -379,22 +415,6 @@
       <div id="saveStatus" class="status"></div>
 
       <section class="layout">
-        <aside class="panel">
-          <h2>Producto</h2>
-          <div class="stack">
-            <label>
-              Buscar por titulo, handle, ID o URL
-              <input id="productSearch" placeholder="Ej. blusa roja o /products/blusa-roja" />
-            </label>
-            <div class="inline">
-              <button id="searchProducts" class="ghost">Buscar</button>
-              <button id="loadProduct" class="secondary">Cargar directo</button>
-            </div>
-            <div id="searchStatus" class="status"></div>
-            <div id="productList" class="product-list"></div>
-          </div>
-        </aside>
-
         <section class="panel">
           <div class="title-row">
             <div>
@@ -403,24 +423,9 @@
             </div>
           </div>
 
-          <div class="settings-grid">
-            <label>
-              Opcion de color
-              <select id="colorOption"></select>
-            </label>
-            <label>
-              Opcion de talla
-              <select id="sizeOption"></select>
-            </label>
-          </div>
-
           <div class="panel" style="padding: 12px; background: var(--surface-soft)">
             <div class="title-row">
               <h3>Colores detectados</h3>
-              <div class="inline">
-                <button id="autoAssignMedia" class="ghost">Desde variantes</button>
-                <button id="buildColors" class="ghost">Actualizar colores</button>
-              </div>
             </div>
             <div id="colorGrid" class="color-grid"></div>
           </div>
@@ -454,6 +459,17 @@
 
       const $ = (id) => document.getElementById(id);
 
+      function on(id, event, handler) {
+        const node = $(id);
+        if (node) node.addEventListener(event, handler);
+      }
+
+      function updateConnectionSummary() {
+        const summary = $("connectionSummary");
+        if (!summary) return;
+        summary.textContent = $("shopDomain").value.trim() || "Sin tienda";
+      }
+
       function connection() {
         return {
           shopDomain: $("shopDomain").value.trim(),
@@ -464,12 +480,19 @@
       function saveConnection() {
         localStorage.setItem("carianaVariantVisualsShop", $("shopDomain").value.trim());
         localStorage.setItem("carianaVariantVisualsKey", $("apiKey").value.trim());
-        setStatus("searchStatus", "Conexion guardada.", "ok");
+        updateConnectionSummary();
+        setStatus("saveStatus", "Conexion guardada.", "ok");
+
+        const productInput = productInputFromUrlParams(new URLSearchParams(window.location.search));
+        if (productInput && $("apiKey").value.trim() && !state.product) {
+          loadProduct(productInput);
+        }
       }
 
       function loadConnection() {
         $("shopDomain").value = localStorage.getItem("carianaVariantVisualsShop") || "";
         $("apiKey").value = localStorage.getItem("carianaVariantVisualsKey") || "";
+        updateConnectionSummary();
       }
 
       function productInputFromUrlParams(params) {
@@ -507,14 +530,13 @@
         if (shop) {
           $("shopDomain").value = shop;
           localStorage.setItem("carianaVariantVisualsShop", shop);
+          updateConnectionSummary();
         }
 
         if (!productInput) return;
 
-        $("productSearch").value = productInput;
-
         if (!$("apiKey").value.trim()) {
-          setStatus("searchStatus", "Producto detectado desde Shopify. Pega la API interna y presiona Cargar directo.", "ok");
+          setStatus("saveStatus", "Producto detectado desde Shopify. Abre Tienda, pega la API interna y guarda la conexion.", "ok");
           return;
         }
 
@@ -546,7 +568,8 @@
       }
 
       function setStatus(id, message, tone = "") {
-        const node = $(id);
+        const node = $(id) || $("saveStatus");
+        if (!node) return;
         node.textContent = message || "";
         node.className = `status ${tone}`.trim();
       }
@@ -569,6 +592,7 @@
       }
 
       function renderProductSearch(products) {
+        if (!$("productList")) return;
         $("productList").innerHTML = "";
 
         for (const product of products) {
@@ -589,28 +613,29 @@
 
       async function searchProducts() {
         try {
-          setStatus("searchStatus", "Buscando...");
-          const query = $("productSearch").value.trim();
+          setStatus("saveStatus", "Buscando...");
+          const query = $("productSearch")?.value.trim() || "";
           const payload = await api(`/api/variant-visuals/products/search?query=${encodeURIComponent(query)}`);
           renderProductSearch(payload.products || []);
-          setStatus("searchStatus", `${payload.products?.length || 0} productos encontrados.`, "ok");
+          setStatus("saveStatus", `${payload.products?.length || 0} productos encontrados.`, "ok");
         } catch (error) {
-          setStatus("searchStatus", error.message, "error");
+          setStatus("saveStatus", error.message, "error");
         }
       }
 
-      async function loadProduct(input = $("productSearch").value.trim()) {
+      async function loadProduct(input = productInputFromUrlParams(new URLSearchParams(window.location.search))) {
         try {
-          setStatus("searchStatus", "Cargando producto...");
+          if (!input) throw new Error("Abre esta pantalla desde Mas acciones en un producto de Shopify.");
+          setStatus("saveStatus", "Cargando producto...");
           const payload = await api(`/api/variant-visuals/product?product=${encodeURIComponent(input)}`);
           state.product = payload.product;
           state.config = payload.savedConfig || buildDefaultConfig(payload.product);
           seedVariantImagesByColor(state.config, payload.product, true);
           state.activeColor = Object.keys(state.config.groups || {})[0] || "";
           renderProduct();
-          setStatus("searchStatus", "Producto cargado.", "ok");
+          setStatus("saveStatus", "Producto cargado.", "ok");
         } catch (error) {
-          setStatus("searchStatus", error.message, "error");
+          setStatus("saveStatus", error.message, "error");
         }
       }
 
@@ -757,6 +782,7 @@
       }
 
       function renderOptionSelects() {
+        if (!$("colorOption") || !$("sizeOption")) return;
         const options = state.product.options || [];
         $("colorOption").innerHTML = options.map(optionTemplate).join("");
         $("sizeOption").innerHTML = options.map(optionTemplate).join("");
@@ -934,8 +960,8 @@
       }
 
       function rebuildColors() {
-        state.config.colorOptionName = $("colorOption").value;
-        state.config.sizeOptionName = $("sizeOption").value;
+        if ($("colorOption")) state.config.colorOptionName = $("colorOption").value;
+        if ($("sizeOption")) state.config.sizeOptionName = $("sizeOption").value;
         ensureGroupsFromOptions();
         renderColors();
         renderMedia();
@@ -969,8 +995,8 @@
         try {
           if (!state.product) return;
           setStatus("saveStatus", "Guardando en Shopify...");
-          state.config.colorOptionName = $("colorOption").value;
-          state.config.sizeOptionName = $("sizeOption").value;
+          if ($("colorOption")) state.config.colorOptionName = $("colorOption").value;
+          if ($("sizeOption")) state.config.sizeOptionName = $("sizeOption").value;
 
           await api("/api/variant-visuals/product", {
             method: "POST",
@@ -994,17 +1020,17 @@
           .replace(/"/g, "&quot;");
       }
 
-      $("saveConnection").addEventListener("click", saveConnection);
-      $("searchProducts").addEventListener("click", searchProducts);
-      $("loadProduct").addEventListener("click", () => loadProduct());
-      $("autoAssignMedia").addEventListener("click", autoAssignMediaFromVariants);
-      $("buildColors").addEventListener("click", rebuildColors);
-      $("colorOption").addEventListener("change", rebuildColors);
-      $("sizeOption").addEventListener("change", rebuildColors);
-      $("selectAllMedia").addEventListener("click", () => setAllMedia(true));
-      $("clearMedia").addEventListener("click", () => setAllMedia(false));
-      $("saveConfig").addEventListener("click", saveConfig);
-      $("productSearch").addEventListener("keydown", (event) => {
+      on("saveConnection", "click", saveConnection);
+      on("searchProducts", "click", searchProducts);
+      on("loadProduct", "click", () => loadProduct());
+      on("autoAssignMedia", "click", autoAssignMediaFromVariants);
+      on("buildColors", "click", rebuildColors);
+      on("colorOption", "change", rebuildColors);
+      on("sizeOption", "change", rebuildColors);
+      on("selectAllMedia", "click", () => setAllMedia(true));
+      on("clearMedia", "click", () => setAllMedia(false));
+      on("saveConfig", "click", saveConfig);
+      on("productSearch", "keydown", (event) => {
         if (event.key === "Enter") searchProducts();
       });
 
