@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v23";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v24";
 
   function parseJson(selector) {
     var node = document.querySelector(selector);
@@ -129,6 +129,7 @@
 
   function sourceGallery() {
     var primary =
+      document.querySelector(".rio-media-gallery") ||
       document.querySelector("media-gallery") ||
       document.querySelector("[data-testid='media-gallery-grid']") ||
       document.querySelector(".media-gallery__grid") ||
@@ -170,6 +171,7 @@
       imageNodesForMedia(item).forEach(function (image) {
         if (image.closest(".cariana-variant-visuals-gallery")) return;
         var wrapper =
+          image.closest(".rio-media-gallery") ||
           image.closest("media-gallery") ||
           image.closest("[data-testid='media-gallery-grid']") ||
           image.closest(".media-gallery__grid") ||
@@ -184,6 +186,7 @@
     });
 
     return (
+      wrappers.find(function (node) { return node.matches && node.matches(".rio-media-gallery"); }) ||
       wrappers.find(function (node) { return node.matches && node.matches("media-gallery"); }) ||
       wrappers.find(function (node) { return node.matches && node.matches(".product-information__media"); }) ||
       wrappers[0] ||
@@ -224,6 +227,9 @@
     if (!gallery) {
       gallery = document.createElement("div");
       gallery.className = "cariana-variant-visuals-gallery";
+    }
+
+    if (gallery.parentElement !== nativeWrapper.parentElement || gallery.nextSibling !== nativeWrapper) {
       nativeWrapper.parentElement.insertBefore(gallery, nativeWrapper);
     }
 
@@ -273,7 +279,7 @@
   function originalGalleries() {
     var nodes = Array.from(
       document.querySelectorAll(
-        "media-gallery, slideshow-component, .product-information__media, .product-media-gallery, .product__media-wrapper, .product__media-list, [data-testid='media-gallery-grid'], .media-gallery__grid"
+        ".rio-media-gallery, media-gallery, slideshow-component, .product-information__media, .product-media-gallery, .product__media-wrapper, .product__media-list, [data-testid='media-gallery-grid'], .media-gallery__grid"
       )
     );
     var unique = [];
