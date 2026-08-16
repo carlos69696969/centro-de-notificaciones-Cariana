@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v33";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v34";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -46,7 +46,7 @@
       "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
       '[data-cariana-variant-visuals-option-unavailable="true"]{opacity:.32!important;pointer-events:none!important;filter:grayscale(1);}' +
       '[data-cariana-variant-visuals-option-soldout="true"]{opacity:.55!important;position:relative!important;}' +
-      '[data-cariana-variant-visuals-color-option="true"]{border:2px solid rgba(17,24,39,.62)!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.85),0 0 0 2px #fff!important;outline:2px solid rgba(17,24,39,.28)!important;outline-offset:1px!important;}' +
+      '[data-cariana-variant-visuals-color-option="true"],[data-cariana-variant-visuals-color-swatch="true"]{border:2px solid #374151!important;box-shadow:inset 0 0 0 2px #fff,0 0 0 2px #fff,0 0 0 4px #6b7280!important;outline:0!important;}' +
       'button[data-cariana-variant-visuals-option-soldout="true"]::after,label[data-cariana-variant-visuals-option-soldout="true"]::after,[role="button"][data-cariana-variant-visuals-option-soldout="true"]::after,.variant-option__button-label[data-cariana-variant-visuals-option-soldout="true"]::after,.swatch-input__label[data-cariana-variant-visuals-option-soldout="true"]::after{content:"";position:absolute;left:10%;right:10%;top:50%;border-top:2px solid currentColor;transform:rotate(-14deg);pointer-events:none;}' +
       ".cariana-variant-visuals-gallery{display:block!important;width:100%;min-height:var(--cariana-variant-visuals-min-height,0px);margin:0 0 24px;transition:opacity .16s ease;}" +
       ".cariana-variant-visuals-gallery[data-cariana-updating='true']{opacity:.98;}" +
@@ -212,6 +212,12 @@
       var label = document.querySelector('label[for="' + cssEscape(node.id) + '"]');
       if (label) return label;
     }
+    if (node.nextElementSibling && node.nextElementSibling.matches("label,button,[role='button'],.swatch-input__label,.variant-option__button-label")) {
+      return node.nextElementSibling;
+    }
+    if (node.previousElementSibling && node.previousElementSibling.matches("label,button,[role='button'],.swatch-input__label,.variant-option__button-label")) {
+      return node.previousElementSibling;
+    }
     return (
       node.closest("label") ||
       node.closest(".variant-option__button-label") ||
@@ -296,6 +302,24 @@
     var attribute = "data-cariana-variant-visuals-" + kind + "-option";
     if (control.node) control.node.setAttribute(attribute, "true");
     if (control.wrapper) control.wrapper.setAttribute(attribute, "true");
+
+    if (kind === "color") {
+      var visualNodes = [];
+      if (control.wrapper) {
+        visualNodes = Array.from(
+          control.wrapper.querySelectorAll(
+            ".swatch,.swatch-input__swatch,.color-swatch,[class*='swatch'],[style*='background']"
+          )
+        );
+      }
+      if (!visualNodes.length && control.wrapper) visualNodes = [control.wrapper];
+      visualNodes.forEach(function (node) {
+        node.setAttribute("data-cariana-variant-visuals-color-swatch", "true");
+        node.style.setProperty("border", "2px solid #374151", "important");
+        node.style.setProperty("box-shadow", "inset 0 0 0 2px #fff, 0 0 0 2px #fff, 0 0 0 4px #6b7280", "important");
+        node.style.setProperty("outline", "0", "important");
+      });
+    }
   }
 
   function chooseColorControl(controls) {
