@@ -6,5 +6,5 @@ type = "admin_link"
 uid = "e34488f6-fe70-44f0-a072-2e90f32d41a5"
 
 [[extensions.targeting]]
-target = "admin.product.action.link"
+target = "admin.product-details.action.link"
 url = "/variant-visuals"
