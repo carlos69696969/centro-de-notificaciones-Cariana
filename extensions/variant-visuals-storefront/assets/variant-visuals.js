@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v26";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v27";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -44,7 +44,8 @@
       '[data-cariana-variant-visuals-filtered="hidden"]{display:none!important;visibility:hidden!important;}' +
       '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
       "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
-      ".cariana-variant-visuals-gallery{display:block!important;width:100%;margin:0 0 24px;}" +
+      ".cariana-variant-visuals-gallery{display:block!important;width:100%;min-height:var(--cariana-variant-visuals-min-height,0px);margin:0 0 24px;transition:opacity .16s ease;}" +
+      ".cariana-variant-visuals-gallery[data-cariana-updating='true']{opacity:.98;}" +
       ".cariana-variant-visuals-gallery__track{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}" +
       ".cariana-variant-visuals-gallery__item{margin:0;min-width:0;}" +
       ".cariana-variant-visuals-gallery__image{display:block;width:100%;height:auto;object-fit:contain;}" +
@@ -249,6 +250,48 @@
     });
   }
 
+  function rememberGalleryHeight(gallery) {
+    if (!gallery) return;
+    var height = Math.ceil(gallery.getBoundingClientRect().height || 0);
+    if (height > 20) {
+      gallery.style.setProperty("--cariana-variant-visuals-min-height", height + "px");
+    }
+  }
+
+  function releaseGalleryHeight(gallery) {
+    if (!gallery) return;
+    window.setTimeout(function () {
+      gallery.style.removeProperty("--cariana-variant-visuals-min-height");
+    }, 220);
+  }
+
+  function imageIsReady(src) {
+    if (!src) return true;
+    return Array.from(document.images || []).some(function (image) {
+      return (image.currentSrc === src || image.src === src) && image.complete && image.naturalWidth > 0;
+    });
+  }
+
+  function preloadImage(src, callback) {
+    if (!src || imageIsReady(src)) {
+      callback();
+      return;
+    }
+
+    var image = new Image();
+    var done = false;
+    var finish = function () {
+      if (done) return;
+      done = true;
+      callback();
+    };
+
+    image.onload = finish;
+    image.onerror = finish;
+    image.src = src;
+    window.setTimeout(finish, 700);
+  }
+
   function renderReplacementGallery(media, group) {
     var nativeWrapper = commonGalleryWrapper(media);
     if (!nativeWrapper || !nativeWrapper.parentElement) return false;
@@ -280,11 +323,29 @@
     }
 
     if (gallery.getAttribute("data-cariana-render-key") !== renderKey) {
+      var firstSrc = selectedMedia[0] && selectedMedia[0].src;
+      if (gallery.children.length && gallery.getAttribute("data-cariana-pending-key") !== renderKey && !imageIsReady(firstSrc)) {
+        rememberGalleryHeight(gallery);
+        gallery.setAttribute("data-cariana-pending-key", renderKey);
+        gallery.setAttribute("data-cariana-updating", "true");
+        preloadImage(firstSrc, function () {
+          if (gallery.getAttribute("data-cariana-pending-key") === renderKey) {
+            gallery.removeAttribute("data-cariana-pending-key");
+            renderReplacementGallery(media, group);
+            keepReplacementGalleryVisible();
+          }
+        });
+        hideNativeGallery(media, true);
+        return true;
+      }
+
       var track = document.createElement("div");
       var dots = document.createElement("div");
 
+      rememberGalleryHeight(gallery);
       gallery.innerHTML = "";
       gallery.setAttribute("data-cariana-render-key", renderKey);
+      gallery.removeAttribute("data-cariana-pending-key");
       track.className = "cariana-variant-visuals-gallery__track";
       dots.className = "cariana-variant-visuals-gallery__dots";
 
@@ -311,6 +372,9 @@
       gallery.appendChild(track);
       gallery.appendChild(dots);
       bindReplacementCarousel(gallery);
+      track.scrollLeft = 0;
+      gallery.removeAttribute("data-cariana-updating");
+      releaseGalleryHeight(gallery);
     }
 
     gallery.hidden = false;
@@ -649,7 +713,7 @@
 
   function scheduleFilter() {
     window.clearTimeout(window.CarianaVariantVisualsTimer);
-    window.CarianaVariantVisualsTimer = window.setTimeout(applyFilter, 80);
+    window.CarianaVariantVisualsTimer = window.setTimeout(applyFilter, 32);
   }
 
   document.addEventListener("change", scheduleFilter, true);
