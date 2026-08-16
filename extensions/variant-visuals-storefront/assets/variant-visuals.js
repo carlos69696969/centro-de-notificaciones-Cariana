@@ -18,7 +18,11 @@
     style.id = "cariana-variant-visuals-style";
     style.textContent =
       '[data-cariana-variant-visuals-filtered="hidden"]{display:none!important;visibility:hidden!important;}' +
-      '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}';
+      '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
+      ".cariana-variant-visuals-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--image-gap,16px);width:100%;}" +
+      ".cariana-variant-visuals-gallery__item{margin:0;min-width:0;}" +
+      ".cariana-variant-visuals-gallery__image{display:block;width:100%;height:auto;object-fit:contain;}" +
+      "@media(max-width:749px){.cariana-variant-visuals-gallery{grid-template-columns:1fr;}}";
     document.head.appendChild(style);
   }
 
@@ -116,6 +120,64 @@
     return nodes;
   }
 
+  function sourceGallery() {
+    return (
+      document.querySelector(".product-information__media media-gallery") ||
+      document.querySelector("media-gallery") ||
+      document.querySelector(".product__media-list") ||
+      document.querySelector(".media-gallery__grid")
+    );
+  }
+
+  function setOriginalGalleryHidden(hidden) {
+    var gallery = sourceGallery();
+    if (!gallery) return;
+
+    gallery.setAttribute("data-cariana-variant-visuals-original", hidden ? "hidden" : "visible");
+    if (hidden) {
+      gallery.style.setProperty("display", "none", "important");
+      gallery.style.setProperty("visibility", "hidden", "important");
+    } else {
+      gallery.style.removeProperty("display");
+      gallery.style.removeProperty("visibility");
+    }
+  }
+
+  function renderCompactGallery(media, allowed) {
+    var gallery = sourceGallery();
+    if (!gallery) return false;
+
+    var compact = document.querySelector(".cariana-variant-visuals-gallery");
+    if (!compact) {
+      compact = document.createElement("div");
+      compact.className = "cariana-variant-visuals-gallery";
+      gallery.parentElement.insertBefore(compact, gallery);
+    }
+
+    var selectedMedia = media.filter(function (item) {
+      return Boolean(allowed[numericId(item.id || item.gid)]);
+    });
+
+    if (!selectedMedia.length) return false;
+
+    compact.innerHTML = "";
+    selectedMedia.forEach(function (item) {
+      var figure = document.createElement("figure");
+      var image = document.createElement("img");
+      figure.className = "cariana-variant-visuals-gallery__item";
+      image.className = "cariana-variant-visuals-gallery__image";
+      image.src = item.src;
+      image.alt = item.alt || "";
+      image.loading = "lazy";
+      figure.appendChild(image);
+      compact.appendChild(figure);
+    });
+
+    compact.hidden = false;
+    compact.style.removeProperty("display");
+    return true;
+  }
+
   function applyFilter() {
     installStyles();
 
@@ -130,6 +192,13 @@
     group.mediaIds.forEach(function (id) {
       allowed[numericId(id)] = true;
     });
+
+    if (renderCompactGallery(media, allowed)) {
+      setOriginalGalleryHidden(true);
+      return;
+    }
+
+    setOriginalGalleryHidden(false);
 
     var knownContainers = [];
     media.forEach(function (item) {
