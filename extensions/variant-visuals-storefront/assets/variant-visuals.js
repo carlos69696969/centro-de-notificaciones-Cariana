@@ -19,14 +19,7 @@
     style.textContent =
       '[data-cariana-variant-visuals-filtered="hidden"]{display:none!important;visibility:hidden!important;}' +
       '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
-      ".cariana-variant-visuals-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--image-gap,16px);width:100%;}" +
-      ".cariana-variant-visuals-gallery__item{margin:0;min-width:0;}" +
-      ".cariana-variant-visuals-gallery__image{display:block;width:100%;height:auto;object-fit:contain;}" +
-      "[data-cariana-variant-visuals-wrapper='hidden']{display:none!important;visibility:hidden!important;}" +
-      "body.cariana-variant-visuals-active media-gallery[data-cariana-variant-visuals-original]," +
-      "body.cariana-variant-visuals-active [data-testid='media-gallery-grid'][data-cariana-variant-visuals-original]," +
-      "body.cariana-variant-visuals-active .product__media-list[data-cariana-variant-visuals-original]{display:none!important;visibility:hidden!important;}" +
-      "@media(max-width:749px){.cariana-variant-visuals-gallery{grid-template-columns:1fr;}}";
+      ".cariana-variant-visuals-gallery{display:none!important;}";
     document.head.appendChild(style);
   }
 
@@ -205,39 +198,49 @@
     });
   }
 
-  function renderCompactGallery(media, allowed) {
-    var gallery = commonGalleryWrapper(media);
-    if (!gallery) return false;
+  function cssEscape(value) {
+    if (window.CSS && window.CSS.escape) return window.CSS.escape(value);
+    return String(value || "").replace(/["\\]/g, "\\$&");
+  }
 
-    var compact = document.querySelector(".cariana-variant-visuals-gallery");
-    if (!compact) {
-      compact = document.createElement("div");
-      compact.className = "cariana-variant-visuals-gallery";
-      gallery.parentElement.insertBefore(compact, gallery);
+  function applyNativeGalleryFilter(allowed) {
+    var style = document.getElementById("cariana-variant-visuals-native-filter");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "cariana-variant-visuals-native-filter";
+      document.head.appendChild(style);
     }
 
-    var selectedMedia = media.filter(function (item) {
-      return Boolean(allowed[numericId(item.id || item.gid)]);
+    var allowedIds = Object.keys(allowed).filter(Boolean);
+    if (!allowedIds.length) {
+      style.textContent = "";
+      return false;
+    }
+
+    var hideSelectors = [
+      "media-gallery li:has(.product-media[data-media-id])",
+      "media-gallery slideshow-slide:has(.product-media[data-media-id])",
+      "media-gallery .product-media-container:has(.product-media[data-media-id])",
+      "[data-testid='media-gallery-grid'] li:has(.product-media[data-media-id])",
+      ".product__media-list > *:has(.product-media[data-media-id])"
+    ];
+
+    var showSelectors = [];
+    allowedIds.forEach(function (id) {
+      var escapedId = cssEscape(id);
+      showSelectors.push("media-gallery li:has(.product-media[data-media-id='" + escapedId + "'])");
+      showSelectors.push("media-gallery slideshow-slide:has(.product-media[data-media-id='" + escapedId + "'])");
+      showSelectors.push("media-gallery .product-media-container:has(.product-media[data-media-id='" + escapedId + "'])");
+      showSelectors.push("[data-testid='media-gallery-grid'] li:has(.product-media[data-media-id='" + escapedId + "'])");
+      showSelectors.push(".product__media-list > *:has(.product-media[data-media-id='" + escapedId + "'])");
     });
 
-    if (!selectedMedia.length) return false;
+    style.textContent =
+      hideSelectors.join(",") +
+      "{display:none!important;visibility:hidden!important;}" +
+      showSelectors.join(",") +
+      "{display:revert!important;visibility:visible!important;}";
 
-    compact.innerHTML = "";
-    selectedMedia.forEach(function (item) {
-      var figure = document.createElement("figure");
-      var image = document.createElement("img");
-      figure.className = "cariana-variant-visuals-gallery__item";
-      image.className = "cariana-variant-visuals-gallery__image";
-      image.src = item.src;
-      image.alt = item.alt || "";
-      image.loading = "lazy";
-      figure.appendChild(image);
-      compact.appendChild(figure);
-    });
-
-    compact.hidden = false;
-    compact.style.removeProperty("display");
-    gallery.setAttribute("data-cariana-variant-visuals-wrapper", "hidden");
     if (document.body) document.body.classList.add("cariana-variant-visuals-active");
     return true;
   }
@@ -257,8 +260,8 @@
       allowed[numericId(id)] = true;
     });
 
-    if (renderCompactGallery(media, allowed)) {
-      setOriginalGalleryHidden(true);
+    if (applyNativeGalleryFilter(allowed)) {
+      setOriginalGalleryHidden(false);
       return;
     }
 
