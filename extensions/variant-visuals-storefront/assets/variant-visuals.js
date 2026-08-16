@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v21";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v22";
 
   function parseJson(selector) {
     var node = document.querySelector(selector);
@@ -133,7 +133,9 @@
       document.querySelector("[data-testid='media-gallery-grid']") ||
       document.querySelector(".media-gallery__grid") ||
       document.querySelector(".product__media-list") ||
-      document.querySelector(".product-information__media");
+      document.querySelector(".product-information__media") ||
+      document.querySelector(".product-media-gallery") ||
+      document.querySelector(".product__media-wrapper");
 
     if (primary) return primary.closest("media-gallery") || primary;
 
@@ -172,7 +174,9 @@
           image.closest("[data-testid='media-gallery-grid']") ||
           image.closest(".media-gallery__grid") ||
           image.closest(".product__media-list") ||
-          image.closest(".product-information__media");
+          image.closest(".product-information__media") ||
+          image.closest(".product-media-gallery") ||
+          image.closest(".product__media-wrapper");
         if (wrapper && wrappers.indexOf(wrapper) < 0 && !wrapper.classList.contains("cariana-variant-visuals-gallery")) {
           wrappers.push(wrapper);
         }
@@ -244,12 +248,19 @@
 
   function originalGalleries() {
     var nodes = Array.from(
-      document.querySelectorAll("media-gallery, .product__media-list, [data-testid='media-gallery-grid'], .media-gallery__grid")
+      document.querySelectorAll(
+        "media-gallery, slideshow-component, .product-information__media, .product-media-gallery, .product__media-wrapper, .product__media-list, [data-testid='media-gallery-grid'], .media-gallery__grid"
+      )
     );
     var unique = [];
     nodes.forEach(function (node) {
+      if (node.matches && node.matches("slideshow-component") && !node.querySelector(".product-media[data-media-id]")) return;
       var gallery = node.closest("media-gallery") || node;
-      if (unique.indexOf(gallery) < 0 && !gallery.classList.contains("cariana-variant-visuals-gallery")) {
+      if (
+        unique.indexOf(gallery) < 0 &&
+        !gallery.classList.contains("cariana-variant-visuals-gallery") &&
+        !gallery.querySelector(".cariana-variant-visuals-gallery")
+      ) {
         unique.push(gallery);
       }
     });
@@ -490,8 +501,12 @@
 
     var replacementRendered = renderReplacementGallery(media, group);
     var productMediaNodeCount = document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length;
-    var result = replacementRendered || applyNativeGalleryFilter(allowed);
-    var imageKeyNodeCount = replacementRendered ? 0 : applyImageKeyFilter(media, Object.keys(allowed));
+    var nativeFilterResult = applyNativeGalleryFilter(allowed);
+    var imageKeyNodeCount = applyImageKeyFilter(media, Object.keys(allowed));
+    var result = replacementRendered || nativeFilterResult || imageKeyNodeCount > 0;
+    var selectedReplacementMedia = media.filter(function (item) {
+      return Boolean(allowed[numericId(item.id || item.gid)]);
+    });
     showDebug({
       loaded: true,
       version: SCRIPT_VERSION,
@@ -503,8 +518,13 @@
       selectedOptions: selectedOptions(),
       selectedVariantId: selectedVariantId(),
       allowedNumericIds: Object.keys(allowed),
+      replacementMediaCount: selectedReplacementMedia.length,
+      replacementMedia: selectedReplacementMedia.map(function (item) {
+        return { id: numericId(item.id || item.gid), key: item.key || "", alt: item.alt || "" };
+      }),
       productMediaNodes: productMediaNodeCount,
       imageKeyNodes: imageKeyNodeCount,
+      originalGalleryNodes: originalGalleries().length,
       slideshowSlides: document.querySelectorAll("slideshow-slide").length,
       nativeFilterApplied: Boolean(result),
       replacementGallery: replacementRendered
