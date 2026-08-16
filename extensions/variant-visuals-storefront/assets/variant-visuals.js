@@ -22,6 +22,7 @@
       ".cariana-variant-visuals-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--image-gap,16px);width:100%;}" +
       ".cariana-variant-visuals-gallery__item{margin:0;min-width:0;}" +
       ".cariana-variant-visuals-gallery__image{display:block;width:100%;height:auto;object-fit:contain;}" +
+      "[data-cariana-variant-visuals-wrapper='hidden']{display:none!important;visibility:hidden!important;}" +
       "body.cariana-variant-visuals-active media-gallery[data-cariana-variant-visuals-original]," +
       "body.cariana-variant-visuals-active [data-testid='media-gallery-grid'][data-cariana-variant-visuals-original]," +
       "body.cariana-variant-visuals-active .product__media-list[data-cariana-variant-visuals-original]{display:none!important;visibility:hidden!important;}" +
@@ -109,64 +110,65 @@
     return firstKey ? groups[firstKey] : null;
   }
 
-  function mediaContainer(node) {
-    return (
-      node.closest(
-        [
-          ".product__media-item",
-          ".product-gallery__media",
-          ".media-gallery__item",
-          ".thumbnail-list__item",
-          ".product__media-list > *",
-          ".slider__slide",
-          "li"
-        ].join(", ")
-      ) ||
-      node.closest(".product-media-container, [data-product-media], product-media") ||
-      node
-    );
-  }
-
-  function matchingNodesForMedia(media) {
-    var id = numericId(media.id || media.gid);
-    var nodes = [];
-    if (id) {
-      document.querySelectorAll('[data-media-id*="' + id + '"], [data-thumbnail-id*="' + id + '"], [id*="' + id + '"]').forEach(function (node) {
-        nodes.push(mediaContainer(node));
-      });
-    }
-
-    var srcKey = String(media.src || "").split("?")[0].split("/").pop();
-    if (srcKey) {
-      document.querySelectorAll("img, source, a").forEach(function (node) {
-        var url = node.currentSrc || node.src || node.href || "";
-        if (url.indexOf(srcKey) >= 0) nodes.push(mediaContainer(node));
-      });
-    }
-
-    return nodes;
-  }
-
   function sourceGallery() {
     var primary =
-      document.querySelector(".product-information__media media-gallery") ||
       document.querySelector("media-gallery") ||
-      document.querySelector(".product__media-list") ||
       document.querySelector("[data-testid='media-gallery-grid']") ||
-      document.querySelector(".media-gallery__grid");
+      document.querySelector(".media-gallery__grid") ||
+      document.querySelector(".product__media-list") ||
+      document.querySelector(".product-information__media");
 
     if (primary) return primary.closest("media-gallery") || primary;
 
-    var configMedia = parseJson("[data-cariana-variant-visuals-media]") || [];
-    for (var index = 0; index < configMedia.length; index += 1) {
-      var nodes = matchingNodesForMedia(configMedia[index]);
-      for (var nodeIndex = 0; nodeIndex < nodes.length; nodeIndex += 1) {
-        var gallery = nodes[nodeIndex].closest("media-gallery, .product__media-list, [data-testid='media-gallery-grid']");
-        if (gallery) return gallery.closest("media-gallery") || gallery;
-      }
-    }
-
     return null;
+  }
+
+  function mediaFileKey(media) {
+    if (media.key) return media.key;
+    return String(media.src || "").split("?")[0].split("/").pop();
+  }
+
+  function imageNodesForMedia(media) {
+    var key = mediaFileKey(media);
+    if (!key) return [];
+
+    return Array.from(document.querySelectorAll("img")).filter(function (image) {
+      var candidates = [
+        image.currentSrc,
+        image.src,
+        image.getAttribute("src"),
+        image.getAttribute("srcset"),
+        image.getAttribute("data-src"),
+        image.getAttribute("data-srcset")
+      ].join(" ");
+      return candidates.indexOf(key) >= 0;
+    });
+  }
+
+  function commonGalleryWrapper(media) {
+    var wrappers = [];
+    media.forEach(function (item) {
+      imageNodesForMedia(item).forEach(function (image) {
+        if (image.closest(".cariana-variant-visuals-gallery")) return;
+        var wrapper =
+          image.closest("media-gallery") ||
+          image.closest("[data-testid='media-gallery-grid']") ||
+          image.closest(".media-gallery__grid") ||
+          image.closest(".product__media-list") ||
+          image.closest(".product-information__media") ||
+          image.closest("section");
+        if (wrapper && wrappers.indexOf(wrapper) < 0 && !wrapper.classList.contains("cariana-variant-visuals-gallery")) {
+          wrappers.push(wrapper);
+        }
+      });
+    });
+
+    return (
+      wrappers.find(function (node) { return node.matches && node.matches("media-gallery"); }) ||
+      wrappers.find(function (node) { return node.matches && node.matches(".product-information__media"); }) ||
+      wrappers[0] ||
+      sourceGallery()
+    );
   }
 
   function originalGalleries() {
@@ -204,7 +206,7 @@
   }
 
   function renderCompactGallery(media, allowed) {
-    var gallery = sourceGallery();
+    var gallery = commonGalleryWrapper(media);
     if (!gallery) return false;
 
     var compact = document.querySelector(".cariana-variant-visuals-gallery");
@@ -235,6 +237,8 @@
 
     compact.hidden = false;
     compact.style.removeProperty("display");
+    gallery.setAttribute("data-cariana-variant-visuals-wrapper", "hidden");
+    if (document.body) document.body.classList.add("cariana-variant-visuals-active");
     return true;
   }
 
@@ -259,36 +263,6 @@
     }
 
     setOriginalGalleryHidden(false);
-
-    var knownContainers = [];
-    media.forEach(function (item) {
-      matchingNodesForMedia(item).forEach(function (container) {
-        if (knownContainers.indexOf(container) < 0) knownContainers.push(container);
-      });
-    });
-
-    knownContainers.forEach(function (container) {
-      var itemId = "";
-      media.some(function (item) {
-        var nodes = matchingNodesForMedia(item);
-        if (nodes.indexOf(container) >= 0) {
-          itemId = numericId(item.id || item.gid);
-          return true;
-        }
-        return false;
-      });
-
-      var shouldShow = Boolean(allowed[itemId]);
-      container.hidden = !shouldShow;
-      if (shouldShow) {
-        container.style.removeProperty("display");
-        container.style.removeProperty("visibility");
-      } else {
-        container.style.setProperty("display", "none", "important");
-        container.style.setProperty("visibility", "hidden", "important");
-      }
-      container.setAttribute("data-cariana-variant-visuals-filtered", shouldShow ? "visible" : "hidden");
-    });
   }
 
   function scheduleFilter() {
