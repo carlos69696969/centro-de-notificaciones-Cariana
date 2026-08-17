@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v37";
+  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v39";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -46,9 +46,10 @@
       "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
       '[data-cariana-variant-visuals-option-unavailable="true"]{opacity:.32!important;pointer-events:none!important;filter:grayscale(1);}' +
       '[data-cariana-variant-visuals-option-soldout="true"]{opacity:.55!important;position:relative!important;}' +
-      'label[data-cariana-variant-visuals-color-option="true"],button[data-cariana-variant-visuals-color-option="true"],[role="button"][data-cariana-variant-visuals-color-option="true"],.swatch-input__label[data-cariana-variant-visuals-color-option="true"],.variant-option__button-label[data-cariana-variant-visuals-color-option="true"]{box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:34px!important;min-height:34px!important;padding:3px!important;border:1.5px solid #a8b0bd!important;border-radius:999px!important;background:#fff!important;box-shadow:0 1px 2px rgba(17,24,39,.14)!important;outline:0!important;}' +
-      '[data-cariana-variant-visuals-color-swatch="true"]{border:1.5px solid #9ca3af!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.9)!important;outline:0!important;}' +
-      ".cariana-variant-visuals-swatch-ring{position:absolute!important;inset:-2px!important;border:1.5px solid #a8b0bd!important;border-radius:999px!important;box-shadow:0 1px 3px rgba(17,24,39,.16)!important;pointer-events:none!important;z-index:3!important;}" +
+      'label[data-cariana-variant-visuals-color-option="true"],button[data-cariana-variant-visuals-color-option="true"],[role="button"][data-cariana-variant-visuals-color-option="true"],.swatch-input__label[data-cariana-variant-visuals-color-option="true"],.variant-option__button-label[data-cariana-variant-visuals-color-option="true"],.cariana-variant-visuals-color-button{box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;padding:4px!important;border:2px solid #8f98a8!important;border-radius:999px!important;background:#fff!important;box-shadow:0 1px 3px rgba(17,24,39,.22)!important;outline:0!important;}' +
+      '[data-cariana-variant-visuals-color-swatch="true"]{box-sizing:border-box!important;width:28px!important;height:28px!important;border:4px solid #fff!important;border-radius:999px!important;box-shadow:0 0 0 2px #8f98a8,inset 0 0 0 1px rgba(17,24,39,.18),0 1px 3px rgba(17,24,39,.2)!important;outline:0!important;}' +
+      ".cariana-variant-visuals-swatch-ring{position:absolute!important;inset:1px!important;border:2px solid #8f98a8!important;border-radius:999px!important;box-shadow:0 1px 3px rgba(17,24,39,.18)!important;pointer-events:none!important;z-index:3!important;}" +
+      'input[type="radio"]:checked + [data-cariana-variant-visuals-color-option="true"],[data-cariana-variant-visuals-color-option="true"][aria-selected="true"],[data-cariana-variant-visuals-color-option="true"].is-selected{border-color:#111827!important;box-shadow:0 0 0 2px #111827,0 2px 4px rgba(17,24,39,.24)!important;}' +
       'button[data-cariana-variant-visuals-option-soldout="true"]::after,label[data-cariana-variant-visuals-option-soldout="true"]::after,[role="button"][data-cariana-variant-visuals-option-soldout="true"]::after,.variant-option__button-label[data-cariana-variant-visuals-option-soldout="true"]::after,.swatch-input__label[data-cariana-variant-visuals-option-soldout="true"]::after{content:"";position:absolute;left:10%;right:10%;top:50%;border-top:2px solid currentColor;transform:rotate(-14deg);pointer-events:none;}' +
       ".cariana-variant-visuals-gallery{display:block!important;width:100%;min-height:var(--cariana-variant-visuals-min-height,0px);margin:0 0 24px;transition:opacity .16s ease;}" +
       ".cariana-variant-visuals-gallery[data-cariana-updating='true']{opacity:.98;}" +
@@ -99,7 +100,7 @@
         if (optionName && value) result[normalize(optionName)] = value.trim();
       });
 
-    document.querySelectorAll("fieldset.variant-option").forEach(function (fieldset) {
+    document.querySelectorAll("fieldset").forEach(function (fieldset) {
       var legend = fieldset.querySelector("legend");
       var checked = fieldset.querySelector('input[type="radio"]:checked, input[data-current-checked="true"]');
       if (!legend || !checked) return;
@@ -237,8 +238,7 @@
     document
       .querySelectorAll(
         [
-          'input[type="radio"][name^="options["]',
-          'input[type="radio"][data-option-name]',
+          'input[type="radio"]',
           "[data-variant-option]"
         ].join(", ")
       )
@@ -253,7 +253,7 @@
         });
       });
 
-    document.querySelectorAll("fieldset.variant-option").forEach(function (fieldset) {
+    document.querySelectorAll("fieldset").forEach(function (fieldset) {
       var legend = fieldset.querySelector("legend");
       var fieldsetOptionName = legend && legend.childNodes[0] ? legend.childNodes[0].textContent : legend && legend.textContent;
       if (normalize(fieldsetOptionName) !== normalizedOptionName) return;
@@ -307,19 +307,22 @@
 
     if (kind === "color") {
       if (control.wrapper) {
+        control.wrapper.classList.add("cariana-variant-visuals-color-button");
         control.wrapper.style.setProperty("position", "relative", "important");
         control.wrapper.style.setProperty("overflow", "visible", "important");
         control.wrapper.style.setProperty("box-sizing", "border-box", "important");
         control.wrapper.style.setProperty("display", "inline-flex", "important");
         control.wrapper.style.setProperty("align-items", "center", "important");
         control.wrapper.style.setProperty("justify-content", "center", "important");
-        control.wrapper.style.setProperty("min-width", "34px", "important");
-        control.wrapper.style.setProperty("min-height", "34px", "important");
-        control.wrapper.style.setProperty("padding", "3px", "important");
-        control.wrapper.style.setProperty("border", "1.5px solid #a8b0bd", "important");
+        control.wrapper.style.setProperty("width", "38px", "important");
+        control.wrapper.style.setProperty("height", "38px", "important");
+        control.wrapper.style.setProperty("min-width", "38px", "important");
+        control.wrapper.style.setProperty("min-height", "38px", "important");
+        control.wrapper.style.setProperty("padding", "4px", "important");
+        control.wrapper.style.setProperty("border", "2px solid #8f98a8", "important");
         control.wrapper.style.setProperty("border-radius", "999px", "important");
         control.wrapper.style.setProperty("background", "#fff", "important");
-        control.wrapper.style.setProperty("box-shadow", "0 1px 2px rgba(17,24,39,.14)", "important");
+        control.wrapper.style.setProperty("box-shadow", "0 1px 3px rgba(17,24,39,.22)", "important");
         if (!control.wrapper.querySelector(".cariana-variant-visuals-swatch-ring")) {
           var ring = document.createElement("span");
           ring.className = "cariana-variant-visuals-swatch-ring";
@@ -339,8 +342,12 @@
       if (!visualNodes.length && control.wrapper) visualNodes = [control.wrapper];
       visualNodes.forEach(function (node) {
         node.setAttribute("data-cariana-variant-visuals-color-swatch", "true");
-        node.style.setProperty("border", "1.5px solid #9ca3af", "important");
-        node.style.setProperty("box-shadow", "inset 0 0 0 1px rgba(255,255,255,.9)", "important");
+        node.style.setProperty("box-sizing", "border-box", "important");
+        node.style.setProperty("width", "28px", "important");
+        node.style.setProperty("height", "28px", "important");
+        node.style.setProperty("border", "4px solid #fff", "important");
+        node.style.setProperty("border-radius", "999px", "important");
+        node.style.setProperty("box-shadow", "0 0 0 2px #8f98a8, inset 0 0 0 1px rgba(17,24,39,.18), 0 1px 3px rgba(17,24,39,.2)", "important");
         node.style.setProperty("outline", "0", "important");
       });
     }
