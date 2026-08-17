@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="shopify-api-key" content="fe9abcb93f4b4191be77701f482dec83" />
     <title>CARIANA Visual Variants</title>
+    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
     <style>
       :root {
         --bg: #f5f6f8;
@@ -1282,14 +1284,39 @@
         return `https://admin.shopify.com/store/${encodeURIComponent(storeHandle)}/products/${productId}`;
       }
 
+      function shopifyProductAdminProtocolUrl() {
+        const productId = numericProductId(state.product?.id || productInputFromUrlParams(new URLSearchParams(window.location.search)));
+
+        return productId ? `shopify:admin/products/${productId}` : "";
+      }
+
       function redirectToShopifyProduct() {
-        const url = shopifyProductAdminUrl();
-        if (!url) return;
+        const appBridgeUrl = shopifyProductAdminProtocolUrl();
+        const adminUrl = shopifyProductAdminUrl();
+        const url = appBridgeUrl || adminUrl;
+
+        if (!url) {
+          $("saveConfig").disabled = false;
+          setStatus("saveStatus", "Configuracion guardada. No pude encontrar el enlace del producto.", "ok");
+          return;
+        }
 
         try {
-          window.top.location.assign(url);
+          if (window.shopify && typeof window.shopify.open === "function" && appBridgeUrl) {
+            window.shopify.open(appBridgeUrl, "_top");
+            return;
+          }
+
+          const link = document.createElement("a");
+          link.href = url;
+          link.target = "_top";
+          link.rel = "noopener";
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
         } catch (_error) {
-          window.location.assign(url);
+          $("saveConfig").disabled = false;
+          setStatus("saveStatus", "Configuracion guardada. No pude abrir el producto automaticamente.", "ok");
         }
       }
 
