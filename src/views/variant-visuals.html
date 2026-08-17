@@ -346,6 +346,60 @@
         border-radius: 999px;
         cursor: pointer;
         accent-color: var(--picker-hex);
+        background: transparent;
+        appearance: none;
+        -webkit-appearance: none;
+      }
+
+      .custom-color-hue::-webkit-slider-runnable-track {
+        height: 12px;
+        border-radius: 999px;
+        background: linear-gradient(
+          to right,
+          #ff0000 0%,
+          #ffff00 16.66%,
+          #00ff00 33.33%,
+          #00ffff 50%,
+          #0000ff 66.66%,
+          #ff00ff 83.33%,
+          #ff0000 100%
+        );
+      }
+
+      .custom-color-hue::-webkit-slider-thumb {
+        width: 18px;
+        height: 18px;
+        margin-top: -3px;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        background: var(--picker-hex);
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.65), 0 1px 3px rgba(15, 23, 42, 0.2);
+        appearance: none;
+        -webkit-appearance: none;
+      }
+
+      .custom-color-hue::-moz-range-track {
+        height: 12px;
+        border-radius: 999px;
+        background: linear-gradient(
+          to right,
+          #ff0000 0%,
+          #ffff00 16.66%,
+          #00ff00 33.33%,
+          #00ffff 50%,
+          #0000ff 66.66%,
+          #ff00ff 83.33%,
+          #ff0000 100%
+        );
+      }
+
+      .custom-color-hue::-moz-range-thumb {
+        width: 18px;
+        height: 18px;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        background: var(--picker-hex);
+        box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.65), 0 1px 3px rgba(15, 23, 42, 0.2);
       }
 
       .custom-color-done {
