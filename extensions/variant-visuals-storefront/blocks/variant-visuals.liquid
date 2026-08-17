@@ -25,10 +25,10 @@
             "gid": "gid://shopify/ProductVariant/{{ variant.id }}",
             "available": {{ variant.available | json }},
             "selectedOptions": [
-              {% for option in variant.selected_options %}
+              {% for option_value in variant.options %}
                 {
-                  "name": {{ option.name | json }},
-                  "value": {{ option.value | json }}
+                  "name": {{ product.options[forloop.index0] | json }},
+                  "value": {{ option_value | json }}
                 }{% unless forloop.last %},{% endunless %}
               {% endfor %}
             ]
