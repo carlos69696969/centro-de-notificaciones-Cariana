@@ -857,6 +857,14 @@
             event.stopPropagation();
           });
           node.addEventListener("input", (event) => {
+            const picker = event.currentTarget;
+            const group = state.config.groups[picker.dataset.color];
+            if (!group) return;
+
+            group.hex = picker.value;
+            picker.previousElementSibling?.style.setProperty("background", picker.value);
+          });
+          node.addEventListener("change", (event) => {
             state.config.groups[event.currentTarget.dataset.color].hex = event.currentTarget.value;
             renderColors();
             renderSummary();

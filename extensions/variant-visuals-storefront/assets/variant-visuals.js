@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-16-gallery-replacement-v39";
+  var SCRIPT_VERSION = "2026-08-17-admin-color-hex-v40";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -72,6 +72,26 @@
   function numericId(value) {
     var match = String(value || "").match(/(\d{8,})(?!.*\d)/);
     return match ? match[1] : "";
+  }
+
+  function validHex(value) {
+    var text = String(value || "").trim();
+    return /^#[0-9a-f]{6}$/i.test(text) ? text : "";
+  }
+
+  function groupForColorValue(config, colorValue) {
+    var groups = (config && config.groups) || {};
+    var wanted = normalize(colorValue);
+    if (!wanted) return null;
+
+    for (var colorName in groups) {
+      if (!Object.prototype.hasOwnProperty.call(groups, colorName)) continue;
+
+      var group = groups[colorName] || {};
+      if (normalize(colorName) === wanted || normalize(group.label) === wanted) return group;
+    }
+
+    return null;
   }
 
   function optionNameFromInput(input) {
@@ -299,13 +319,15 @@
     }
   }
 
-  function markOptionControlKind(control, kind) {
+  function markOptionControlKind(control, kind, group) {
     if (!control || !kind) return;
     var attribute = "data-cariana-variant-visuals-" + kind + "-option";
     if (control.node) control.node.setAttribute(attribute, "true");
     if (control.wrapper) control.wrapper.setAttribute(attribute, "true");
 
     if (kind === "color") {
+      var hex = validHex(group && group.hex);
+
       if (control.wrapper) {
         control.wrapper.classList.add("cariana-variant-visuals-color-button");
         control.wrapper.style.setProperty("position", "relative", "important");
@@ -349,6 +371,11 @@
         node.style.setProperty("border-radius", "999px", "important");
         node.style.setProperty("box-shadow", "0 0 0 2px #8f98a8, inset 0 0 0 1px rgba(17,24,39,.18), 0 1px 3px rgba(17,24,39,.2)", "important");
         node.style.setProperty("outline", "0", "important");
+        if (hex) {
+          node.style.setProperty("background", hex, "important");
+          node.style.setProperty("background-color", hex, "important");
+          node.style.setProperty("background-image", "none", "important");
+        }
       });
     }
   }
@@ -393,9 +420,9 @@
 
     colorControls.forEach(function (control) {
       var colorKey = normalize(control.value);
-      var group = (config.groups || {})[control.value];
+      var group = (config.groups || {})[control.value] || groupForColorValue(config, control.value);
       var labelKey = group && group.label ? normalize(group.label) : "";
-      markOptionControlKind(control, "color");
+      markOptionControlKind(control, "color", group);
       setOptionControlStatus(control, colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false });
     });
 
