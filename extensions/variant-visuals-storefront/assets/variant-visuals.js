@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-17-admin-color-hex-v40";
+  var SCRIPT_VERSION = "2026-08-17-size-soldout-v41";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -219,7 +219,7 @@
 
       if (!map[key]) map[key] = { exists: false, available: false };
       map[key].exists = true;
-      if (variant.available !== false) map[key].available = true;
+      if (variant.available !== false && variant.availableForSale !== false) map[key].available = true;
     });
 
     return map;
@@ -428,6 +428,7 @@
 
     sizeControls.forEach(function (control) {
       var sizeKey = normalize(control.value);
+      markOptionControlKind(control, "size");
       setOptionControlStatus(control, sizeStatuses[sizeKey] || { exists: false, available: false });
     });
 
