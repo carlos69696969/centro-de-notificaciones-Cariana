@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-17-size-soldout-v41";
+  var SCRIPT_VERSION = "2026-08-17-muted-soldout-colors-v42";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -45,7 +45,8 @@
       '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
       "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
       '[data-cariana-variant-visuals-option-unavailable="true"]{opacity:.32!important;pointer-events:none!important;filter:grayscale(1);}' +
-      '[data-cariana-variant-visuals-option-soldout="true"]{opacity:.55!important;position:relative!important;}' +
+      '[data-cariana-variant-visuals-option-soldout="true"]{position:relative!important;}' +
+      '[data-cariana-variant-visuals-color-option="true"][data-cariana-variant-visuals-option-soldout="true"] [data-cariana-variant-visuals-color-swatch="true"]{filter:saturate(.62) brightness(.9)!important;opacity:.58!important;}' +
       'label[data-cariana-variant-visuals-color-option="true"],button[data-cariana-variant-visuals-color-option="true"],[role="button"][data-cariana-variant-visuals-color-option="true"],.swatch-input__label[data-cariana-variant-visuals-color-option="true"],.variant-option__button-label[data-cariana-variant-visuals-color-option="true"],.cariana-variant-visuals-color-button{box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;padding:4px!important;border:2px solid #8f98a8!important;border-radius:999px!important;background:#fff!important;box-shadow:0 1px 3px rgba(17,24,39,.22)!important;outline:0!important;}' +
       '[data-cariana-variant-visuals-color-swatch="true"]{box-sizing:border-box!important;width:28px!important;height:28px!important;border:4px solid #fff!important;border-radius:999px!important;box-shadow:0 0 0 2px #8f98a8,inset 0 0 0 1px rgba(17,24,39,.18),0 1px 3px rgba(17,24,39,.2)!important;outline:0!important;}' +
       ".cariana-variant-visuals-swatch-ring{position:absolute!important;inset:1px!important;border:2px solid #8f98a8!important;border-radius:999px!important;box-shadow:0 1px 3px rgba(17,24,39,.18)!important;pointer-events:none!important;z-index:3!important;}" +
