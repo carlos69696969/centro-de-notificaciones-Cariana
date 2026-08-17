@@ -515,7 +515,7 @@
 
       <section class="title-row">
         <div>
-          <h1>Visual Variants CARIANA</h1>
+          <h1>Variantes visual Cariana</h1>
           <div class="muted">Colores, tallas e imagenes agrupadas por producto</div>
         </div>
         <button id="saveConfig" disabled>Guardar en Shopify</button>
@@ -1239,6 +1239,7 @@
       async function saveConfig() {
         try {
           if (!state.product) return;
+          $("saveConfig").disabled = true;
           setStatus("saveStatus", "Guardando en Shopify...");
           if ($("colorOption")) state.config.colorOptionName = $("colorOption").value;
           if ($("sizeOption")) state.config.sizeOptionName = $("sizeOption").value;
@@ -1251,9 +1252,44 @@
             })
           });
 
-          setStatus("saveStatus", "Configuracion guardada en la app y en metafield de Shopify.", "ok");
+          setStatus("saveStatus", "Configuracion guardada. Regresando al producto...", "ok");
+          setTimeout(redirectToShopifyProduct, 450);
         } catch (error) {
+          $("saveConfig").disabled = false;
           setStatus("saveStatus", error.message, "error");
+        }
+      }
+
+      function numericProductId(value) {
+        const match = String(value || "").match(/\d{8,}/);
+        return match ? match[0] : "";
+      }
+
+      function shopifyAdminStoreHandle() {
+        const match = window.location.pathname.match(/\/store\/([^/]+)/);
+        if (match) return decodeURIComponent(match[1]);
+
+        const shopDomain = connection().shopDomain;
+        return shopDomain ? shopDomain.replace(/\.myshopify\.com$/i, "") : "";
+      }
+
+      function shopifyProductAdminUrl() {
+        const productId = numericProductId(state.product?.id || productInputFromUrlParams(new URLSearchParams(window.location.search)));
+        const storeHandle = shopifyAdminStoreHandle();
+
+        if (!productId || !storeHandle) return "";
+
+        return `https://admin.shopify.com/store/${encodeURIComponent(storeHandle)}/products/${productId}`;
+      }
+
+      function redirectToShopifyProduct() {
+        const url = shopifyProductAdminUrl();
+        if (!url) return;
+
+        try {
+          window.top.location.assign(url);
+        } catch (_error) {
+          window.location.assign(url);
         }
       }
 
