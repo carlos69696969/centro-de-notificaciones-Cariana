@@ -12,6 +12,9 @@
             "gid": "gid://shopify/MediaImage/{{ media.id }}",
             "alt": {{ media.alt | json }},
             "src": {{ media.preview_image | image_url: width: 2048 | json }},
+            "width": {{ media.preview_image.width | json }},
+            "height": {{ media.preview_image.height | json }},
+            "aspectRatio": {{ media.preview_image.aspect_ratio | json }},
             "key": {{ media.preview_image.src | split: '/' | last | split: '?' | first | json }}
           }{% unless forloop.last %},{% endunless %}
         {% endfor %}
