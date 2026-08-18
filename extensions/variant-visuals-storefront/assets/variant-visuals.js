@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v56";
+  var SCRIPT_VERSION = "2026-08-18-select-first-valid-color-v57";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
   var persistentSelectedOptions = {};
@@ -503,22 +503,25 @@
     }
   }
 
-  function forceHideMissingNativeColorOptions(colorOptionName) {
+  function forceHideMissingNativeColorOptions(colorOptionName, config, colorStatuses) {
     optionControls(colorOptionName).forEach(function (control) {
       var node = control && control.node;
       if (!node || node.tagName !== "INPUT" || !node.hasAttribute("data-option-available")) return;
 
-      var missing = node.getAttribute("data-option-available") === "false" && !numericId(node.getAttribute("data-variant-id"));
+      var status = config && colorStatuses ? colorControlStatus(config, colorStatuses, control) : null;
+      var nativeMissing = node.getAttribute("data-option-available") === "false" && !numericId(node.getAttribute("data-variant-id"));
+      var missing = status ? status.exists === false : nativeMissing;
+
       setMissingVisualState(control.wrapper || node, missing);
       node.setAttribute("data-cariana-variant-visuals-option-missing", missing ? "true" : "false");
       if (missing && node.checked) node.checked = false;
     });
   }
 
-  function scheduleNativeColorOptionRefresh(colorOptionName) {
+  function scheduleNativeColorOptionRefresh(colorOptionName, config, colorStatuses) {
     window.clearTimeout(window.CarianaVariantVisualsColorOptionTimer);
     window.CarianaVariantVisualsColorOptionTimer = window.setTimeout(function () {
-      forceHideMissingNativeColorOptions(colorOptionName);
+      forceHideMissingNativeColorOptions(colorOptionName, config, colorStatuses);
     }, 90);
   }
 
@@ -583,13 +586,54 @@
     }
   }
 
-  function chooseColorControl(controls, optionName) {
+  function colorControlStatus(config, colorStatuses, control) {
+    if (!control) return { exists: false, available: false };
+
+    var group = (config.groups || {})[control.value] || groupForColorValue(config, control.value);
+    var colorKey = normalize(control.value);
+    var labelKey = group && group.label ? normalize(group.label) : "";
+    return colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false };
+  }
+
+  function chooseOptionControl(controls, optionName) {
     var current = controls.find(controlIsSelected);
     if (current && current.node.disabled !== true) return false;
 
     var next = controls.find(function (control) {
       return control.node.disabled !== true;
     });
+    if (!next) return false;
+
+    rememberOptionSelection(optionName, next.value);
+
+    if (next.node.tagName === "INPUT") {
+      next.node.checked = true;
+      next.node.dispatchEvent(new Event("input", { bubbles: true }));
+      next.node.dispatchEvent(new Event("change", { bubbles: true }));
+      if (next.wrapper && next.wrapper.click) next.wrapper.click();
+      return true;
+    }
+
+    if (next.node.click) {
+      next.node.click();
+      return true;
+    }
+
+    return false;
+  }
+
+  function chooseColorControl(controls, optionName, config, colorStatuses) {
+    var current = controls.find(controlIsSelected);
+    var currentStatus = colorControlStatus(config, colorStatuses, current);
+    if (current && currentStatus.exists !== false) return false;
+
+    var next =
+      controls.find(function (control) {
+        return colorControlStatus(config, colorStatuses, control).available === true;
+      }) ||
+      controls.find(function (control) {
+        return colorControlStatus(config, colorStatuses, control).exists !== false;
+      });
     if (!next) return false;
 
     rememberOptionSelection(optionName, next.value);
@@ -635,11 +679,11 @@
       var labelKey = group && group.label ? normalize(group.label) : "";
       var status = colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false };
       markOptionControlKind(control, "color", group);
-      setOptionControlStatus(control, resolvedNativeOptionStatus(control, status), true);
+      setOptionControlStatus(control, status, true);
     });
 
-    forceHideMissingNativeColorOptions(colorOptionName);
-    scheduleNativeColorOptionRefresh(colorOptionName);
+    forceHideMissingNativeColorOptions(colorOptionName, config, colorStatuses);
+    scheduleNativeColorOptionRefresh(colorOptionName, config, colorStatuses);
 
     sizeControls.forEach(function (control) {
       var sizeKey = normalize(control.value);
@@ -647,7 +691,7 @@
       setOptionControlStatus(control, sizeStatuses[sizeKey] || { exists: false, available: false });
     });
 
-    return chooseColorControl(colorControls, colorOptionName) || chooseColorControl(sizeControls, sizeOptionName);
+    return chooseColorControl(colorControls, colorOptionName, config, colorStatuses) || chooseOptionControl(sizeControls, sizeOptionName);
   }
 
   function sourceGallery() {
