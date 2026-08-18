@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-activate-valid-color-v59";
+  var SCRIPT_VERSION = "2026-08-18-defer-size-valid-color-v60";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
   var persistentSelectedOptions = {};
@@ -649,6 +649,15 @@
     if (normalize(optionName) === "color") setOptionLegendValue(optionName, control.value);
 
     if (control.node.tagName === "INPUT") {
+      var groupName = control.node.getAttribute("name");
+      if (groupName) {
+        document.querySelectorAll('input[type="radio"][name="' + cssEscape(groupName) + '"]').forEach(function (radio) {
+          radio.checked = radio === control.node;
+          radio.setAttribute("data-current-checked", radio === control.node ? "true" : "false");
+          radio.setAttribute("data-previous-checked", "false");
+        });
+      }
+
       control.node.checked = true;
 
       var picker = control.node.closest && control.node.closest("variant-picker");
@@ -1473,7 +1482,7 @@
 
   function rememberImmediateSelection(target) {
     var config = parseJson("[data-cariana-variant-visuals-config]");
-    if (!config) return false;
+    if (!config) return null;
 
     var colorOptionName = config.colorOptionName || "Color";
     var sizeOptionName = config.sizeOptionName || "Talla";
@@ -1491,17 +1500,22 @@
       return targetMatchesControl(target, candidate.control);
     });
 
-    if (!match || !match.control || !match.control.value) return false;
-    if (match.control.node && match.control.node.disabled) return false;
+    if (!match || !match.control || !match.control.value) return null;
+    if (match.control.node && match.control.node.disabled) return null;
 
     ensurePersistentSelectionScope(config);
     rememberOptionSelection(match.optionName, match.control.value);
-    return true;
+    return match;
   }
 
   function applyFilterImmediatelyFromEvent(event) {
-    if (!rememberImmediateSelection(event.target)) return;
+    var match = rememberImmediateSelection(event.target);
+    if (!match) return;
     window.clearTimeout(window.CarianaVariantVisualsTimer);
+    if (event.type === "pointerdown" && normalize(match.optionName) === normalize((parseJson("[data-cariana-variant-visuals-config]") || {}).sizeOptionName || "Talla")) {
+      window.CarianaVariantVisualsTimer = window.setTimeout(applyFilter, 160);
+      return;
+    }
     applyFilter();
   }
 
