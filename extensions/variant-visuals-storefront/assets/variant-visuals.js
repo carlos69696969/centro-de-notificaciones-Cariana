@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v52";
+  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v53";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
   var persistentSelectedOptions = {};
@@ -63,6 +63,8 @@
   }
 
   function optionNameFromInput(input) {
+    if (input.classList && input.classList.contains("cariana-size-proxy")) return "Talla";
+
     var raw = input.getAttribute("data-option-name") || input.getAttribute("name") || input.getAttribute("aria-label") || "";
     var match = raw.match(/options\[(.+?)\]/i);
     return match ? match[1] : raw;
@@ -165,6 +167,7 @@
       '[aria-selected="true"]',
       '[data-current-checked="true"]',
       '[data-selected="true"]',
+      '[aria-pressed="true"]',
       ".is-selected",
       ".selected",
       ".active"
@@ -173,6 +176,7 @@
     if (
       node.checked ||
       node.getAttribute("aria-selected") === "true" ||
+      node.getAttribute("aria-pressed") === "true" ||
       node.getAttribute("data-current-checked") === "true" ||
       node.getAttribute("data-selected") === "true" ||
       node.classList.contains("is-selected") ||
@@ -186,6 +190,7 @@
 
     return (
       wrapper.getAttribute("aria-selected") === "true" ||
+      wrapper.getAttribute("aria-pressed") === "true" ||
       wrapper.getAttribute("data-current-checked") === "true" ||
       wrapper.getAttribute("data-selected") === "true" ||
       wrapper.classList.contains("is-selected") ||
@@ -211,12 +216,14 @@
           control &&
             control.node &&
             (control.node.getAttribute("aria-selected") === "true" ||
+              control.node.getAttribute("aria-pressed") === "true" ||
               control.node.getAttribute("data-selected") === "true" ||
               control.node.classList.contains("is-selected") ||
               control.node.classList.contains("selected") ||
               control.node.classList.contains("active") ||
               (control.wrapper &&
                 (control.wrapper.getAttribute("aria-selected") === "true" ||
+                  control.wrapper.getAttribute("aria-pressed") === "true" ||
                   control.wrapper.getAttribute("data-selected") === "true" ||
                   control.wrapper.classList.contains("is-selected") ||
                   control.wrapper.classList.contains("selected") ||
@@ -354,7 +361,7 @@
   }
 
   function optionControlValue(node) {
-    return String(node.value || node.getAttribute("data-variant-option") || node.textContent || "").trim();
+    return String(node.value || node.getAttribute("data-size-value") || node.getAttribute("data-variant-option") || node.textContent || "").trim();
   }
 
   function optionControlWrapper(node) {
@@ -387,7 +394,8 @@
       .querySelectorAll(
         [
           'input[type="radio"]',
-          "[data-variant-option]"
+          "[data-variant-option]",
+          ".cariana-size-proxy[data-size-value]"
         ].join(", ")
       )
       .forEach(function (node) {
@@ -1364,6 +1372,11 @@
   document.addEventListener("variant:change", scheduleFilter, true);
   document.addEventListener("shopify:section:load", scheduleFilter, true);
   window.addEventListener("popstate", scheduleFilter);
-  new MutationObserver(handleDomMutations).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(handleDomMutations).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["checked", "data-current-checked", "data-option-available", "aria-pressed", "aria-selected", "class"]
+  });
   scheduleFilter();
 })();
