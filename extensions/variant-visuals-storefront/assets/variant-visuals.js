@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v55";
+  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v56";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
   var persistentSelectedOptions = {};
@@ -459,6 +459,21 @@
     };
   }
 
+  function setMissingVisualState(target, missing) {
+    if (!target) return;
+
+    target.hidden = missing;
+    target.setAttribute("data-cariana-variant-visuals-option-missing", missing ? "true" : "false");
+
+    if (missing) {
+      target.style.setProperty("display", "none", "important");
+      target.style.setProperty("visibility", "hidden", "important");
+    } else {
+      target.style.removeProperty("display");
+      target.style.removeProperty("visibility");
+    }
+  }
+
   function setOptionControlStatus(control, status, hideMissing) {
     if (!control || !control.node) return;
 
@@ -484,17 +499,27 @@
     }
 
     if (hideMissing) {
-      var visualTarget = control.wrapper || control.node;
-      if (missing) {
-        visualTarget.hidden = true;
-        visualTarget.style.setProperty("display", "none", "important");
-        visualTarget.style.setProperty("visibility", "hidden", "important");
-      } else {
-        visualTarget.hidden = false;
-        visualTarget.style.removeProperty("display");
-        visualTarget.style.removeProperty("visibility");
-      }
+      setMissingVisualState(control.wrapper || control.node, missing);
     }
+  }
+
+  function forceHideMissingNativeColorOptions(colorOptionName) {
+    optionControls(colorOptionName).forEach(function (control) {
+      var node = control && control.node;
+      if (!node || node.tagName !== "INPUT" || !node.hasAttribute("data-option-available")) return;
+
+      var missing = node.getAttribute("data-option-available") === "false" && !numericId(node.getAttribute("data-variant-id"));
+      setMissingVisualState(control.wrapper || node, missing);
+      node.setAttribute("data-cariana-variant-visuals-option-missing", missing ? "true" : "false");
+      if (missing && node.checked) node.checked = false;
+    });
+  }
+
+  function scheduleNativeColorOptionRefresh(colorOptionName) {
+    window.clearTimeout(window.CarianaVariantVisualsColorOptionTimer);
+    window.CarianaVariantVisualsColorOptionTimer = window.setTimeout(function () {
+      forceHideMissingNativeColorOptions(colorOptionName);
+    }, 90);
   }
 
   function markOptionControlKind(control, kind, group) {
@@ -612,6 +637,9 @@
       markOptionControlKind(control, "color", group);
       setOptionControlStatus(control, resolvedNativeOptionStatus(control, status), true);
     });
+
+    forceHideMissingNativeColorOptions(colorOptionName);
+    scheduleNativeColorOptionRefresh(colorOptionName);
 
     sizeControls.forEach(function (control) {
       var sizeKey = normalize(control.value);
@@ -1418,6 +1446,8 @@
       "data-variant-id",
       "aria-pressed",
       "aria-selected",
+      "hidden",
+      "style",
       "class"
     ]
   });

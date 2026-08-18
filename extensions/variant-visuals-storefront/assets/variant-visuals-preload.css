@@ -31,6 +31,16 @@ html:not(.cariana-variant-visuals-ready) [data-testid="product-information-media
   visibility: hidden !important;
 }
 
+variant-picker label:has(input[type="radio"][name*="color" i][data-option-available="false"]:not([data-variant-id])),
+variant-picker .variant-option__button-label:has(input[type="radio"][name*="color" i][data-option-available="false"]:not([data-variant-id])),
+variant-picker .swatch-input__label:has(input[type="radio"][name*="color" i][data-option-available="false"]:not([data-variant-id])),
+product-form label:has(input[type="radio"][name*="color" i][data-option-available="false"]:not([data-variant-id])),
+product-form .variant-option__button-label:has(input[type="radio"][name*="color" i][data-option-available="false"]:not([data-variant-id])),
+product-form .swatch-input__label:has(input[type="radio"][name*="color" i][data-option-available="false"]:not([data-variant-id])) {
+  display: none !important;
+  visibility: hidden !important;
+}
+
 [data-cariana-variant-visuals-option-soldout="true"] {
   position: relative !important;
 }
