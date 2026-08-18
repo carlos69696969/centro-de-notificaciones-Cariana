@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-sync-valid-color-selection-v58";
+  var SCRIPT_VERSION = "2026-08-18-activate-valid-color-v59";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
   var persistentSelectedOptions = {};
@@ -281,6 +281,37 @@
     var immediateColor = immediateOptionValue(colorOptionName);
     if (immediateSize) result[normalize(sizeOptionName)] = immediateSize;
     if (immediateColor) result[normalize(colorOptionName)] = immediateColor;
+
+    var selectedSizeValue = result[normalize(sizeOptionName)];
+    var selectedColorValue = result[normalize(colorOptionName)];
+    if (selectedSizeValue && selectedColorValue && variants && variants.length) {
+      var colorFilterOptions = {};
+      Object.keys(result).forEach(function (optionName) {
+        if (optionName !== normalize(colorOptionName)) colorFilterOptions[optionName] = result[optionName];
+      });
+
+      var colorStatuses = optionStatusMap(variants, colorFilterOptions, colorOptionName, []);
+      var selectedGroup = groupForColorValue(config, selectedColorValue);
+      var selectedStatus =
+        colorStatuses[normalize(selectedColorValue)] ||
+        colorStatuses[normalize(selectedGroup && selectedGroup.label)] ||
+        { exists: false, available: false };
+
+      if (selectedStatus.exists === false) {
+        var groups = config.groups || {};
+        var firstColor = "";
+        Object.keys(groups).some(function (colorName) {
+          var group = groups[colorName] || {};
+          var status = colorStatuses[normalize(colorName)] || colorStatuses[normalize(group.label)];
+          if (status && status.exists !== false) {
+            firstColor = group.label || colorName;
+            return true;
+          }
+          return false;
+        });
+        if (firstColor) result[normalize(colorOptionName)] = firstColor;
+      }
+    }
 
     return result;
   }
@@ -595,6 +626,51 @@
     return colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false };
   }
 
+  function setOptionLegendValue(optionName, value) {
+    var normalizedOptionName = normalize(optionName);
+    if (!normalizedOptionName || !value) return;
+
+    document.querySelectorAll("fieldset").forEach(function (fieldset) {
+      var legend = fieldset.querySelector("legend");
+      if (!legend) return;
+
+      var rawText = String(legend.textContent || "").trim();
+      var baseText = rawText.split(":")[0].trim();
+      if (normalize(baseText) !== normalizedOptionName) return;
+
+      legend.textContent = baseText + ": " + value;
+    });
+  }
+
+  function activateOptionControl(control, optionName) {
+    if (!control || !control.node) return false;
+
+    rememberOptionSelection(optionName, control.value);
+    if (normalize(optionName) === "color") setOptionLegendValue(optionName, control.value);
+
+    if (control.node.tagName === "INPUT") {
+      control.node.checked = true;
+
+      var picker = control.node.closest && control.node.closest("variant-picker");
+      if (picker && typeof picker.updateSelectedOption === "function") {
+        try {
+          picker.updateSelectedOption(control.node);
+        } catch (_error) {}
+      }
+
+      control.node.dispatchEvent(new Event("input", { bubbles: true }));
+      control.node.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    }
+
+    if (control.node.click) {
+      control.node.click();
+      return true;
+    }
+
+    return false;
+  }
+
   function chooseOptionControl(controls, optionName) {
     var current = controls.find(controlIsSelected);
     if (current && current.node.disabled !== true) return false;
@@ -604,22 +680,7 @@
     });
     if (!next) return false;
 
-    rememberOptionSelection(optionName, next.value);
-
-    if (next.node.tagName === "INPUT") {
-      next.node.checked = true;
-      next.node.dispatchEvent(new Event("input", { bubbles: true }));
-      next.node.dispatchEvent(new Event("change", { bubbles: true }));
-      if (next.wrapper && next.wrapper.click) next.wrapper.click();
-      return true;
-    }
-
-    if (next.node.click) {
-      next.node.click();
-      return true;
-    }
-
-    return false;
+    return activateOptionControl(next, optionName);
   }
 
   function chooseColorControl(controls, optionName, config, colorStatuses) {
@@ -643,22 +704,7 @@
       });
     if (!next) return false;
 
-    rememberOptionSelection(optionName, next.value);
-
-    if (next.node.tagName === "INPUT") {
-      if (next.wrapper && next.wrapper.click) next.wrapper.click();
-      next.node.checked = true;
-      next.node.dispatchEvent(new Event("input", { bubbles: true }));
-      next.node.dispatchEvent(new Event("change", { bubbles: true }));
-      return true;
-    }
-
-    if (next.node.click) {
-      next.node.click();
-      return true;
-    }
-
-    return false;
+    return activateOptionControl(next, optionName);
   }
 
   function applyVariantOptionAvailability(config, variants) {
