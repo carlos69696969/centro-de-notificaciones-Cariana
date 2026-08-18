@@ -1,7 +1,9 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-17-stable-visual-gallery-v44";
+  var SCRIPT_VERSION = "2026-08-17-instant-variant-visuals-v45";
+  var immediateSelectedOptions = {};
+  var immediateSelectedOptionsExpiresAt = 0;
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -128,6 +130,12 @@
       var optionName = legend.childNodes[0] ? legend.childNodes[0].textContent : legend.textContent;
       if (optionName && checked.value) result[normalize(optionName)] = checked.value;
     });
+
+    if (Date.now() < immediateSelectedOptionsExpiresAt) {
+      Object.keys(immediateSelectedOptions).forEach(function (optionName) {
+        if (immediateSelectedOptions[optionName]) result[optionName] = immediateSelectedOptions[optionName];
+      });
+    }
 
     return result;
   }
@@ -659,22 +667,6 @@
     }
 
     if (gallery.getAttribute("data-cariana-render-key") !== renderKey) {
-      var firstSrc = selectedMedia[0] && selectedMedia[0].src;
-      if (gallery.children.length && gallery.getAttribute("data-cariana-pending-key") !== renderKey && !imageIsReady(firstSrc)) {
-        rememberGalleryHeight(gallery);
-        gallery.setAttribute("data-cariana-pending-key", renderKey);
-        gallery.setAttribute("data-cariana-updating", "true");
-        preloadImage(firstSrc, function () {
-          if (gallery.getAttribute("data-cariana-pending-key") === renderKey) {
-            gallery.removeAttribute("data-cariana-pending-key");
-            renderReplacementGallery(media, group);
-            keepReplacementGalleryVisible();
-          }
-        });
-        hideNativeGallery(media, true);
-        return true;
-      }
-
       var track = document.createElement("div");
       var dots = document.createElement("div");
 
@@ -1099,6 +1091,48 @@
     window.CarianaVariantVisualsTimer = window.setTimeout(applyFilter, 32);
   }
 
+  function targetMatchesControl(target, control) {
+    if (!target || !control) return false;
+    if (target === control.node || target === control.wrapper) return true;
+    if (control.node && control.node.contains && control.node.contains(target)) return true;
+    if (control.wrapper && control.wrapper.contains && control.wrapper.contains(target)) return true;
+    return false;
+  }
+
+  function rememberImmediateSelection(target) {
+    var config = parseJson("[data-cariana-variant-visuals-config]");
+    if (!config) return false;
+
+    var colorOptionName = config.colorOptionName || "Color";
+    var sizeOptionName = config.sizeOptionName || "Talla";
+    var candidates = optionControls(colorOptionName)
+      .map(function (control) {
+        return { optionName: colorOptionName, control: control };
+      })
+      .concat(
+        optionControls(sizeOptionName).map(function (control) {
+          return { optionName: sizeOptionName, control: control };
+        })
+      );
+
+    var match = candidates.find(function (candidate) {
+      return targetMatchesControl(target, candidate.control);
+    });
+
+    if (!match || !match.control || !match.control.value) return false;
+    if (match.control.node && match.control.node.disabled) return false;
+
+    immediateSelectedOptions[normalize(match.optionName)] = match.control.value;
+    immediateSelectedOptionsExpiresAt = Date.now() + 2500;
+    return true;
+  }
+
+  function applyFilterImmediatelyFromEvent(event) {
+    if (!rememberImmediateSelection(event.target)) return;
+    window.clearTimeout(window.CarianaVariantVisualsTimer);
+    applyFilter();
+  }
+
   function isOwnGalleryMutation(mutation) {
     var target = mutation && mutation.target;
     if (target && target.closest && target.closest(".cariana-variant-visuals-gallery")) return true;
@@ -1119,6 +1153,8 @@
     scheduleFilter();
   }
 
+  document.addEventListener("pointerdown", applyFilterImmediatelyFromEvent, true);
+  document.addEventListener("input", applyFilterImmediatelyFromEvent, true);
   document.addEventListener("change", scheduleFilter, true);
   document.addEventListener("click", scheduleFilter, true);
   document.addEventListener("variant:change", scheduleFilter, true);
