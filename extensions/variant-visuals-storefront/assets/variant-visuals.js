@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v53";
+  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v54";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
   var persistentSelectedOptions = {};
@@ -202,6 +202,19 @@
 
   function selectedControlValue(optionName) {
     var controls = optionControls(optionName);
+    var selectedProxy = controls.find(function (control) {
+      return Boolean(
+        control &&
+          control.node &&
+          control.node.classList &&
+          control.node.classList.contains("cariana-size-proxy") &&
+          (control.node.getAttribute("aria-pressed") === "true" ||
+            control.node.classList.contains("cariana-size-proxy-selected"))
+      );
+    });
+
+    if (selectedProxy && selectedProxy.value) return selectedProxy.value;
+
     var selected =
       controls.find(function (control) {
         return Boolean(
@@ -565,7 +578,15 @@
     var colorOptionName = config.colorOptionName || "Color";
     var sizeOptionName = config.sizeOptionName || "Talla";
     var options = effectiveSelectedOptions(config, variants);
-    var colorStatuses = optionStatusMap(variants, options, colorOptionName, []);
+    var selectedSize = immediateOptionValue(sizeOptionName) || selectedControlValue(sizeOptionName);
+    if (selectedSize) options[normalize(sizeOptionName)] = selectedSize;
+
+    var colorFilterOptions = {};
+    Object.keys(options).forEach(function (optionName) {
+      if (optionName !== normalize(colorOptionName)) colorFilterOptions[optionName] = options[optionName];
+    });
+
+    var colorStatuses = optionStatusMap(variants, colorFilterOptions, colorOptionName, []);
     var colorControls = optionControls(colorOptionName);
     var sizeStatuses = optionStatusMap(variants, options, sizeOptionName, [colorOptionName]);
     var sizeControls = optionControls(sizeOptionName);
