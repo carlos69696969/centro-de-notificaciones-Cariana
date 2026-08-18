@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-select-first-valid-color-v57";
+  var SCRIPT_VERSION = "2026-08-18-sync-valid-color-selection-v58";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
   var persistentSelectedOptions = {};
@@ -285,9 +285,9 @@
     return result;
   }
 
-  function findActiveGroup(config) {
+  function findActiveGroup(config, variants) {
     var groups = config.groups || {};
-    var options = selectedOptions();
+    var options = variants && variants.length ? effectiveSelectedOptions(config, variants) : selectedOptions();
     var colorValue = options[normalize(config.colorOptionName || "Color")];
     if (colorValue) {
       for (var colorName in groups) {
@@ -623,7 +623,14 @@
   }
 
   function chooseColorControl(controls, optionName, config, colorStatuses) {
-    var current = controls.find(controlIsSelected);
+    var current =
+      controls.find(function (control) {
+        return Boolean(
+          control &&
+            control.node &&
+            (control.node.checked || control.node.getAttribute("data-current-checked") === "true")
+        );
+      }) || controls.find(controlIsSelected);
     var currentStatus = colorControlStatus(config, colorStatuses, current);
     if (current && currentStatus.exists !== false) return false;
 
@@ -639,10 +646,10 @@
     rememberOptionSelection(optionName, next.value);
 
     if (next.node.tagName === "INPUT") {
+      if (next.wrapper && next.wrapper.click) next.wrapper.click();
       next.node.checked = true;
       next.node.dispatchEvent(new Event("input", { bubbles: true }));
       next.node.dispatchEvent(new Event("change", { bubbles: true }));
-      if (next.wrapper && next.wrapper.click) next.wrapper.click();
       return true;
     }
 
@@ -1372,7 +1379,7 @@
     warmVariantVisualImages(config, media);
 
     applyVariantOptionAvailability(config, variants);
-    var group = findActiveGroup(config);
+    var group = findActiveGroup(config, variants);
     if (!group || !group.mediaIds || !group.mediaIds.length) {
       markReady();
       return;
