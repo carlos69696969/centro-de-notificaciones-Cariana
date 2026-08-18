@@ -1,15 +1,9 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-defer-size-valid-color-v60";
+  var SCRIPT_VERSION = "2026-08-17-instant-variant-visuals-v45";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
-  var persistentSelectedOptions = {};
-  var persistentProductKey = "";
-  var preloadedImageUrls = {};
-  var preloadLinkUrls = {};
-  var preloadBankUrls = {};
-  var warmedProductMediaKey = "";
 
   function markReady() {
     document.documentElement.classList.add("cariana-variant-visuals-ready");
@@ -27,7 +21,47 @@
     }
   }
 
-  function installStyles() {}
+  function debugEnabled() {
+    return /[?&]carianaVisualDebug=1\b/.test(window.location.search || "");
+  }
+
+  function showDebug(details) {
+    if (!debugEnabled() || !document.body) return;
+    var node = document.getElementById("cariana-variant-visuals-debug");
+    if (!node) {
+      node = document.createElement("pre");
+      node.id = "cariana-variant-visuals-debug";
+      node.style.cssText =
+        "position:fixed;z-index:2147483647;left:8px;bottom:8px;max-width:92vw;max-height:45vh;overflow:auto;background:#111827;color:#d1fae5;padding:10px;border-radius:6px;font:12px/1.35 monospace;white-space:pre-wrap;";
+      document.body.appendChild(node);
+    }
+    node.textContent = JSON.stringify(details, null, 2);
+  }
+
+  function installStyles() {
+    if (document.getElementById("cariana-variant-visuals-style")) return;
+    var style = document.createElement("style");
+    style.id = "cariana-variant-visuals-style";
+    style.textContent =
+      '[data-cariana-variant-visuals-filtered="hidden"]{display:none!important;visibility:hidden!important;}' +
+      '[data-cariana-variant-visuals-filtered="visible"]{visibility:visible!important;}' +
+      "[data-cariana-variant-visuals-native='hidden']{display:none!important;visibility:hidden!important;}" +
+      '[data-cariana-variant-visuals-option-unavailable="true"]{opacity:.32!important;pointer-events:none!important;filter:grayscale(1);}' +
+      '[data-cariana-variant-visuals-option-soldout="true"]{position:relative!important;}' +
+      'label[data-cariana-variant-visuals-color-option="true"],button[data-cariana-variant-visuals-color-option="true"],[role="button"][data-cariana-variant-visuals-color-option="true"],.swatch-input__label[data-cariana-variant-visuals-color-option="true"],.variant-option__button-label[data-cariana-variant-visuals-color-option="true"],.cariana-variant-visuals-color-button{box-sizing:border-box!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;padding:4px!important;border:2px solid #8f98a8!important;border-radius:999px!important;background:#fff!important;box-shadow:0 1px 3px rgba(17,24,39,.22)!important;outline:0!important;}' +
+      '[data-cariana-variant-visuals-color-swatch="true"]{box-sizing:border-box!important;width:28px!important;height:28px!important;border:4px solid #fff!important;border-radius:999px!important;box-shadow:0 0 0 2px #8f98a8,inset 0 0 0 1px rgba(17,24,39,.18),0 1px 3px rgba(17,24,39,.2)!important;outline:0!important;}' +
+      ".cariana-variant-visuals-swatch-ring{position:absolute!important;inset:1px!important;border:2px solid #8f98a8!important;border-radius:999px!important;box-shadow:0 1px 3px rgba(17,24,39,.18)!important;pointer-events:none!important;z-index:3!important;}" +
+      'input[type="radio"]:checked + [data-cariana-variant-visuals-color-option="true"],[data-cariana-variant-visuals-color-option="true"][aria-selected="true"],[data-cariana-variant-visuals-color-option="true"].is-selected{border-color:#111827!important;box-shadow:0 0 0 2px #111827,0 2px 4px rgba(17,24,39,.24)!important;}' +
+      'button[data-cariana-variant-visuals-option-soldout="true"]::after,label[data-cariana-variant-visuals-option-soldout="true"]::after,[role="button"][data-cariana-variant-visuals-option-soldout="true"]::after,.variant-option__button-label[data-cariana-variant-visuals-option-soldout="true"]::after,.swatch-input__label[data-cariana-variant-visuals-option-soldout="true"]::after{content:"";position:absolute;left:10%;right:10%;top:50%;border-top:2px solid currentColor;transform:rotate(-14deg);pointer-events:none;}' +
+      ".cariana-variant-visuals-gallery{display:block!important;width:100%;min-height:var(--cariana-variant-visuals-min-height,0px);margin:0 0 24px;overflow:hidden;transition:opacity .16s ease;contain:layout paint;}" +
+      ".cariana-variant-visuals-gallery[data-cariana-updating='true']{opacity:.98;}" +
+      ".cariana-variant-visuals-gallery__track{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;width:100%;}" +
+      ".cariana-variant-visuals-gallery__item{margin:0;min-width:0;position:relative;aspect-ratio:var(--cariana-variant-visuals-ratio,.75);background-color:#fff;background-image:var(--cariana-variant-visuals-image);background-position:center;background-repeat:no-repeat;background-size:contain;}" +
+      ".cariana-variant-visuals-gallery__image{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0!important;pointer-events:none;}" +
+      ".cariana-variant-visuals-gallery__dots{display:none;}" +
+      "@media(max-width:749px){.cariana-variant-visuals-gallery{margin:0 0 18px;}.cariana-variant-visuals-gallery__track{display:flex!important;grid-template-columns:none;gap:0;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;}.cariana-variant-visuals-gallery__track::-webkit-scrollbar{display:none;}.cariana-variant-visuals-gallery__item{flex:0 0 100%;scroll-snap-align:start;}.cariana-variant-visuals-gallery__dots{display:flex!important;justify-content:center;align-items:center;gap:7px;margin:10px 0 0;}.cariana-variant-visuals-gallery__dot{appearance:none;border:0;border-radius:50%;width:8px;height:8px;padding:0;background:#c7c7c7;}.cariana-variant-visuals-gallery__dot[aria-current='true']{background:#333;}}";
+    document.head.appendChild(style);
+  }
 
   function normalize(value) {
     return String(value || "")
@@ -63,8 +97,6 @@
   }
 
   function optionNameFromInput(input) {
-    if (input.classList && input.classList.contains("cariana-size-proxy")) return "Talla";
-
     var raw = input.getAttribute("data-option-name") || input.getAttribute("name") || input.getAttribute("aria-label") || "";
     var match = raw.match(/options\[(.+?)\]/i);
     return match ? match[1] : raw;
@@ -92,9 +124,7 @@
 
     document.querySelectorAll("fieldset").forEach(function (fieldset) {
       var legend = fieldset.querySelector("legend");
-      var checked =
-        fieldset.querySelector('input[type="radio"]:checked') ||
-        fieldset.querySelector('input[data-current-checked="true"]');
+      var checked = fieldset.querySelector('input[type="radio"]:checked, input[data-current-checked="true"]');
       if (!legend || !checked) return;
 
       var optionName = legend.childNodes[0] ? legend.childNodes[0].textContent : legend.textContent;
@@ -115,210 +145,9 @@
     return numericId(input && input.value);
   }
 
-  function immediateOptionValue(optionName) {
-    if (Date.now() >= immediateSelectedOptionsExpiresAt) return "";
-    return immediateSelectedOptions[normalize(optionName)] || "";
-  }
-
-  function productSelectionKey(config) {
-    return String((config && (config.productId || config.handle)) || "");
-  }
-
-  function ensurePersistentSelectionScope(config) {
-    var nextKey = productSelectionKey(config);
-    if (!nextKey || nextKey === persistentProductKey) return;
-    persistentProductKey = nextKey;
-    persistentSelectedOptions = {};
-  }
-
-  function rememberOptionSelection(optionName, value) {
-    var key = normalize(optionName);
-    if (!key || !value) return;
-
-    persistentSelectedOptions[key] = value;
-    immediateSelectedOptions[key] = value;
-    immediateSelectedOptionsExpiresAt = Date.now() + 2500;
-  }
-
-  function selectedOptionsFromVariant(variants) {
-    var result = {};
-    var variantId = selectedVariantId();
-    if (!variantId || !variants || !variants.length) return result;
-
-    var variant = variants.find(function (candidate) {
-      return numericId(candidate.id || candidate.gid) === variantId;
-    });
-
-    (variant && variant.selectedOptions ? variant.selectedOptions : []).forEach(function (option) {
-      if (option && option.name && option.value) result[normalize(option.name)] = String(option.value).trim();
-    });
-
-    return result;
-  }
-
-  function controlIsSelected(control) {
-    if (!control || !control.node) return false;
-
-    var node = control.node;
-    var wrapper = control.wrapper;
-    var selectedSelector = [
-      'input[type="radio"]:checked',
-      'input[data-current-checked="true"]',
-      '[aria-selected="true"]',
-      '[data-current-checked="true"]',
-      '[data-selected="true"]',
-      '[aria-pressed="true"]',
-      ".is-selected",
-      ".selected",
-      ".active"
-    ].join(", ");
-
-    if (
-      node.checked ||
-      node.getAttribute("aria-selected") === "true" ||
-      node.getAttribute("aria-pressed") === "true" ||
-      node.getAttribute("data-current-checked") === "true" ||
-      node.getAttribute("data-selected") === "true" ||
-      node.classList.contains("is-selected") ||
-      node.classList.contains("selected") ||
-      node.classList.contains("active")
-    ) {
-      return true;
-    }
-
-    if (!wrapper) return false;
-
-    return (
-      wrapper.getAttribute("aria-selected") === "true" ||
-      wrapper.getAttribute("aria-pressed") === "true" ||
-      wrapper.getAttribute("data-current-checked") === "true" ||
-      wrapper.getAttribute("data-selected") === "true" ||
-      wrapper.classList.contains("is-selected") ||
-      wrapper.classList.contains("selected") ||
-      wrapper.classList.contains("active") ||
-      Boolean(wrapper.querySelector(selectedSelector))
-    );
-  }
-
-  function selectedControlValue(optionName) {
-    var controls = optionControls(optionName);
-    var selectedProxy = controls.find(function (control) {
-      return Boolean(
-        control &&
-          control.node &&
-          control.node.classList &&
-          control.node.classList.contains("cariana-size-proxy") &&
-          (control.node.getAttribute("aria-pressed") === "true" ||
-            control.node.classList.contains("cariana-size-proxy-selected"))
-      );
-    });
-
-    if (selectedProxy && selectedProxy.value) return selectedProxy.value;
-
-    var selected =
-      controls.find(function (control) {
-        return Boolean(
-          control &&
-            control.node &&
-            (control.node.checked ||
-              (control.wrapper && control.wrapper.querySelector && control.wrapper.querySelector('input[type="radio"]:checked')))
-        );
-      }) ||
-      controls.find(function (control) {
-        return Boolean(
-          control &&
-            control.node &&
-            (control.node.getAttribute("aria-selected") === "true" ||
-              control.node.getAttribute("aria-pressed") === "true" ||
-              control.node.getAttribute("data-selected") === "true" ||
-              control.node.classList.contains("is-selected") ||
-              control.node.classList.contains("selected") ||
-              control.node.classList.contains("active") ||
-              (control.wrapper &&
-                (control.wrapper.getAttribute("aria-selected") === "true" ||
-                  control.wrapper.getAttribute("aria-pressed") === "true" ||
-                  control.wrapper.getAttribute("data-selected") === "true" ||
-                  control.wrapper.classList.contains("is-selected") ||
-                  control.wrapper.classList.contains("selected") ||
-                  control.wrapper.classList.contains("active"))))
-        );
-      }) ||
-      controls.find(function (control) {
-        return Boolean(
-          control &&
-            control.node &&
-            (control.node.getAttribute("data-current-checked") === "true" ||
-              (control.wrapper &&
-                control.wrapper.querySelector &&
-                control.wrapper.querySelector('input[data-current-checked="true"]')))
-        );
-      });
-    return selected && selected.value ? selected.value : "";
-  }
-
-  function effectiveSelectedOptions(config, variants) {
-    ensurePersistentSelectionScope(config);
-
-    var colorOptionName = config.colorOptionName || "Color";
-    var sizeOptionName = config.sizeOptionName || "Talla";
-    var result = selectedOptionsFromVariant(variants);
-    var domOptions = selectedOptions();
-
-    Object.keys(domOptions).forEach(function (optionName) {
-      if (domOptions[optionName]) result[optionName] = domOptions[optionName];
-    });
-
-    var selectedSize = selectedControlValue(sizeOptionName);
-    var selectedColor = selectedControlValue(colorOptionName);
-    if (selectedSize) result[normalize(sizeOptionName)] = selectedSize;
-    if (selectedColor) result[normalize(colorOptionName)] = selectedColor;
-
-    Object.keys(persistentSelectedOptions).forEach(function (optionName) {
-      if (persistentSelectedOptions[optionName]) result[optionName] = persistentSelectedOptions[optionName];
-    });
-
-    var immediateSize = immediateOptionValue(sizeOptionName);
-    var immediateColor = immediateOptionValue(colorOptionName);
-    if (immediateSize) result[normalize(sizeOptionName)] = immediateSize;
-    if (immediateColor) result[normalize(colorOptionName)] = immediateColor;
-
-    var selectedSizeValue = result[normalize(sizeOptionName)];
-    var selectedColorValue = result[normalize(colorOptionName)];
-    if (selectedSizeValue && selectedColorValue && variants && variants.length) {
-      var colorFilterOptions = {};
-      Object.keys(result).forEach(function (optionName) {
-        if (optionName !== normalize(colorOptionName)) colorFilterOptions[optionName] = result[optionName];
-      });
-
-      var colorStatuses = optionStatusMap(variants, colorFilterOptions, colorOptionName, []);
-      var selectedGroup = groupForColorValue(config, selectedColorValue);
-      var selectedStatus =
-        colorStatuses[normalize(selectedColorValue)] ||
-        colorStatuses[normalize(selectedGroup && selectedGroup.label)] ||
-        { exists: false, available: false };
-
-      if (selectedStatus.exists === false) {
-        var groups = config.groups || {};
-        var firstColor = "";
-        Object.keys(groups).some(function (colorName) {
-          var group = groups[colorName] || {};
-          var status = colorStatuses[normalize(colorName)] || colorStatuses[normalize(group.label)];
-          if (status && status.exists !== false) {
-            firstColor = group.label || colorName;
-            return true;
-          }
-          return false;
-        });
-        if (firstColor) result[normalize(colorOptionName)] = firstColor;
-      }
-    }
-
-    return result;
-  }
-
-  function findActiveGroup(config, variants) {
+  function findActiveGroup(config) {
     var groups = config.groups || {};
-    var options = variants && variants.length ? effectiveSelectedOptions(config, variants) : selectedOptions();
+    var options = selectedOptions();
     var colorValue = options[normalize(config.colorOptionName || "Color")];
     if (colorValue) {
       for (var colorName in groups) {
@@ -405,7 +234,7 @@
   }
 
   function optionControlValue(node) {
-    return String(node.value || node.getAttribute("data-size-value") || node.getAttribute("data-variant-option") || node.textContent || "").trim();
+    return String(node.value || node.getAttribute("data-variant-option") || node.textContent || "").trim();
   }
 
   function optionControlWrapper(node) {
@@ -438,8 +267,7 @@
       .querySelectorAll(
         [
           'input[type="radio"]',
-          "[data-variant-option]",
-          ".cariana-size-proxy[data-size-value]"
+          "[data-variant-option]"
         ].join(", ")
       )
       .forEach(function (node) {
@@ -477,83 +305,26 @@
     return controls;
   }
 
-  function resolvedNativeOptionStatus(control, fallbackStatus) {
-    var node = control && control.node;
-    if (!node || node.tagName !== "INPUT" || !node.hasAttribute("data-option-available")) {
-      return fallbackStatus;
-    }
-
-    var exists = Boolean(numericId(node.getAttribute("data-variant-id")));
-    return {
-      exists: exists,
-      available: exists && node.getAttribute("data-option-available") !== "false"
-    };
-  }
-
-  function setMissingVisualState(target, missing) {
-    if (!target) return;
-
-    target.hidden = missing;
-    target.setAttribute("data-cariana-variant-visuals-option-missing", missing ? "true" : "false");
-
-    if (missing) {
-      target.style.setProperty("display", "none", "important");
-      target.style.setProperty("visibility", "hidden", "important");
-    } else {
-      target.style.removeProperty("display");
-      target.style.removeProperty("visibility");
-    }
-  }
-
-  function setOptionControlStatus(control, status, hideMissing) {
+  function setOptionControlStatus(control, status) {
     if (!control || !control.node) return;
 
     var exists = !status || status.exists !== false;
     var available = !status || status.available !== false;
     var unavailable = !exists;
     var soldout = exists && !available;
-    var missing = Boolean(hideMissing && !exists);
 
     control.node.disabled = unavailable;
     control.node.setAttribute("aria-disabled", unavailable ? "true" : "false");
     control.node.setAttribute("data-cariana-variant-visuals-option-unavailable", unavailable ? "true" : "false");
     control.node.setAttribute("data-cariana-variant-visuals-option-soldout", soldout ? "true" : "false");
-    control.node.setAttribute("data-cariana-variant-visuals-option-missing", missing ? "true" : "false");
     control.node.setAttribute("title", soldout ? "Agotado" : "");
 
     if (control.wrapper) {
       control.wrapper.setAttribute("aria-disabled", unavailable ? "true" : "false");
       control.wrapper.setAttribute("data-cariana-variant-visuals-option-unavailable", unavailable ? "true" : "false");
       control.wrapper.setAttribute("data-cariana-variant-visuals-option-soldout", soldout ? "true" : "false");
-      control.wrapper.setAttribute("data-cariana-variant-visuals-option-missing", missing ? "true" : "false");
       control.wrapper.setAttribute("title", soldout ? "Agotado" : "");
     }
-
-    if (hideMissing) {
-      setMissingVisualState(control.wrapper || control.node, missing);
-    }
-  }
-
-  function forceHideMissingNativeColorOptions(colorOptionName, config, colorStatuses) {
-    optionControls(colorOptionName).forEach(function (control) {
-      var node = control && control.node;
-      if (!node || node.tagName !== "INPUT" || !node.hasAttribute("data-option-available")) return;
-
-      var status = config && colorStatuses ? colorControlStatus(config, colorStatuses, control) : null;
-      var nativeMissing = node.getAttribute("data-option-available") === "false" && !numericId(node.getAttribute("data-variant-id"));
-      var missing = status ? status.exists === false : nativeMissing;
-
-      setMissingVisualState(control.wrapper || node, missing);
-      node.setAttribute("data-cariana-variant-visuals-option-missing", missing ? "true" : "false");
-      if (missing && node.checked) node.checked = false;
-    });
-  }
-
-  function scheduleNativeColorOptionRefresh(colorOptionName, config, colorStatuses) {
-    window.clearTimeout(window.CarianaVariantVisualsColorOptionTimer);
-    window.CarianaVariantVisualsColorOptionTimer = window.setTimeout(function () {
-      forceHideMissingNativeColorOptions(colorOptionName, config, colorStatuses);
-    }, 90);
   }
 
   function markOptionControlKind(control, kind, group) {
@@ -617,71 +388,10 @@
     }
   }
 
-  function colorControlStatus(config, colorStatuses, control) {
-    if (!control) return { exists: false, available: false };
-
-    var group = (config.groups || {})[control.value] || groupForColorValue(config, control.value);
-    var colorKey = normalize(control.value);
-    var labelKey = group && group.label ? normalize(group.label) : "";
-    return colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false };
-  }
-
-  function setOptionLegendValue(optionName, value) {
-    var normalizedOptionName = normalize(optionName);
-    if (!normalizedOptionName || !value) return;
-
-    document.querySelectorAll("fieldset").forEach(function (fieldset) {
-      var legend = fieldset.querySelector("legend");
-      if (!legend) return;
-
-      var rawText = String(legend.textContent || "").trim();
-      var baseText = rawText.split(":")[0].trim();
-      if (normalize(baseText) !== normalizedOptionName) return;
-
-      legend.textContent = baseText + ": " + value;
+  function chooseColorControl(controls) {
+    var current = controls.find(function (control) {
+      return control.node.checked || control.node.getAttribute("aria-selected") === "true" || control.node.classList.contains("is-selected");
     });
-  }
-
-  function activateOptionControl(control, optionName) {
-    if (!control || !control.node) return false;
-
-    rememberOptionSelection(optionName, control.value);
-    if (normalize(optionName) === "color") setOptionLegendValue(optionName, control.value);
-
-    if (control.node.tagName === "INPUT") {
-      var groupName = control.node.getAttribute("name");
-      if (groupName) {
-        document.querySelectorAll('input[type="radio"][name="' + cssEscape(groupName) + '"]').forEach(function (radio) {
-          radio.checked = radio === control.node;
-          radio.setAttribute("data-current-checked", radio === control.node ? "true" : "false");
-          radio.setAttribute("data-previous-checked", "false");
-        });
-      }
-
-      control.node.checked = true;
-
-      var picker = control.node.closest && control.node.closest("variant-picker");
-      if (picker && typeof picker.updateSelectedOption === "function") {
-        try {
-          picker.updateSelectedOption(control.node);
-        } catch (_error) {}
-      }
-
-      control.node.dispatchEvent(new Event("input", { bubbles: true }));
-      control.node.dispatchEvent(new Event("change", { bubbles: true }));
-      return true;
-    }
-
-    if (control.node.click) {
-      control.node.click();
-      return true;
-    }
-
-    return false;
-  }
-
-  function chooseOptionControl(controls, optionName) {
-    var current = controls.find(controlIsSelected);
     if (current && current.node.disabled !== true) return false;
 
     var next = controls.find(function (control) {
@@ -689,48 +399,29 @@
     });
     if (!next) return false;
 
-    return activateOptionControl(next, optionName);
-  }
+    if (next.node.tagName === "INPUT") {
+      next.node.checked = true;
+      next.node.dispatchEvent(new Event("input", { bubbles: true }));
+      next.node.dispatchEvent(new Event("change", { bubbles: true }));
+      if (next.wrapper && next.wrapper.click) next.wrapper.click();
+      return true;
+    }
 
-  function chooseColorControl(controls, optionName, config, colorStatuses) {
-    var current =
-      controls.find(function (control) {
-        return Boolean(
-          control &&
-            control.node &&
-            (control.node.checked || control.node.getAttribute("data-current-checked") === "true")
-        );
-      }) || controls.find(controlIsSelected);
-    var currentStatus = colorControlStatus(config, colorStatuses, current);
-    if (current && currentStatus.exists !== false) return false;
+    if (next.node.click) {
+      next.node.click();
+      return true;
+    }
 
-    var next =
-      controls.find(function (control) {
-        return colorControlStatus(config, colorStatuses, control).available === true;
-      }) ||
-      controls.find(function (control) {
-        return colorControlStatus(config, colorStatuses, control).exists !== false;
-      });
-    if (!next) return false;
-
-    return activateOptionControl(next, optionName);
+    return false;
   }
 
   function applyVariantOptionAvailability(config, variants) {
     if (!config || !variants || !variants.length) return false;
 
+    var options = selectedOptions();
     var colorOptionName = config.colorOptionName || "Color";
     var sizeOptionName = config.sizeOptionName || "Talla";
-    var options = effectiveSelectedOptions(config, variants);
-    var selectedSize = immediateOptionValue(sizeOptionName) || selectedControlValue(sizeOptionName);
-    if (selectedSize) options[normalize(sizeOptionName)] = selectedSize;
-
-    var colorFilterOptions = {};
-    Object.keys(options).forEach(function (optionName) {
-      if (optionName !== normalize(colorOptionName)) colorFilterOptions[optionName] = options[optionName];
-    });
-
-    var colorStatuses = optionStatusMap(variants, colorFilterOptions, colorOptionName, []);
+    var colorStatuses = optionStatusMap(variants, options, colorOptionName, []);
     var colorControls = optionControls(colorOptionName);
     var sizeStatuses = optionStatusMap(variants, options, sizeOptionName, [colorOptionName]);
     var sizeControls = optionControls(sizeOptionName);
@@ -739,13 +430,9 @@
       var colorKey = normalize(control.value);
       var group = (config.groups || {})[control.value] || groupForColorValue(config, control.value);
       var labelKey = group && group.label ? normalize(group.label) : "";
-      var status = colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false };
       markOptionControlKind(control, "color", group);
-      setOptionControlStatus(control, status, true);
+      setOptionControlStatus(control, colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false });
     });
-
-    forceHideMissingNativeColorOptions(colorOptionName, config, colorStatuses);
-    scheduleNativeColorOptionRefresh(colorOptionName, config, colorStatuses);
 
     sizeControls.forEach(function (control) {
       var sizeKey = normalize(control.value);
@@ -753,7 +440,7 @@
       setOptionControlStatus(control, sizeStatuses[sizeKey] || { exists: false, available: false });
     });
 
-    return chooseColorControl(colorControls, colorOptionName, config, colorStatuses) || chooseOptionControl(sizeControls, sizeOptionName);
+    return chooseColorControl(colorControls) || chooseColorControl(sizeControls);
   }
 
   function sourceGallery() {
@@ -900,173 +587,29 @@
 
   function imageIsReady(src) {
     if (!src) return true;
-    if (preloadedImageUrls[src] === true) return true;
     return Array.from(document.images || []).some(function (image) {
       return (image.currentSrc === src || image.src === src) && image.complete && image.naturalWidth > 0;
     });
   }
 
-  function preloadImageResource(src, highPriority) {
-    if (!src || preloadLinkUrls[src] || !document.head) return;
-    preloadLinkUrls[src] = true;
-
-    var link = document.createElement("link");
-    link.rel = "preload";
-    link.as = "image";
-    link.href = src;
-    if (highPriority && "fetchPriority" in link) link.fetchPriority = "high";
-    document.head.appendChild(link);
-  }
-
-  function ensurePreloadBank(urls) {
-    if (!urls || !urls.length) return;
-    if (!document.body) {
-      window.setTimeout(function () {
-        ensurePreloadBank(urls);
-      }, 40);
-      return;
-    }
-
-    var bank = document.querySelector(".cariana-variant-visuals-preload-bank");
-    if (!bank) {
-      bank = document.createElement("div");
-      bank.className = "cariana-variant-visuals-preload-bank";
-      bank.setAttribute("aria-hidden", "true");
-      document.body.appendChild(bank);
-    }
-
-    urls.forEach(function (src, index) {
-      if (!src || preloadBankUrls[src]) return;
-      preloadBankUrls[src] = true;
-
-      var image = document.createElement("img");
-      image.alt = "";
-      image.decoding = "async";
-      image.loading = "eager";
-      if (index < 10 && "fetchPriority" in image) image.fetchPriority = "high";
-      image.onload = function () {
-        if (image.naturalWidth > 0) preloadedImageUrls[src] = true;
-      };
-      image.onerror = function () {
-        preloadBankUrls[src] = false;
-      };
-      image.src = src;
-      bank.appendChild(image);
-    });
-  }
-
-  function preloadImage(src, callback, holdUntilLoaded, highPriority) {
+  function preloadImage(src, callback) {
     if (!src || imageIsReady(src)) {
-      preloadedImageUrls[src] = true;
-      if (callback) callback();
+      callback();
       return;
     }
-
-    preloadImageResource(src, highPriority);
 
     var image = new Image();
     var done = false;
     var finish = function () {
       if (done) return;
       done = true;
-      if (image.naturalWidth > 0) preloadedImageUrls[src] = true;
-      if (callback) callback();
+      callback();
     };
 
-    image.decoding = "async";
-    image.loading = "eager";
-    if (highPriority && "fetchPriority" in image) image.fetchPriority = "high";
     image.onload = finish;
     image.onerror = finish;
     image.src = src;
-    if (!holdUntilLoaded) window.setTimeout(finish, 700);
-  }
-
-  function mediaByNumericId(media) {
-    var mediaById = {};
-    media.forEach(function (item) {
-      mediaById[numericId(item.id || item.gid)] = item;
-    });
-    return mediaById;
-  }
-
-  function mediaForGroup(media, group) {
-    var mediaById = mediaByNumericId(media);
-    return (group.mediaIds || [])
-      .map(function (id) {
-        return mediaById[numericId(id)];
-      })
-      .filter(Boolean);
-  }
-
-  function mediaRenderKey(mediaItems) {
-    return (mediaItems || [])
-      .map(function (item) {
-        return numericId(item.id || item.gid);
-      })
-      .join(",");
-  }
-
-  function warmVariantVisualImages(config, media) {
-    var groups = (config && config.groups) || {};
-    var mediaKey = media
-      .map(function (item) {
-        return String(item.src || "");
-      })
-      .filter(Boolean)
-      .join("|");
-
-    if (!mediaKey || warmedProductMediaKey === mediaKey) return;
-    warmedProductMediaKey = mediaKey;
-
-    var priorityUrls = [];
-    var secondaryUrls = [];
-    var restUrls = [];
-    var seenUrls = {};
-    var addMediaTo = function (list, item) {
-      if (!item || !item.src || seenUrls[item.src]) return;
-      seenUrls[item.src] = true;
-      list.push(item.src);
-    };
-    var groupedMedia = Object.keys(groups).map(function (colorName) {
-      return mediaForGroup(media, groups[colorName] || {});
-    });
-
-    groupedMedia.forEach(function (groupMedia) {
-      addMediaTo(priorityUrls, groupMedia[0]);
-    });
-
-    groupedMedia.forEach(function (groupMedia) {
-      addMediaTo(secondaryUrls, groupMedia[1]);
-    });
-
-    groupedMedia.forEach(function (groupMedia) {
-      groupMedia.slice(2).forEach(function (item) {
-        addMediaTo(restUrls, item);
-      });
-    });
-
-    media.forEach(function (item) {
-      addMediaTo(restUrls, item);
-    });
-
-    ensurePreloadBank(priorityUrls.concat(secondaryUrls));
-
-    priorityUrls.forEach(function (src) {
-      preloadImage(src, null, false, true);
-    });
-
-    window.setTimeout(function () {
-      secondaryUrls.forEach(function (src) {
-        preloadImage(src, null, false, false);
-      });
-    }, 350);
-
-    window.setTimeout(function () {
-      restUrls.forEach(function (src) {
-        preloadImage(src, null, false, false);
-      });
-    }, 1400);
+    window.setTimeout(finish, 700);
   }
 
   function cssImageUrl(src) {
@@ -1094,11 +637,24 @@
       allowed[numericId(id)] = true;
     });
 
-    var selectedMedia = mediaForGroup(media, group);
+    var mediaById = {};
+    media.forEach(function (item) {
+      mediaById[numericId(item.id || item.gid)] = item;
+    });
+
+    var selectedMedia = (group.mediaIds || [])
+      .map(function (id) {
+        return mediaById[numericId(id)];
+      })
+      .filter(Boolean);
 
     if (!selectedMedia.length) return false;
 
-    var renderKey = mediaRenderKey(selectedMedia);
+    var renderKey = selectedMedia
+      .map(function (item) {
+        return numericId(item.id || item.gid);
+      })
+      .join(",");
 
     var gallery = document.querySelector(".cariana-variant-visuals-gallery");
     if (!gallery) {
@@ -1111,34 +667,9 @@
     }
 
     if (gallery.getAttribute("data-cariana-render-key") !== renderKey) {
-      var firstImageSrc = selectedMedia[0] && selectedMedia[0].src;
-      var currentRenderKey = gallery.getAttribute("data-cariana-render-key");
-
-      if (currentRenderKey && firstImageSrc && !imageIsReady(firstImageSrc)) {
-        if (gallery.getAttribute("data-cariana-pending-key") !== renderKey) {
-          gallery.setAttribute("data-cariana-pending-key", renderKey);
-          gallery.setAttribute("data-cariana-updating", "true");
-          rememberGalleryHeight(gallery);
-          preloadImage(firstImageSrc, function () {
-            var activeGroup = findActiveGroup(parseJson("[data-cariana-variant-visuals-config]") || {});
-            if (!activeGroup || mediaRenderKey(mediaForGroup(media, activeGroup)) !== renderKey) return;
-            renderReplacementGallery(media, activeGroup);
-          }, true);
-        }
-
-        gallery.hidden = false;
-        gallery.style.removeProperty("display");
-        hideNativeGallery(media, true);
-        syncReplacementCarouselDots(gallery);
-        return true;
-      }
-
       var track = document.createElement("div");
       var dots = document.createElement("div");
 
-      selectedMedia.slice(1, 3).forEach(function (item) {
-        if (item && item.src) preloadImage(item.src);
-      });
       rememberGalleryHeight(gallery);
       gallery.innerHTML = "";
       gallery.setAttribute("data-cariana-render-key", renderKey);
@@ -1158,7 +689,6 @@
         image.src = item.src;
         image.alt = item.alt || "";
         image.loading = index === 0 ? "eager" : "lazy";
-        if (index === 0 && "fetchPriority" in image) image.fetchPriority = "high";
         figure.appendChild(image);
         track.appendChild(figure);
 
@@ -1427,15 +957,39 @@
     var media = parseJson("[data-cariana-variant-visuals-media]") || [];
     var variants = parseJson("[data-cariana-variant-visuals-variants]") || [];
     if (!config || !media.length) {
+      showDebug({
+        loaded: true,
+        version: SCRIPT_VERSION,
+        hasConfig: Boolean(config),
+        mediaCount: media.length,
+        variantCount: variants.length,
+        configScriptNodes: document.querySelectorAll("[data-cariana-variant-visuals-config]").length,
+        mediaScriptNodes: document.querySelectorAll("[data-cariana-variant-visuals-media]").length,
+        variantScriptNodes: document.querySelectorAll("[data-cariana-variant-visuals-variants]").length,
+        productMediaNodes: document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length,
+        slideshowSlides: document.querySelectorAll("slideshow-slide").length
+      });
       markReady();
       return;
     }
 
-    warmVariantVisualImages(config, media);
-
-    applyVariantOptionAvailability(config, variants);
-    var group = findActiveGroup(config, variants);
+    var adjustedSelection = applyVariantOptionAvailability(config, variants);
+    var group = findActiveGroup(config);
     if (!group || !group.mediaIds || !group.mediaIds.length) {
+      showDebug({
+        loaded: true,
+        version: SCRIPT_VERSION,
+        hasConfig: true,
+        mediaCount: media.length,
+        variantCount: variants.length,
+        groups: Object.keys(config.groups || {}),
+        selectedOptions: selectedOptions(),
+        selectedVariantId: selectedVariantId(),
+        adjustedSelection: adjustedSelection,
+        groupFound: Boolean(group),
+        productMediaNodes: document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length,
+        slideshowSlides: document.querySelectorAll("slideshow-slide").length
+      });
       markReady();
       return;
     }
@@ -1446,16 +1000,81 @@
     });
 
     var replacementRendered = renderReplacementGallery(media, group);
+    var productMediaNodeCount = document.querySelectorAll(".product-media[data-media-id], [data-media-id].product-media").length;
     if (replacementRendered) {
+      var replacementMediaById = {};
+      media.forEach(function (item) {
+        replacementMediaById[numericId(item.id || item.gid)] = item;
+      });
+      var replacementMedia = (group.mediaIds || [])
+        .map(function (id) {
+          return replacementMediaById[numericId(id)];
+        })
+        .filter(Boolean);
+
       setOriginalGalleryHidden(true);
       keepReplacementGalleryVisible();
       markReady();
+      showDebug({
+        loaded: true,
+        version: SCRIPT_VERSION,
+        hasConfig: true,
+        mediaCount: media.length,
+        variantCount: variants.length,
+        groups: Object.keys(config.groups || {}),
+        activeGroup: group.label || "",
+        activeGroupMediaIds: group.mediaIds || [],
+        selectedOptions: selectedOptions(),
+        selectedVariantId: selectedVariantId(),
+        adjustedSelection: adjustedSelection,
+        allowedNumericIds: Object.keys(allowed),
+        replacementMediaCount: replacementMedia.length,
+        replacementMedia: replacementMedia.map(function (item) {
+          return { id: numericId(item.id || item.gid), key: item.key || "", alt: item.alt || "" };
+        }),
+        productMediaNodes: productMediaNodeCount,
+        originalGalleryNodes: originalGalleries().length,
+        replacementGallery: true
+      });
       return;
     }
 
     var nativeFilterResult = applyNativeGalleryFilter(allowed);
     var imageKeyNodeCount = applyImageKeyFilter(media, Object.keys(allowed));
     var result = replacementRendered || nativeFilterResult || imageKeyNodeCount > 0;
+    var debugMediaById = {};
+    media.forEach(function (item) {
+      debugMediaById[numericId(item.id || item.gid)] = item;
+    });
+    var selectedReplacementMedia = (group.mediaIds || [])
+      .map(function (id) {
+        return debugMediaById[numericId(id)];
+      })
+      .filter(Boolean);
+    showDebug({
+      loaded: true,
+      version: SCRIPT_VERSION,
+      hasConfig: true,
+      mediaCount: media.length,
+      variantCount: variants.length,
+      groups: Object.keys(config.groups || {}),
+      activeGroup: group.label || "",
+      activeGroupMediaIds: group.mediaIds || [],
+      selectedOptions: selectedOptions(),
+      selectedVariantId: selectedVariantId(),
+      adjustedSelection: adjustedSelection,
+      allowedNumericIds: Object.keys(allowed),
+      replacementMediaCount: selectedReplacementMedia.length,
+      replacementMedia: selectedReplacementMedia.map(function (item) {
+        return { id: numericId(item.id || item.gid), key: item.key || "", alt: item.alt || "" };
+      }),
+      productMediaNodes: productMediaNodeCount,
+      imageKeyNodes: imageKeyNodeCount,
+      originalGalleryNodes: originalGalleries().length,
+      slideshowSlides: document.querySelectorAll("slideshow-slide").length,
+      nativeFilterApplied: Boolean(result),
+      replacementGallery: replacementRendered
+    });
 
     if (result) {
       setOriginalGalleryHidden(false);
@@ -1482,7 +1101,7 @@
 
   function rememberImmediateSelection(target) {
     var config = parseJson("[data-cariana-variant-visuals-config]");
-    if (!config) return null;
+    if (!config) return false;
 
     var colorOptionName = config.colorOptionName || "Color";
     var sizeOptionName = config.sizeOptionName || "Talla";
@@ -1500,22 +1119,17 @@
       return targetMatchesControl(target, candidate.control);
     });
 
-    if (!match || !match.control || !match.control.value) return null;
-    if (match.control.node && match.control.node.disabled) return null;
+    if (!match || !match.control || !match.control.value) return false;
+    if (match.control.node && match.control.node.disabled) return false;
 
-    ensurePersistentSelectionScope(config);
-    rememberOptionSelection(match.optionName, match.control.value);
-    return match;
+    immediateSelectedOptions[normalize(match.optionName)] = match.control.value;
+    immediateSelectedOptionsExpiresAt = Date.now() + 2500;
+    return true;
   }
 
   function applyFilterImmediatelyFromEvent(event) {
-    var match = rememberImmediateSelection(event.target);
-    if (!match) return;
+    if (!rememberImmediateSelection(event.target)) return;
     window.clearTimeout(window.CarianaVariantVisualsTimer);
-    if (event.type === "pointerdown" && normalize(match.optionName) === normalize((parseJson("[data-cariana-variant-visuals-config]") || {}).sizeOptionName || "Talla")) {
-      window.CarianaVariantVisualsTimer = window.setTimeout(applyFilter, 160);
-      return;
-    }
     applyFilter();
   }
 
@@ -1546,21 +1160,6 @@
   document.addEventListener("variant:change", scheduleFilter, true);
   document.addEventListener("shopify:section:load", scheduleFilter, true);
   window.addEventListener("popstate", scheduleFilter);
-  new MutationObserver(handleDomMutations).observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: [
-      "checked",
-      "data-current-checked",
-      "data-option-available",
-      "data-variant-id",
-      "aria-pressed",
-      "aria-selected",
-      "hidden",
-      "style",
-      "class"
-    ]
-  });
+  new MutationObserver(handleDomMutations).observe(document.documentElement, { childList: true, subtree: true });
   scheduleFilter();
 })();
