@@ -1,9 +1,11 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v50";
+  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v52";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
+  var persistentSelectedOptions = {};
+  var persistentProductKey = "";
   var preloadedImageUrls = {};
   var preloadLinkUrls = {};
   var preloadBankUrls = {};
@@ -88,7 +90,9 @@
 
     document.querySelectorAll("fieldset").forEach(function (fieldset) {
       var legend = fieldset.querySelector("legend");
-      var checked = fieldset.querySelector('input[type="radio"]:checked, input[data-current-checked="true"]');
+      var checked =
+        fieldset.querySelector('input[type="radio"]:checked') ||
+        fieldset.querySelector('input[data-current-checked="true"]');
       if (!legend || !checked) return;
 
       var optionName = legend.childNodes[0] ? legend.childNodes[0].textContent : legend.textContent;
@@ -112,6 +116,26 @@
   function immediateOptionValue(optionName) {
     if (Date.now() >= immediateSelectedOptionsExpiresAt) return "";
     return immediateSelectedOptions[normalize(optionName)] || "";
+  }
+
+  function productSelectionKey(config) {
+    return String((config && (config.productId || config.handle)) || "");
+  }
+
+  function ensurePersistentSelectionScope(config) {
+    var nextKey = productSelectionKey(config);
+    if (!nextKey || nextKey === persistentProductKey) return;
+    persistentProductKey = nextKey;
+    persistentSelectedOptions = {};
+  }
+
+  function rememberOptionSelection(optionName, value) {
+    var key = normalize(optionName);
+    if (!key || !value) return;
+
+    persistentSelectedOptions[key] = value;
+    immediateSelectedOptions[key] = value;
+    immediateSelectedOptionsExpiresAt = Date.now() + 2500;
   }
 
   function selectedOptionsFromVariant(variants) {
@@ -173,11 +197,48 @@
 
   function selectedControlValue(optionName) {
     var controls = optionControls(optionName);
-    var selected = controls.find(controlIsSelected);
+    var selected =
+      controls.find(function (control) {
+        return Boolean(
+          control &&
+            control.node &&
+            (control.node.checked ||
+              (control.wrapper && control.wrapper.querySelector && control.wrapper.querySelector('input[type="radio"]:checked')))
+        );
+      }) ||
+      controls.find(function (control) {
+        return Boolean(
+          control &&
+            control.node &&
+            (control.node.getAttribute("aria-selected") === "true" ||
+              control.node.getAttribute("data-selected") === "true" ||
+              control.node.classList.contains("is-selected") ||
+              control.node.classList.contains("selected") ||
+              control.node.classList.contains("active") ||
+              (control.wrapper &&
+                (control.wrapper.getAttribute("aria-selected") === "true" ||
+                  control.wrapper.getAttribute("data-selected") === "true" ||
+                  control.wrapper.classList.contains("is-selected") ||
+                  control.wrapper.classList.contains("selected") ||
+                  control.wrapper.classList.contains("active"))))
+        );
+      }) ||
+      controls.find(function (control) {
+        return Boolean(
+          control &&
+            control.node &&
+            (control.node.getAttribute("data-current-checked") === "true" ||
+              (control.wrapper &&
+                control.wrapper.querySelector &&
+                control.wrapper.querySelector('input[data-current-checked="true"]')))
+        );
+      });
     return selected && selected.value ? selected.value : "";
   }
 
   function effectiveSelectedOptions(config, variants) {
+    ensurePersistentSelectionScope(config);
+
     var colorOptionName = config.colorOptionName || "Color";
     var sizeOptionName = config.sizeOptionName || "Talla";
     var result = selectedOptionsFromVariant(variants);
@@ -191,6 +252,10 @@
     var selectedColor = selectedControlValue(colorOptionName);
     if (selectedSize) result[normalize(sizeOptionName)] = selectedSize;
     if (selectedColor) result[normalize(colorOptionName)] = selectedColor;
+
+    Object.keys(persistentSelectedOptions).forEach(function (optionName) {
+      if (persistentSelectedOptions[optionName]) result[optionName] = persistentSelectedOptions[optionName];
+    });
 
     var immediateSize = immediateOptionValue(sizeOptionName);
     var immediateColor = immediateOptionValue(colorOptionName);
@@ -459,16 +524,16 @@
     }
   }
 
-  function chooseColorControl(controls) {
-    var current = controls.find(function (control) {
-      return control.node.checked || control.node.getAttribute("aria-selected") === "true" || control.node.classList.contains("is-selected");
-    });
+  function chooseColorControl(controls, optionName) {
+    var current = controls.find(controlIsSelected);
     if (current && current.node.disabled !== true) return false;
 
     var next = controls.find(function (control) {
       return control.node.disabled !== true;
     });
     if (!next) return false;
+
+    rememberOptionSelection(optionName, next.value);
 
     if (next.node.tagName === "INPUT") {
       next.node.checked = true;
@@ -511,7 +576,7 @@
       setOptionControlStatus(control, sizeStatuses[sizeKey] || { exists: false, available: false });
     });
 
-    return chooseColorControl(colorControls) || chooseColorControl(sizeControls);
+    return chooseColorControl(colorControls, colorOptionName) || chooseColorControl(sizeControls, sizeOptionName);
   }
 
   function sourceGallery() {
@@ -1261,8 +1326,8 @@
     if (!match || !match.control || !match.control.value) return false;
     if (match.control.node && match.control.node.disabled) return false;
 
-    immediateSelectedOptions[normalize(match.optionName)] = match.control.value;
-    immediateSelectedOptionsExpiresAt = Date.now() + 2500;
+    ensurePersistentSelectionScope(config);
+    rememberOptionSelection(match.optionName, match.control.value);
     return true;
   }
 
