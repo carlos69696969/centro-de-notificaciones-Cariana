@@ -57,6 +57,14 @@ button[data-cariana-variant-visuals-color-option="true"],
   outline: 0 !important;
 }
 
+label[data-cariana-variant-visuals-color-option="true"][data-cariana-variant-visuals-option-missing="true"],
+button[data-cariana-variant-visuals-color-option="true"][data-cariana-variant-visuals-option-missing="true"],
+[role="button"][data-cariana-variant-visuals-color-option="true"][data-cariana-variant-visuals-option-missing="true"],
+.cariana-variant-visuals-color-button[data-cariana-variant-visuals-option-missing="true"] {
+  display: none !important;
+  visibility: hidden !important;
+}
+
 [data-cariana-variant-visuals-color-swatch="true"] {
   box-sizing: border-box !important;
   width: 28px !important;

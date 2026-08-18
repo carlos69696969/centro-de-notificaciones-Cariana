@@ -1,7 +1,7 @@
 (function () {
   if (window.CarianaVariantVisualsLoaded) return;
   window.CarianaVariantVisualsLoaded = true;
-  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v54";
+  var SCRIPT_VERSION = "2026-08-18-hide-missing-color-options-v55";
   var immediateSelectedOptions = {};
   var immediateSelectedOptionsExpiresAt = 0;
   var persistentSelectedOptions = {};
@@ -446,6 +446,19 @@
     return controls;
   }
 
+  function resolvedNativeOptionStatus(control, fallbackStatus) {
+    var node = control && control.node;
+    if (!node || node.tagName !== "INPUT" || !node.hasAttribute("data-option-available")) {
+      return fallbackStatus;
+    }
+
+    var exists = Boolean(numericId(node.getAttribute("data-variant-id")));
+    return {
+      exists: exists,
+      available: exists && node.getAttribute("data-option-available") !== "false"
+    };
+  }
+
   function setOptionControlStatus(control, status, hideMissing) {
     if (!control || !control.node) return;
 
@@ -595,8 +608,9 @@
       var colorKey = normalize(control.value);
       var group = (config.groups || {})[control.value] || groupForColorValue(config, control.value);
       var labelKey = group && group.label ? normalize(group.label) : "";
+      var status = colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false };
       markOptionControlKind(control, "color", group);
-      setOptionControlStatus(control, colorStatuses[colorKey] || colorStatuses[labelKey] || { exists: false, available: false }, true);
+      setOptionControlStatus(control, resolvedNativeOptionStatus(control, status), true);
     });
 
     sizeControls.forEach(function (control) {
@@ -1397,7 +1411,15 @@
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ["checked", "data-current-checked", "data-option-available", "aria-pressed", "aria-selected", "class"]
+    attributeFilter: [
+      "checked",
+      "data-current-checked",
+      "data-option-available",
+      "data-variant-id",
+      "aria-pressed",
+      "aria-selected",
+      "class"
+    ]
   });
   scheduleFilter();
 })();
