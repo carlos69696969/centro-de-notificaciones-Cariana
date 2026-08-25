@@ -646,7 +646,7 @@ const validManualStatusCodes = new Set([
   "order_cancelled"
 ]);
 const ORDER_STATUS_DEDUPE_WINDOW_MINUTES = 2;
-const DEDUPED_ORDER_STATUS_CODES = new Set(["order_in_transit", "order_delivered"]);
+const DEDUPED_ORDER_STATUS_CODES = new Set(["order_in_transit", "order_rescheduled", "order_delivered"]);
 
 async function hasRecentOrderRescheduleNotification({ shopDomain, orderId, orderNumber, minutes = 10 }) {
   const normalizedOrderId = parseLegacyNumericId(orderId);
