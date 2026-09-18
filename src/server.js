@@ -19,6 +19,7 @@ const returnSettingsRoutes = require("./routes/returnSettings");
 const storefrontNotificationsRoutes = require("./routes/storefrontNotifications");
 const abandonedCartRoutes = require("./routes/abandonedCart");
 const variantVisualsRoutes = require("./routes/variantVisuals");
+const storeCreditRoutes = require("./routes/storeCredit");
 
 const app = express();
 const APP_LINK_DOMAIN = "app.cariana.mx";
@@ -71,6 +72,7 @@ app.use("/api/orders", requireInternalApiKey, ordersRoutes);
 app.use("/api/return-settings", requireInternalApiKey, returnSettingsRoutes);
 app.use("/api/abandoned-cart", requireInternalApiKey, abandonedCartRoutes);
 app.use("/api/variant-visuals", requireInternalApiKey, variantVisualsRoutes);
+app.use("/api/store-credit", requireInternalApiKey, storeCreditRoutes);
 app.use("/proxy/notifications", storefrontNotificationsRoutes);
 app.use("/proxy/returns", returnsRoutes);
 app.use("/proxy/orders", ordersRoutes);
