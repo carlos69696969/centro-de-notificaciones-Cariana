@@ -1,6 +1,7 @@
 const pool = require("../db/pool");
 const logger = require("../utils/logger");
 const { getCustomerByShopifyId, getCustomerByEmail } = require("./customerService");
+const { buildStoreCreditDeepLink } = require("./deepLinkService");
 const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
 
 const DEFAULT_DELAY_MS = 60 * 1000;
@@ -43,9 +44,11 @@ function buildStoreCreditMessage(amount, currencyCode = "MXN") {
   return `Se agregaron ${formatCreditAmount(amount, currencyCode)} de crédito en tu cuenta de CARIANA. Úsalos en tu próxima compra o acumúlalos para después. 🎁 CARIANA te agradece por ser parte de nuestra comunidad.`;
 }
 
-function notificationDeepLink(shopDomain) {
-  const domain = cleanText(shopDomain);
-  return domain ? `https://${domain}/apps/notificaciones` : "";
+function notificationDeepLink(shopDomain, sourceKey) {
+  return buildStoreCreditDeepLink({
+    shopDomain,
+    sourceKey
+  });
 }
 
 async function scheduleStoreCreditNotification({
@@ -143,7 +146,7 @@ async function resolveJobCustomer(job) {
 
 async function sendStoreCreditNotificationJob(job) {
   const customer = await resolveJobCustomer(job);
-  const deepLink = notificationDeepLink(job.shop_domain);
+  const deepLink = notificationDeepLink(job.shop_domain, job.source_key);
   const data = {
     notificationType: "store_credit_reward",
     deepLinkType: "store_credit",

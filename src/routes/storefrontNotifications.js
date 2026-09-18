@@ -2,7 +2,7 @@ const express = require("express");
 const pool = require("../db/pool");
 const env = require("../config/env");
 const { verifyAppProxySignature } = require("../services/shopifyAppProxyVerifier");
-const { buildCartDeepLink, buildOrderDeepLink, buildLegacyOrderFallbackDeepLink, toAbsoluteStorefrontUrl } = require("../services/deepLinkService");
+const { buildCartDeepLink, buildOrderDeepLink, buildLegacyOrderFallbackDeepLink, buildStoreCreditDeepLink, toAbsoluteStorefrontUrl } = require("../services/deepLinkService");
 const { recordAbandonedCartActivity } = require("../services/abandonedCartService");
 
 const router = express.Router();
@@ -249,6 +249,41 @@ async function markOpenedByOrderContext({ shopDomain, orderNumber }) {
   );
 }
 
+async function markOpenedByStoreCreditContext({ shopDomain, sourceKey, shopifyCustomerId }) {
+  const normalizedSourceKey = safeTrim(sourceKey);
+  const customerContext = await resolveCustomerContext(shopDomain, shopifyCustomerId);
+  const currentCustomerId = Number(customerContext.customerId || 0);
+  const currentCustomerEmail = safeTrim(customerContext.customerEmail).toLowerCase();
+  const effectiveShopDomain = safeTrim(customerContext.effectiveShopDomain || shopDomain);
+
+  if (!effectiveShopDomain || (!normalizedSourceKey && !currentCustomerId && !currentCustomerEmail)) return;
+
+  await pool.query(
+    `
+    WITH candidates AS (
+      SELECT n.id
+      FROM notifications n
+      WHERE n.shop_domain = $1
+        AND n.status = 'sent'
+        AND n.opened_at IS NULL
+        AND n.type = 'store_credit_reward'
+        AND (
+          ($2 <> '' AND COALESCE(n.data->>'sourceKey', n.data->>'source_key', '') = $2)
+          OR ($3 > 0 AND n.customer_id = $3)
+          OR ($4 <> '' AND LOWER(COALESCE(n.data->>'customerEmail', '')) = $4)
+        )
+      ORDER BY n.created_at DESC
+      LIMIT 20
+    )
+    UPDATE notifications n
+    SET opened_at = COALESCE(n.opened_at, NOW()), updated_at = NOW()
+    FROM candidates c
+    WHERE n.id = c.id
+    `,
+    [effectiveShopDomain, normalizedSourceKey, currentCustomerId, currentCustomerEmail]
+  );
+}
+
 async function markOpenedByCampaignContext({ shopDomain, campaignId, targetUrl, shopifyCustomerId }) {
   const normalizedCampaignId = Number(campaignId || 0);
   const normalizedTargetUrl = safeTrim(targetUrl);
@@ -379,6 +414,7 @@ function resolveNotificationDeepLink({ shopDomain, item }) {
   const deepLinkType = safeTrim(rawData.deepLinkType || rawData.deeplinkType || rawData.linkType);
   const isOrderLike = ["order_event", "order_manual", "refund_event"].includes(type) || deepLinkType === "order";
   const isCartLike = type === "abandoned_cart" || deepLinkType === "cart";
+  const isStoreCreditLike = type === "store_credit_reward" || deepLinkType === "store_credit";
   const existing = safeTrim(item?.deep_link);
 
   if (isCartLike) {
@@ -387,6 +423,13 @@ function resolveNotificationDeepLink({ shopDomain, item }) {
       checkoutId: rawData.checkoutId || rawData.checkout_id || "",
       stage: rawData.stage || "",
       deepLink: existing || "/cart"
+    });
+  }
+
+  if (isStoreCreditLike) {
+    return buildStoreCreditDeepLink({
+      shopDomain,
+      sourceKey: rawData.sourceKey || rawData.source_key || ""
     });
   }
 
@@ -1978,6 +2021,46 @@ router.get("/open-cart", requireValidProxy, async (req, res, next) => {
   </head>
   <body>
     <p>Abriendo carrito...</p>
+    <p><a href="${safeTarget}">Continuar</a></p>
+    <script>
+      window.location.replace(${JSON.stringify(targetUrl)});
+    </script>
+  </body>
+</html>`);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/open-store-credit", requireValidProxy, async (req, res, next) => {
+  try {
+    const shopDomain = resolveShopDomain(req);
+    const shopifyCustomerId = resolveCustomerId(req);
+    const sourceKey = req.query.source || req.query.source_key || req.query.sourceKey || "";
+
+    await markOpenedByStoreCreditContext({
+      shopDomain,
+      sourceKey,
+      shopifyCustomerId
+    });
+
+    const targetUrl = toAbsoluteStorefrontUrl(shopDomain, "/account?open=store-credit");
+    const safeTarget = escapeHtml(targetUrl);
+
+    if (!targetUrl || !isAbsoluteUrl(targetUrl)) {
+      return res.status(400).send("Invalid store credit target");
+    }
+
+    return res.status(200).send(`<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Abriendo credito en tienda...</title>
+    <meta http-equiv="refresh" content="0;url=${safeTarget}" />
+  </head>
+  <body>
+    <p>Abriendo credito en tienda...</p>
     <p><a href="${safeTarget}">Continuar</a></p>
     <script>
       window.location.replace(${JSON.stringify(targetUrl)});

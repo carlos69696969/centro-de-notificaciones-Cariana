@@ -157,6 +157,13 @@ function buildNotificationsDeepLink({ shopDomain }) {
   return toAbsoluteShopDomainUrl(shopDomain, "/apps/notificaciones");
 }
 
+function buildStoreCreditDeepLink({ shopDomain, sourceKey }) {
+  const bridgeUrl = toAbsoluteShopDomainUrl(shopDomain, "/apps/notificaciones/open-store-credit");
+  return appendQueryParams(bridgeUrl, {
+    source: sourceKey
+  });
+}
+
 function buildCampaignDeepLink({ shopDomain, deepLink, campaignId }) {
   const targetUrl = safeTrim(deepLink)
     ? toAbsoluteStorefrontUrl(shopDomain, deepLink)
@@ -187,6 +194,7 @@ module.exports = {
   buildLegacyOrderFallbackDeepLink,
   buildReturnDeepLink,
   buildNotificationsDeepLink,
+  buildStoreCreditDeepLink,
   buildCampaignDeepLink,
   buildCartDeepLink,
   toAbsoluteStorefrontUrl
