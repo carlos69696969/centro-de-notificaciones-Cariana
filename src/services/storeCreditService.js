@@ -57,7 +57,8 @@ async function scheduleStoreCreditNotification({
   orderNumber,
   amount,
   currencyCode,
-  delayMs = DEFAULT_DELAY_MS
+  delayMs = DEFAULT_DELAY_MS,
+  sendNow = false
 }) {
   const normalizedShop = cleanText(shopDomain).toLowerCase();
   const normalizedSourceKey = cleanText(sourceKey);
@@ -70,7 +71,9 @@ async function scheduleStoreCreditNotification({
     return { skipped: true, reason: "missing_required_fields" };
   }
 
-  const scheduledAt = new Date(Date.now() + Math.max(0, Number(delayMs || DEFAULT_DELAY_MS)));
+  const scheduledAt = sendNow
+    ? new Date()
+    : new Date(Date.now() + Math.max(0, Number(delayMs || DEFAULT_DELAY_MS)));
   const message = buildStoreCreditMessage(normalizedAmount, normalizedCurrency);
 
   const result = await pool.query(
@@ -115,11 +118,17 @@ async function scheduleStoreCreditNotification({
     return { skipped: true, reason: "already_sent_or_sending" };
   }
 
-  return {
+  const scheduled = {
     scheduled: true,
     jobId: result.rows[0].id,
     scheduledAt: result.rows[0].scheduled_at
   };
+
+  if (sendNow) {
+    scheduled.sendResult = await processStoreCreditNotificationJob(result.rows[0].id);
+  }
+
+  return scheduled;
 }
 
 async function resolveJobCustomer(job) {
@@ -172,6 +181,75 @@ async function sendStoreCreditNotificationJob(job) {
   return { sent: 0, failed: 0, stored: 0, total: 0, skipped: true, reason: "customer_not_found" };
 }
 
+async function processStoreCreditNotificationJob(jobId) {
+  const locked = await pool.query(
+    `
+    UPDATE store_credit_notification_jobs
+    SET status = 'sending', updated_at = NOW()
+    WHERE id = $1
+      AND status = 'scheduled'
+      AND scheduled_at <= NOW()
+    RETURNING *
+    `,
+    [jobId]
+  );
+  if (locked.rowCount === 0) {
+    return { skipped: true, reason: "not_due_or_already_processing" };
+  }
+
+  const lockedJob = locked.rows[0];
+  try {
+    const sendResult = await sendStoreCreditNotificationJob(lockedJob);
+    const delivered = Number(sendResult?.sent || 0) > 0 || Number(sendResult?.stored || 0) > 0;
+    const skipped = Boolean(sendResult?.skipped) || (!delivered && Number(sendResult?.total || 0) === 0);
+    const nextStatus = delivered ? "sent" : skipped ? "skipped" : "failed";
+    await pool.query(
+      `
+      UPDATE store_credit_notification_jobs
+      SET status = $2,
+          sent_at = CASE WHEN $2 = 'sent' THEN NOW() ELSE sent_at END,
+          send_result = $3::jsonb,
+          error_message = $4,
+          updated_at = NOW()
+      WHERE id = $1
+      `,
+      [
+        lockedJob.id,
+        nextStatus,
+        JSON.stringify(sendResult || {}),
+        delivered ? null : cleanText(sendResult?.reason || "No active tokens")
+      ]
+    );
+
+    return {
+      status: nextStatus,
+      sent: Number(sendResult?.sent || 0),
+      stored: Number(sendResult?.stored || 0),
+      failed: Number(sendResult?.failed || 0),
+      total: Number(sendResult?.total || 0),
+      reason: sendResult?.reason || null
+    };
+  } catch (error) {
+    await pool.query(
+      `
+      UPDATE store_credit_notification_jobs
+      SET status = 'failed',
+          error_message = $2,
+          updated_at = NOW()
+      WHERE id = $1
+      `,
+      [lockedJob.id, cleanText(error?.message || error || "unknown").slice(0, 500)]
+    );
+    logger.error("Store credit notification job failed", {
+      jobId: lockedJob.id,
+      shopDomain: lockedJob.shop_domain,
+      sourceKey: lockedJob.source_key,
+      error: error?.message || error
+    });
+    return { status: "failed", error: cleanText(error?.message || error || "unknown") };
+  }
+}
+
 async function runStoreCreditNotificationJobs({ limit = 50 } = {}) {
   const dueJobs = await pool.query(
     `
@@ -190,63 +268,10 @@ async function runStoreCreditNotificationJobs({ limit = 50 } = {}) {
   let failedCount = 0;
 
   for (const job of dueJobs.rows) {
-    const locked = await pool.query(
-      `
-      UPDATE store_credit_notification_jobs
-      SET status = 'sending', updated_at = NOW()
-      WHERE id = $1 AND status = 'scheduled'
-      RETURNING *
-      `,
-      [job.id]
-    );
-    if (locked.rowCount === 0) continue;
-
-    const lockedJob = locked.rows[0];
-    try {
-      const sendResult = await sendStoreCreditNotificationJob(lockedJob);
-      const delivered = Number(sendResult?.sent || 0) > 0 || Number(sendResult?.stored || 0) > 0;
-      const skipped = Boolean(sendResult?.skipped) || (!delivered && Number(sendResult?.total || 0) === 0);
-      const nextStatus = delivered ? "sent" : skipped ? "skipped" : "failed";
-      await pool.query(
-        `
-        UPDATE store_credit_notification_jobs
-        SET status = $2,
-            sent_at = CASE WHEN $2 = 'sent' THEN NOW() ELSE sent_at END,
-            send_result = $3::jsonb,
-            error_message = $4,
-            updated_at = NOW()
-        WHERE id = $1
-        `,
-        [
-          lockedJob.id,
-          nextStatus,
-          JSON.stringify(sendResult || {}),
-          delivered ? null : cleanText(sendResult?.reason || "No active tokens")
-        ]
-      );
-
-      if (nextStatus === "sent") sentCount += 1;
-      else if (nextStatus === "skipped") skippedCount += 1;
-      else failedCount += 1;
-    } catch (error) {
-      failedCount += 1;
-      await pool.query(
-        `
-        UPDATE store_credit_notification_jobs
-        SET status = 'failed',
-            error_message = $2,
-            updated_at = NOW()
-        WHERE id = $1
-        `,
-        [lockedJob.id, cleanText(error?.message || error || "unknown").slice(0, 500)]
-      );
-      logger.error("Store credit notification job failed", {
-        jobId: lockedJob.id,
-        shopDomain: lockedJob.shop_domain,
-        sourceKey: lockedJob.source_key,
-        error: error?.message || error
-      });
-    }
+    const result = await processStoreCreditNotificationJob(job.id);
+    if (result.status === "sent") sentCount += 1;
+    else if (result.status === "skipped" || result.skipped) skippedCount += 1;
+    else failedCount += 1;
   }
 
   return { checked: dueJobs.rowCount, sent: sentCount, skipped: skippedCount, failed: failedCount };
@@ -254,5 +279,6 @@ async function runStoreCreditNotificationJobs({ limit = 50 } = {}) {
 
 module.exports = {
   scheduleStoreCreditNotification,
+  processStoreCreditNotificationJob,
   runStoreCreditNotificationJobs
 };

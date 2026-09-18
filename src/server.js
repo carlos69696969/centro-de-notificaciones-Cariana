@@ -76,6 +76,7 @@ app.use("/api/store-credit", requireInternalApiKey, storeCreditRoutes);
 app.use("/proxy/notifications", storefrontNotificationsRoutes);
 app.use("/proxy/returns", returnsRoutes);
 app.use("/proxy/orders", ordersRoutes);
+app.use("/proxy/store-credit", storeCreditRoutes);
 
 app.get("/finanzas", (_req, res) => {
   res.sendFile(path.join(__dirname, "views", "finanzas.html"));
