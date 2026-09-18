@@ -97,9 +97,19 @@ CREATE TABLE IF NOT EXISTS campaigns (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE notifications
-ADD CONSTRAINT fk_notifications_campaign
-FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'fk_notifications_campaign'
+      AND conrelid = 'notifications'::regclass
+  ) THEN
+    ALTER TABLE notifications
+    ADD CONSTRAINT fk_notifications_campaign
+    FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS campaign_recipients (
   id BIGSERIAL PRIMARY KEY,
