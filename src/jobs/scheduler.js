@@ -3,7 +3,6 @@ const env = require("../config/env");
 const pool = require("../db/pool");
 const { runAbandonedCartSweep } = require("../services/abandonedCartService");
 const { runScheduledCampaigns } = require("../services/campaignService");
-const { runStoreCreditNotificationJobs } = require("../services/storeCreditService");
 const logger = require("../utils/logger");
 
 function startScheduler() {
@@ -31,15 +30,6 @@ function startScheduler() {
       logger.info("Scheduled campaign sweep complete");
     } catch (error) {
       logger.error("Scheduled campaign sweep failed", { error: error.message });
-    }
-  });
-
-  cron.schedule("* * * * *", async () => {
-    try {
-      const result = await runStoreCreditNotificationJobs();
-      logger.info("Store credit notification sweep complete", result);
-    } catch (error) {
-      logger.error("Store credit notification sweep failed", { error: error.message });
     }
   });
 
