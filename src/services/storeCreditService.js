@@ -5,7 +5,10 @@ const { buildStoreCreditDeepLink } = require("./deepLinkService");
 const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationService");
 
 const DEFAULT_DELAY_MS = 60 * 1000;
-const STORE_CREDIT_TITLE = "¡Tienes crédito en CARIANA! 💸";
+const STORE_CREDIT_REWARD_TITLE = "¡Tienes crédito en CARIANA! 💸";
+const STORE_CREDIT_REFUND_TITLE = "Crédito reembolsado 💰";
+const STORE_CREDIT_REWARD_TYPE = "store_credit_reward";
+const STORE_CREDIT_REFUND_TYPE = "store_credit_refund";
 
 function cleanText(value) {
   return String(value || "").trim();
@@ -44,6 +47,59 @@ function buildStoreCreditMessage(amount, currencyCode = "MXN") {
   return `Se agregaron ${formatCreditAmount(amount, currencyCode)} de crédito en tu cuenta de CARIANA. Úsalos en tu próxima compra o acumúlalos para después. 🎁 CARIANA te agradece por ser parte de nuestra comunidad.`;
 }
 
+function buildStoreCreditRefundMessage(amount, currencyCode = "MXN") {
+  return `Debido al reembolso realizado en tu pedido, hemos devuelto ${formatCreditAmount(amount, currencyCode)} a tu crédito de tienda. Este saldo está disponible en tu cuenta y podrás utilizarlo en una próxima compra en Cariana.`;
+}
+
+function normalizeNotificationType(value, sourceKey = "") {
+  const normalized = cleanText(value)
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  const normalizedSourceKey = cleanText(sourceKey).toLowerCase();
+
+  if (
+    normalized === STORE_CREDIT_REFUND_TYPE ||
+    normalized === "store_credit_refunded" ||
+    normalized === "credit_refund" ||
+    normalized === "refund_credit" ||
+    normalizedSourceKey.startsWith("store-credit-refund:") ||
+    normalizedSourceKey.startsWith("store_credit_refund:")
+  ) {
+    return STORE_CREDIT_REFUND_TYPE;
+  }
+
+  return STORE_CREDIT_REWARD_TYPE;
+}
+
+function buildStoreCreditCopy({ amount, currencyCode, notificationType, title, message }) {
+  const explicitTitle = cleanText(title);
+  const explicitMessage = cleanText(message);
+  const defaultTitle =
+    notificationType === STORE_CREDIT_REFUND_TYPE ? STORE_CREDIT_REFUND_TITLE : STORE_CREDIT_REWARD_TITLE;
+  const defaultMessage =
+    notificationType === STORE_CREDIT_REFUND_TYPE
+      ? buildStoreCreditRefundMessage(amount, currencyCode)
+      : buildStoreCreditMessage(amount, currencyCode);
+  if (explicitTitle || explicitMessage) {
+    return {
+      title: explicitTitle || defaultTitle,
+      message: explicitMessage || defaultMessage
+    };
+  }
+
+  if (notificationType === STORE_CREDIT_REFUND_TYPE) {
+    return {
+      title: STORE_CREDIT_REFUND_TITLE,
+      message: buildStoreCreditRefundMessage(amount, currencyCode)
+    };
+  }
+
+  return {
+    title: STORE_CREDIT_REWARD_TITLE,
+    message: buildStoreCreditMessage(amount, currencyCode)
+  };
+}
+
 function notificationDeepLink(shopDomain, sourceKey) {
   return buildStoreCreditDeepLink({
     shopDomain,
@@ -60,6 +116,9 @@ async function scheduleStoreCreditNotification({
   orderNumber,
   amount,
   currencyCode,
+  notificationType,
+  title,
+  message,
   delayMs = DEFAULT_DELAY_MS,
   sendNow = false
 }) {
@@ -69,6 +128,7 @@ async function scheduleStoreCreditNotification({
   const normalizedAmount = roundMoney(amount);
   const normalizedCurrency = normalizeCurrency(currencyCode);
   const normalizedEmail = cleanText(customerEmail).toLowerCase();
+  const normalizedNotificationType = normalizeNotificationType(notificationType, normalizedSourceKey);
 
   if (!normalizedShop || !normalizedSourceKey || normalizedAmount <= 0) {
     return { skipped: true, reason: "missing_required_fields" };
@@ -77,7 +137,13 @@ async function scheduleStoreCreditNotification({
   const scheduledAt = sendNow
     ? new Date()
     : new Date(Date.now() + Math.max(0, Number(delayMs || DEFAULT_DELAY_MS)));
-  const message = buildStoreCreditMessage(normalizedAmount, normalizedCurrency);
+  const copy = buildStoreCreditCopy({
+    amount: normalizedAmount,
+    currencyCode: normalizedCurrency,
+    notificationType: normalizedNotificationType,
+    title,
+    message
+  });
 
   const result = await pool.query(
     `
@@ -111,8 +177,8 @@ async function scheduleStoreCreditNotification({
       cleanText(orderNumber) || null,
       normalizedAmount,
       normalizedCurrency,
-      STORE_CREDIT_TITLE,
-      message,
+      copy.title,
+      copy.message,
       scheduledAt
     ]
   );
@@ -147,8 +213,9 @@ async function resolveJobCustomer(job) {
 async function sendStoreCreditNotificationJob(job) {
   const customer = await resolveJobCustomer(job);
   const deepLink = notificationDeepLink(job.shop_domain, job.source_key);
+  const notificationType = normalizeNotificationType("", job.source_key);
   const data = {
-    notificationType: "store_credit_reward",
+    notificationType,
     deepLinkType: "store_credit",
     orderId: job.order_id || "",
     orderNumber: job.order_number || "",
@@ -161,7 +228,7 @@ async function sendStoreCreditNotificationJob(job) {
     return sendToCustomerTokens({
       shopDomain: job.shop_domain,
       customerId: customer.id,
-      type: "store_credit_reward",
+      type: notificationType,
       title: job.title,
       message: job.message,
       deepLink,
@@ -173,7 +240,7 @@ async function sendStoreCreditNotificationJob(job) {
     return sendToEmailTokens({
       shopDomain: job.shop_domain,
       email: job.customer_email,
-      type: "store_credit_reward",
+      type: notificationType,
       title: job.title,
       message: job.message,
       deepLink,

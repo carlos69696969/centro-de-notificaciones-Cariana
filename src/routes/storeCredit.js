@@ -21,6 +21,9 @@ router.post("/events", async (req, res, next) => {
       orderNumber: event.orderNumber,
       amount: event.amount,
       currencyCode: event.currencyCode,
+      notificationType: event.notificationType || event.type || event.kind,
+      title: event.title,
+      message: event.message,
       delayMs: event.delayMs,
       sendNow: Boolean(event.sendNow)
     });
