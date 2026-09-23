@@ -6,7 +6,7 @@ const { sendToCustomerTokens, sendToEmailTokens } = require("./notificationServi
 
 const DEFAULT_DELAY_MS = 60 * 1000;
 const STORE_CREDIT_REWARD_TITLE = "¡Tienes crédito en CARIANA! 💸";
-const STORE_CREDIT_REFUND_TITLE = "Crédito reembolsado 💰";
+const STORE_CREDIT_REFUND_TITLE = "Actualización de tu crédito Cariana 💳✨";
 const STORE_CREDIT_REWARD_TYPE = "store_credit_reward";
 const STORE_CREDIT_REFUND_TYPE = "store_credit_refund";
 
@@ -48,7 +48,13 @@ function buildStoreCreditMessage(amount, currencyCode = "MXN") {
 }
 
 function buildStoreCreditRefundMessage(amount, currencyCode = "MXN") {
-  return `Debido al reembolso realizado en tu pedido, hemos devuelto ${formatCreditAmount(amount, currencyCode)} a tu crédito de tienda. Este saldo está disponible en tu cuenta y podrás utilizarlo en una próxima compra en Cariana.`;
+  return [
+    "Debido al reembolso realizado en tu pedido, también se realizó un ajuste en tu saldo de crédito Cariana.",
+    `Al realizar tu compra recibiste ${formatCreditAmount(amount, currencyCode)} en crédito como beneficio por esa compra. Debido a que el importe correspondiente fue posteriormente reembolsado, ese crédito generado dejó de ser aplicable y fue ajustado automáticamente de tu saldo.`,
+    "Este ajuste no afecta ningún crédito obtenido en otras compras ni representa un cargo adicional. Únicamente corresponde al beneficio que se había generado por la compra reembolsada.",
+    "Tu saldo restante continúa disponible para utilizarlo en futuras compras. ✨",
+    "Gracias por tu comprensión. Atte. Cariana"
+  ].join("\n");
 }
 
 function normalizeNotificationType(value, sourceKey = "") {
