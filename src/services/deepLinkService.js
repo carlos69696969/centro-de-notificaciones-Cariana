@@ -157,10 +157,11 @@ function buildNotificationsDeepLink({ shopDomain }) {
   return toAbsoluteShopDomainUrl(shopDomain, "/apps/notificaciones");
 }
 
-function buildStoreCreditDeepLink({ shopDomain, sourceKey }) {
+function buildStoreCreditDeepLink({ shopDomain, sourceKey, target }) {
   const bridgeUrl = toAbsoluteShopDomainUrl(shopDomain, "/apps/notificaciones/open-store-credit");
   return appendQueryParams(bridgeUrl, {
-    source: sourceKey
+    source: sourceKey,
+    target
   });
 }
 

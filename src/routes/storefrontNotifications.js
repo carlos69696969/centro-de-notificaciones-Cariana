@@ -266,7 +266,7 @@ async function markOpenedByStoreCreditContext({ shopDomain, sourceKey, shopifyCu
       WHERE n.shop_domain = $1
         AND n.status = 'sent'
         AND n.opened_at IS NULL
-        AND n.type = 'store_credit_reward'
+        AND n.type IN ('store_credit_reward', 'store_credit_refund')
         AND (
           ($2 <> '' AND COALESCE(n.data->>'sourceKey', n.data->>'source_key', '') = $2)
           OR ($3 > 0 AND n.customer_id = $3)
@@ -414,7 +414,8 @@ function resolveNotificationDeepLink({ shopDomain, item }) {
   const deepLinkType = safeTrim(rawData.deepLinkType || rawData.deeplinkType || rawData.linkType);
   const isOrderLike = ["order_event", "order_manual", "refund_event"].includes(type) || deepLinkType === "order";
   const isCartLike = type === "abandoned_cart" || deepLinkType === "cart";
-  const isStoreCreditLike = type === "store_credit_reward" || deepLinkType === "store_credit";
+  const isStoreCreditLike =
+    ["store_credit_reward", "store_credit_refund"].includes(type) || deepLinkType === "store_credit";
   const existing = safeTrim(item?.deep_link);
 
   if (isCartLike) {
@@ -2037,6 +2038,8 @@ router.get("/open-store-credit", requireValidProxy, async (req, res, next) => {
     const shopDomain = resolveShopDomain(req);
     const shopifyCustomerId = resolveCustomerId(req);
     const sourceKey = req.query.source || req.query.source_key || req.query.sourceKey || "";
+    const target = safeTrim(req.query.target || req.query.view).toLowerCase();
+    const openNotifications = ["notifications", "notification_center", "notification-centre"].includes(target);
 
     await markOpenedByStoreCreditContext({
       shopDomain,
@@ -2044,23 +2047,27 @@ router.get("/open-store-credit", requireValidProxy, async (req, res, next) => {
       shopifyCustomerId
     });
 
-    const targetUrl = toAbsoluteStorefrontUrl(shopDomain, "/account?open=store-credit");
+    const targetPath = openNotifications
+      ? appendQueryParams("/apps/notificaciones", { cid: shopifyCustomerId })
+      : "/account?open=store-credit";
+    const targetUrl = toAbsoluteStorefrontUrl(shopDomain, targetPath);
     const safeTarget = escapeHtml(targetUrl);
 
     if (!targetUrl || !isAbsoluteUrl(targetUrl)) {
       return res.status(400).send("Invalid store credit target");
     }
+    const pageTitle = openNotifications ? "Abriendo notificaciones..." : "Abriendo credito en tienda...";
 
     return res.status(200).send(`<!doctype html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Abriendo credito en tienda...</title>
+    <title>${pageTitle}</title>
     <meta http-equiv="refresh" content="0;url=${safeTarget}" />
   </head>
   <body>
-    <p>Abriendo credito en tienda...</p>
+    <p>${pageTitle}</p>
     <p><a href="${safeTarget}">Continuar</a></p>
     <script>
       window.location.replace(${JSON.stringify(targetUrl)});

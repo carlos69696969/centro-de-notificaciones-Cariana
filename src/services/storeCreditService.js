@@ -106,10 +106,11 @@ function buildStoreCreditCopy({ amount, currencyCode, notificationType, title, m
   };
 }
 
-function notificationDeepLink(shopDomain, sourceKey) {
+function notificationDeepLink(shopDomain, sourceKey, options = {}) {
   return buildStoreCreditDeepLink({
     shopDomain,
-    sourceKey
+    sourceKey,
+    target: options.target
   });
 }
 
@@ -220,6 +221,10 @@ async function sendStoreCreditNotificationJob(job) {
   const customer = await resolveJobCustomer(job);
   const deepLink = notificationDeepLink(job.shop_domain, job.source_key);
   const notificationType = normalizeNotificationType("", job.source_key);
+  const pushDeepLink =
+    notificationType === STORE_CREDIT_REFUND_TYPE
+      ? notificationDeepLink(job.shop_domain, job.source_key, { target: "notifications" })
+      : "";
   const data = {
     notificationType,
     deepLinkType: "store_credit",
@@ -238,6 +243,7 @@ async function sendStoreCreditNotificationJob(job) {
       title: job.title,
       message: job.message,
       deepLink,
+      pushDeepLink,
       data
     });
   }
@@ -250,6 +256,7 @@ async function sendStoreCreditNotificationJob(job) {
       title: job.title,
       message: job.message,
       deepLink,
+      pushDeepLink,
       data
     });
   }
