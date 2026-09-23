@@ -50,7 +50,7 @@ function buildStoreCreditMessage(amount, currencyCode = "MXN") {
 function buildStoreCreditRefundMessage(amount, currencyCode = "MXN") {
   return [
     "Debido al reembolso realizado en tu pedido, también se realizó un ajuste en tu saldo de crédito Cariana.",
-    `Al realizar tu compra recibiste ${formatCreditAmount(amount, currencyCode)} en crédito como beneficio por esa compra. Debido a que el importe correspondiente fue posteriormente reembolsado, ese crédito generado dejó de ser aplicable y fue ajustado automáticamente de tu saldo.`,
+    `Al realizar tu compra recibiste ${formatCreditAmount(amount, currencyCode)} en crédito Cariana como beneficio por esa compra. Al realizar el reembolso, ese beneficio también debe ser cancelado y fue ajustado automáticamente de tu saldo.`,
     "Este ajuste no afecta ningún crédito obtenido en otras compras ni representa un cargo adicional. Únicamente corresponde al beneficio que se había generado por la compra reembolsada.",
     "Tu saldo restante continúa disponible para utilizarlo en futuras compras. ✨",
     "Gracias por tu comprensión. Atte. Cariana"
