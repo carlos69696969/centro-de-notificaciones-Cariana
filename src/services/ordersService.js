@@ -1651,6 +1651,15 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
     return { skipped: true, reason: "Refund notification sent manually" };
   }
 
+  const refundFromReturnsPortal = isReturnPortalRefund(payload);
+  if (refundFromReturnsPortal) {
+    await pool.query(
+      `UPDATE notification_events SET status = 'skipped', error_message = 'Return portal refund notification handled by returns event', processed_at = NOW() WHERE id = $1`,
+      [eventId]
+    );
+    return { skipped: true, reason: "Return portal refund notification handled by returns event" };
+  }
+
   const mapResult = await pool.query(
     `
     SELECT shopify_customer_id, order_number
@@ -1703,7 +1712,6 @@ async function processRefundWebhook({ shopDomain, payload, webhookId }) {
   ])
     .toLowerCase()
     .trim();
-  const refundFromReturnsPortal = isReturnPortalRefund(payload);
   const notificationType = refundFromReturnsPortal ? "return_event" : "refund_event";
   const deepLink = refundFromReturnsPortal
     ? buildReturnDeepLink({
