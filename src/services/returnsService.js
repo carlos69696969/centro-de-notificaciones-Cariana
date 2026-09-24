@@ -433,9 +433,6 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
   if (templateCode === "return_picked_up") {
     return "Producto recibido. Hemos recibido tu devoluci\u00F3n y nuestro equipo ya se encuentra revisando tu producto. Una vez finalizado el proceso de verificaci\u00F3n, realizaremos tu reembolso correspondiente. \uD83D\uDCB0 Regresa mas tarde para ver el estado de tu devolucion.";
   }
-  if (templateCode === "refund_processed") {
-    return "Tu reembolso ya fue procesado correctamente. Dependiendo de tu banco, puede reflejarse en un plazo de 5 a 10 dias habiles.";
-  }
   const fromPayload = pickFirstString([
       payload.portal_status_message,
       payload.portalStatusMessage,
@@ -450,6 +447,9 @@ function buildPortalCurrentStatusText(templateCode, payload, fallbackMessage) {
     ]);
   if (fromPayload) {
     return fromPayload;
+  }
+  if (templateCode === "refund_processed") {
+    return "Tu reembolso ya fue procesado correctamente. Dependiendo de tu banco, puede reflejarse en un plazo de 5 a 10 dias habiles.";
   }
   const byStatus = {
     return_requested:
@@ -494,6 +494,32 @@ function buildReturnPremiumTemplate({
     ? "Devolucion entregada"
     : buildReturnStatusTitle(templateCode);
   const portalCurrentText = buildPortalCurrentStatusText(templateCode, payload, fallbackMessage);
+
+  if (templateCode === "refund_processed" || templateCode === "refund_completed") {
+    const explicitTitle = pickFirstString([
+      payload.title,
+      payload.notification_title,
+      payload.notificationTitle
+    ]);
+    const explicitMessage = pickFirstString([
+      payload.message,
+      payload.portal_status_message,
+      payload.portalStatusMessage,
+      payload.current_status_message,
+      payload.currentStatusMessage,
+      payload.note
+    ]);
+    if (explicitTitle || explicitMessage) {
+      return {
+        title: explicitTitle || statusTitle,
+        message: explicitMessage || portalCurrentText,
+        productNames: mergedProductNames,
+        productsInline,
+        rejectionReason,
+        statusLabel
+      };
+    }
+  }
 
   if (templateCode === "return_pickup_in_transit") {
     return {
@@ -813,7 +839,15 @@ async function processReturnEvent({ shopDomain, payload }) {
     return { skipped: true, reason: "Unknown status", eventId };
   }
 
-  if (templateCode === "refund_completed") {
+  const explicitRefundCompletedMessage = pickFirstString([
+    payload.message,
+    payload.portal_status_message,
+    payload.portalStatusMessage,
+    payload.current_status_message,
+    payload.currentStatusMessage,
+    payload.note
+  ]);
+  if (templateCode === "refund_completed" && !explicitRefundCompletedMessage) {
     return { skipped: true, reason: "Refund completed notifications are disabled", eventId };
   }
 
